@@ -143,12 +143,29 @@ it is, re-run the workflow from the Actions tab; the site is then published at
 
 To preview the demo locally: `npm run dev`, then open `/demo`.
 
-### Running the real application
+### Vercel (full application)
 
-The full app needs a Node host — Vercel, Railway, Fly.io, or your own server. This is the
-only way `POST /api/webhooks/jira` gets a public URL that Jira can call, which the
-approval workflow depends on. Set the environment variables from `.env.example`, run
-`npm run build && npm run start`, and register the webhook URL in Jira.
+The complete app — API routes included — needs a Node host. Vercel imports it with no
+configuration: Next.js is detected automatically and no environment variables are
+required for a first look, because Jira falls back to its mock.
+
+<https://vercel.com/new/clone?repository-url=https://github.com/akmalardhiaa/User-mansgement>
+
+This is also the only deployment where `POST /api/webhooks/jira` gets a public URL that
+Jira can actually call. To connect a real site, add the variables from `.env.example` in
+**Project → Settings → Environment Variables**, then register
+`https://<your-deployment>/api/webhooks/jira?secret=…` in Jira.
+
+**Storage caveat.** Serverless platforms mount the deployment read-only, so the JSON
+store falls back to `/tmp` (see `getDataFilePath()`). That path is per-instance and is
+wiped on cold starts, which is fine for a demo but means data is neither durable nor
+shared between instances. For anything real, point `HC_DATA_FILE` at a mounted volume or
+replace `src/lib/db` with a database.
+
+### Any other Node host
+
+Railway, Render, Fly.io, or your own server all work the same way: set the environment
+variables from `.env.example`, then `npm run build && npm run start`.
 
 ## Project structure
 
