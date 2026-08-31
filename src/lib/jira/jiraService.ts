@@ -86,8 +86,7 @@ function transferDetails(target: TransferTarget): Array<[string, string]> {
 
 function employeeDetails(employee: Employee): Array<[string, string]> {
   return [
-    ["Nama lengkap", employee.fullName],
-    ["Display name", employee.displayName],
+    ["Nama lengkap", employee.displayName],
     ["Email", employee.email],
     ["Jabatan saat ini", employee.jobTitle],
     ["Divisi saat ini", employee.department],
@@ -98,7 +97,7 @@ function employeeDetails(employee: Employee): Array<[string, string]> {
 /** Wording that differs between adding and removing an account. */
 const COPY = {
   ONBOARDING: {
-    approvalSummary: (e: Employee) => `[Persetujuan] Akun baru untuk ${e.fullName} (${e.jobTitle})`,
+    approvalSummary: (e: Employee) => `[Persetujuan] Akun baru untuk ${e.displayName} (${e.jobTitle})`,
     approvalHeading: "Butuh persetujuan manager",
     approvalIntro: "Human Capital mengajukan pembuatan akun baru untuk ",
     approvalOutcome:
@@ -106,20 +105,20 @@ const COPY = {
     approvalLabels: ["hc-onboarding", "manager-approval"],
     detailsHeading: "Data karyawan baru",
 
-    fulfilSummary: (e: Employee) => `[Penyiapan] Siapkan akun dan akses untuk ${e.fullName}`,
+    fulfilSummary: (e: Employee) => `[Penyiapan] Siapkan akun dan akses untuk ${e.displayName}`,
     fulfilHeading: "Permintaan penyiapan akun",
     fulfilIntro: "Mohon siapkan akun dan akses dasar untuk karyawan berikut.",
     fulfilChecklist:
       "Akun direktori, mailbox email, pendaftaran SSO, profil VPN, dan role aplikasi dasar sesuai departemen.",
     fulfilOutcome: (e: Employee) => [
       " jika penyiapan sudah selesai — dashboard HC otomatis mengubah status ",
-      e.fullName,
+      e.displayName,
       " menjadi Aktif.",
     ] as const,
     fulfilLabels: ["hc-onboarding", "security-provisioning"],
   },
   TRANSFER: {
-    approvalSummary: (e: Employee) => `[Persetujuan] Pindah divisi ${e.fullName} (${e.jobTitle})`,
+    approvalSummary: (e: Employee) => `[Persetujuan] Pindah divisi ${e.displayName} (${e.jobTitle})`,
     approvalHeading: "Butuh persetujuan manager — pindah divisi",
     approvalIntro: "Human Capital mengajukan pemindahan divisi untuk ",
     approvalOutcome:
@@ -127,7 +126,7 @@ const COPY = {
     approvalLabels: ["hc-transfer", "manager-approval"],
     detailsHeading: "Data karyawan",
 
-    fulfilSummary: (e: Employee) => `[Penyesuaian akses] Pindah divisi ${e.fullName}`,
+    fulfilSummary: (e: Employee) => `[Penyesuaian akses] Pindah divisi ${e.displayName}`,
     fulfilHeading: "Permintaan penyesuaian akses",
     fulfilIntro: "Mohon sesuaikan akun dan akses karyawan berikut dengan divisi barunya.",
     fulfilChecklist:
@@ -175,7 +174,7 @@ export async function createApprovalIssue(
       heading(2, copy.approvalHeading),
       paragraph(
         text(copy.approvalIntro),
-        strong(employee.fullName),
+        strong(employee.displayName),
         text(". Mohon periksa detail di bawah lalu setujui atau tolak pengajuan ini."),
       ),
       heading(3, copy.detailsHeading),

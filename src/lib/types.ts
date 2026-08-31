@@ -37,10 +37,8 @@ export interface Employee {
   firstName: string;
   /** Surname — Active Directory `sn`. */
   lastName: string;
-  /** How the person is shown in lists and directories — AD `displayName`. */
+  /** The person's full name, as shown everywhere — AD `displayName`. */
   displayName: string;
-  /** Formal full name used on tickets and records — AD `cn`. */
-  fullName: string;
   email: string;
   jobTitle: string;
   department: string;
@@ -136,7 +134,6 @@ export interface NewUserInput {
   firstName: string;
   lastName: string;
   displayName: string;
-  fullName: string;
   email: string;
   jobTitle: string;
   department: string;

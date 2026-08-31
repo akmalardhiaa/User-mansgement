@@ -102,7 +102,6 @@ export async function createOnboarding(
       firstName: input.firstName,
       lastName: input.lastName,
       displayName: input.displayName,
-      fullName: input.fullName,
       email: input.email,
       jobTitle: input.jobTitle,
       department: input.department,
@@ -122,7 +121,7 @@ export async function createOnboarding(
       type: "ONBOARDING",
       stage: "MANAGER_APPROVAL",
       events: [
-        makeEvent("request.created", `HC mengajukan pembuatan akun untuk ${input.fullName}.`, {
+        makeEvent("request.created", `HC mengajukan pembuatan akun untuk ${input.displayName}.`, {
           actor: "HC Portal",
         }),
       ],

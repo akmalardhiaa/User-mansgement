@@ -124,7 +124,7 @@ export class DemoStore implements DashboardDataSource {
       managerIssue,
       processedSignals: [],
       events: [
-        event("request.created", `HC submitted an onboarding request for ${value.fullName}.`, "HC Portal"),
+        event("request.created", `HC submitted an onboarding request for ${value.displayName}.`, "HC Portal"),
         event(
           "manager.requested",
           `Approval ticket ${managerIssue.key} raised for ${value.managerName}.`,

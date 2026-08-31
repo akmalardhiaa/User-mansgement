@@ -16,8 +16,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const REQUIRED_FIELDS = [
   ["firstName", "Nama depan", 1, 80],
   ["lastName", "Nama belakang", 1, 80],
-  ["displayName", "Display name", 2, 160],
-  ["fullName", "Nama lengkap", 2, 160],
+  ["displayName", "Nama lengkap", 2, 160],
   ["email", "Email", 5, 200],
   ["jobTitle", "Jabatan", 2, 120],
   ["department", "Departemen", 2, 120],
@@ -67,7 +66,6 @@ export function parseNewUserInput(payload: unknown): ValidationResult {
       firstName: draft.firstName,
       lastName: draft.lastName,
       displayName: draft.displayName,
-      fullName: draft.fullName,
       email: draft.email.toLowerCase(),
       jobTitle: draft.jobTitle,
       department: draft.department,
