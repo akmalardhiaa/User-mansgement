@@ -2,13 +2,13 @@ import Link from "next/link";
 
 import { CreateUserForm } from "@/components/users/CreateUserForm";
 
-export const metadata = { title: "Add user · HC User Management" };
+export const metadata = { title: "Tambah akun · HC User Management" };
 
 const WORKFLOW = [
-  ["1", "HC submits", "The joiner is saved as Awaiting manager — no account is created."],
-  ["2", "Manager approves", "A Jira ticket is assigned to the reporting manager."],
-  ["3", "IT Security provisions", "Approval automatically raises a provisioning ticket."],
-  ["4", "Account activates", "Closing the provisioning ticket flips the status to Active."],
+  ["1", "HC mengajukan", "Karyawan tercatat sebagai Menunggu manager — akun belum dibuat."],
+  ["2", "Manager menyetujui", "Tiket Jira di-assign ke manager yang bersangkutan."],
+  ["3", "IT Security menyiapkan", "Persetujuan otomatis membuat tiket penyiapan akses."],
+  ["4", "Akun aktif", "Menutup tiket penyiapan mengubah status menjadi Aktif."],
 ] as const;
 
 export default function NewUserPage() {
@@ -16,12 +16,12 @@ export default function NewUserPage() {
     <div className="space-y-6">
       <div>
         <Link href="/" className="text-sm text-ink-muted hover:text-ink">
-          ← Back to directory
+          ← Kembali ke direktori
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Add a new user</h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Tambah akun baru</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          The request goes through manager approval and IT Security provisioning before the account
-          becomes active.
+          Pengajuan melewati persetujuan manager dan penyiapan akses IT Security sebelum akun
+          menjadi aktif.
         </p>
       </div>
 
@@ -29,7 +29,7 @@ export default function NewUserPage() {
         <CreateUserForm />
 
         <aside className="rounded-2xl border border-hairline bg-surface/60 p-5">
-          <h2 className="text-xs tracking-wide text-ink-faint uppercase">What happens next</h2>
+          <h2 className="text-xs tracking-wide text-ink-faint uppercase">Tahapan selanjutnya</h2>
           <ol className="mt-4 space-y-4">
             {WORKFLOW.map(([step, title, detail]) => (
               <li key={step} className="flex gap-3">

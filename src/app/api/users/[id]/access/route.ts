@@ -12,7 +12,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const body = (await readJson(request)) as { enabled?: unknown } | undefined;
 
   if (typeof body?.enabled !== "boolean") {
-    return fail("Body must include a boolean `enabled` field.", 422);
+    return fail("Body harus memuat field `enabled` bertipe boolean.", 422);
   }
 
   try {

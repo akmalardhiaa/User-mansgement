@@ -31,14 +31,14 @@ async function resolveAssignee(params: {
 }): Promise<AssigneeResolution> {
   if (params.accountId) return { accountId: params.accountId };
   if (!params.email) {
-    return { problem: `No ${params.role} email was provided, so the ticket is unassigned.` };
+    return { problem: `Email ${params.role} tidak diisi, jadi tiket tidak ter-assign.` };
   }
 
   try {
     const user = await getJiraClient().findUserByEmail(params.email);
     if (!user) {
       return {
-        problem: `No Jira account matches ${params.email}, so the ticket is unassigned and Jira will not email the ${params.role}.`,
+        problem: `Tidak ada akun Jira yang cocok dengan ${params.email}, jadi tiket tidak ter-assign dan Jira tidak mengirim email ke ${params.role}.`,
       };
     }
     return { accountId: user.accountId, displayName: user.displayName };
@@ -46,7 +46,7 @@ async function resolveAssignee(params: {
     // A failed lookup must not block the request: an unassigned ticket that
     // exists is far better than no ticket at all.
     return {
-      problem: `Could not look up ${params.email} in Jira (${(error as Error).message}); the ticket is unassigned.`,
+      problem: `Gagal mencari ${params.email} di Jira (${(error as Error).message}); tiket tidak ter-assign.`,
     };
   }
 }
@@ -66,60 +66,60 @@ function appBaseUrl(): string | undefined {
 
 function requestLink(request: AccessRequest) {
   const base = appBaseUrl();
-  return base ? link("Open the request in the HC dashboard", `${base}/requests`) : text(request.id);
+  return base ? link("Buka pengajuan di dashboard HC", `${base}/requests`) : text(request.id);
 }
 
 function employeeDetails(employee: Employee): Array<[string, string]> {
   return [
-    ["Full name", employee.name],
-    ["Work email", employee.email],
-    ["Job title", employee.jobTitle],
-    ["Department", employee.department],
-    ["Reporting manager", `${employee.managerName} (${employee.managerEmail})`],
+    ["Nama lengkap", employee.name],
+    ["Email kantor", employee.email],
+    ["Jabatan", employee.jobTitle],
+    ["Departemen", employee.department],
+    ["Manager", `${employee.managerName} (${employee.managerEmail})`],
   ];
 }
 
 /** Wording that differs between adding and removing an account. */
 const COPY = {
   ONBOARDING: {
-    approvalSummary: (e: Employee) => `[Approval] New user access for ${e.name} (${e.jobTitle})`,
-    approvalHeading: "Manager approval required",
-    approvalIntro: "Human Capital has requested a new user account for ",
+    approvalSummary: (e: Employee) => `[Persetujuan] Akun baru untuk ${e.name} (${e.jobTitle})`,
+    approvalHeading: "Butuh persetujuan manager",
+    approvalIntro: "Human Capital mengajukan pembuatan akun baru untuk ",
     approvalOutcome:
-      " On approval the HC system automatically raises a provisioning ticket for IT Security.",
+      " Setelah disetujui, sistem HC otomatis membuat tiket penyiapan akses untuk IT Security.",
     approvalLabels: ["hc-onboarding", "manager-approval"],
-    detailsHeading: "New joiner details",
+    detailsHeading: "Data karyawan baru",
 
-    fulfilSummary: (e: Employee) => `[Provisioning] Set up accounts and access for ${e.name}`,
-    fulfilHeading: "Account provisioning request",
-    fulfilIntro: "Please provision accounts and baseline access for the person below.",
+    fulfilSummary: (e: Employee) => `[Penyiapan] Siapkan akun dan akses untuk ${e.name}`,
+    fulfilHeading: "Permintaan penyiapan akun",
+    fulfilIntro: "Mohon siapkan akun dan akses dasar untuk karyawan berikut.",
     fulfilChecklist:
-      "Directory account, email mailbox, SSO enrolment, VPN profile, and the department's baseline application roles.",
+      "Akun direktori, mailbox email, pendaftaran SSO, profil VPN, dan role aplikasi dasar sesuai departemen.",
     fulfilOutcome: (e: Employee) => [
-      " when provisioning is finished — the HC dashboard then flips ",
+      " jika penyiapan sudah selesai — dashboard HC otomatis mengubah status ",
       e.name,
-      " to Active automatically.",
+      " menjadi Aktif.",
     ] as const,
     fulfilLabels: ["hc-onboarding", "security-provisioning"],
   },
   OFFBOARDING: {
-    approvalSummary: (e: Employee) => `[Approval] Remove user access for ${e.name} (${e.jobTitle})`,
-    approvalHeading: "Manager approval required — access removal",
-    approvalIntro: "Human Capital has requested that all access be revoked for ",
+    approvalSummary: (e: Employee) => `[Persetujuan] Penghapusan akun ${e.name} (${e.jobTitle})`,
+    approvalHeading: "Butuh persetujuan manager — pencabutan akses",
+    approvalIntro: "Human Capital mengajukan pencabutan seluruh akses untuk ",
     approvalOutcome:
-      " On approval the HC system automatically raises a deprovisioning ticket for IT Security.",
+      " Setelah disetujui, sistem HC otomatis membuat tiket pencabutan akses untuk IT Security.",
     approvalLabels: ["hc-offboarding", "manager-approval"],
-    detailsHeading: "Employee details",
+    detailsHeading: "Data karyawan",
 
-    fulfilSummary: (e: Employee) => `[Deprovisioning] Revoke accounts and access for ${e.name}`,
-    fulfilHeading: "Account deprovisioning request",
-    fulfilIntro: "Please revoke all accounts and access for the person below.",
+    fulfilSummary: (e: Employee) => `[Pencabutan] Cabut akun dan akses ${e.name}`,
+    fulfilHeading: "Permintaan pencabutan akun",
+    fulfilIntro: "Mohon cabut seluruh akun dan akses karyawan berikut.",
     fulfilChecklist:
-      "Disable the directory account, revoke SSO and VPN, remove application roles, transfer or archive the mailbox, and collect any issued credentials.",
+      "Nonaktifkan akun direktori, cabut SSO dan VPN, hapus role aplikasi, pindahkan atau arsipkan mailbox, dan tarik kredensial yang pernah diberikan.",
     fulfilOutcome: (e: Employee) => [
-      " when deprovisioning is finished — the HC dashboard then marks ",
+      " jika pencabutan sudah selesai — dashboard HC otomatis menandai ",
       e.name,
-      " as Removed automatically.",
+      " sebagai Dihapus.",
     ] as const,
     fulfilLabels: ["hc-offboarding", "security-deprovisioning"],
   },
@@ -146,7 +146,7 @@ export async function createApprovalIssue(
   });
 
   const details = employeeDetails(employee);
-  if (request.reason) details.push(["Reason given by HC", request.reason]);
+  if (request.reason) details.push(["Alasan dari HC", request.reason]);
 
   const issue = await client.createIssue({
     issueType: config.managerIssueType,
@@ -158,18 +158,18 @@ export async function createApprovalIssue(
       paragraph(
         text(copy.approvalIntro),
         strong(employee.name),
-        text(". Please review the details below and approve or reject this request."),
+        text(". Mohon periksa detail di bawah lalu setujui atau tolak pengajuan ini."),
       ),
       heading(3, copy.detailsHeading),
       detailList(details),
       rule(),
-      heading(3, "How to respond"),
+      heading(3, "Cara merespons"),
       paragraph(
-        text("Transition this ticket to "),
+        text("Pindahkan status tiket ini ke "),
         strong(approved),
-        text(" to approve, or "),
+        text(" untuk menyetujui, atau "),
         strong(rejected),
-        text(" to reject."),
+        text(" untuk menolak."),
         text(copy.approvalOutcome),
       ),
       paragraph(requestLink(request)),
@@ -209,8 +209,8 @@ export async function createFulfilmentIssue(
   });
 
   const details = employeeDetails(employee);
-  details.push(["Manager approval ticket", request.managerIssue?.key ?? "n/a"]);
-  if (request.reason) details.push(["Reason given by HC", request.reason]);
+  details.push(["Tiket persetujuan manager", request.managerIssue?.key ?? "n/a"]);
+  if (request.reason) details.push(["Alasan dari HC", request.reason]);
 
   const issue = await client.createIssue({
     issueType: config.securityIssueType,
@@ -220,8 +220,8 @@ export async function createFulfilmentIssue(
     description: doc(
       heading(2, copy.fulfilHeading),
       paragraph(
-        text("Manager approval is complete"),
-        approvedBy ? text(` (approved by ${approvedBy})`) : text(""),
+        text("Persetujuan manager sudah selesai"),
+        approvedBy ? text(` (disetujui oleh ${approvedBy})`) : text(""),
         text(". "),
         text(copy.fulfilIntro),
       ),
@@ -231,7 +231,7 @@ export async function createFulfilmentIssue(
       paragraph(text(copy.fulfilChecklist)),
       rule(),
       paragraph(
-        text("Transition this ticket to "),
+        text("Pindahkan status tiket ini ke "),
         strong(done),
         text(before),
         strong(name),

@@ -14,24 +14,24 @@ interface Step {
 /** Wording for each step, which differs between adding and removing an account. */
 const STEP_COPY = {
   ONBOARDING: {
-    submitted: "HC captured the new joiner's details.",
-    securityTitle: "IT Security provisioning",
-    securityDone: "Accounts and access were provisioned.",
-    securityWaiting: "Waiting for IT Security to close the provisioning ticket.",
-    securityPending: "Raised automatically once the manager approves.",
-    finalTitle: "Account active",
-    finalDone: "The employee is active in the HC dashboard.",
-    finalPending: "Set automatically when the provisioning ticket closes.",
+    submitted: "HC mencatat data karyawan baru.",
+    securityTitle: "Penyiapan akses IT Security",
+    securityDone: "Akun dan akses sudah disiapkan.",
+    securityWaiting: "Menunggu IT Security menutup tiket penyiapan akses.",
+    securityPending: "Dibuat otomatis setelah manager menyetujui.",
+    finalTitle: "Akun aktif",
+    finalDone: "Karyawan sudah aktif di dashboard HC.",
+    finalPending: "Diubah otomatis saat tiket penyiapan ditutup.",
   },
   OFFBOARDING: {
-    submitted: "HC asked for this employee's access to be revoked.",
-    securityTitle: "IT Security deprovisioning",
-    securityDone: "Accounts and access were revoked.",
-    securityWaiting: "Waiting for IT Security to close the deprovisioning ticket.",
-    securityPending: "Raised automatically once the manager approves.",
-    finalTitle: "Access removed",
-    finalDone: "The employee is marked Removed in the HC dashboard.",
-    finalPending: "Set automatically when the deprovisioning ticket closes.",
+    submitted: "HC mengajukan pencabutan akses karyawan ini.",
+    securityTitle: "Pencabutan akses IT Security",
+    securityDone: "Akun dan akses sudah dicabut.",
+    securityWaiting: "Menunggu IT Security menutup tiket pencabutan akses.",
+    securityPending: "Dibuat otomatis setelah manager menyetujui.",
+    finalTitle: "Akses dicabut",
+    finalDone: "Karyawan ditandai Dihapus di dashboard HC.",
+    finalPending: "Diubah otomatis saat tiket pencabutan ditutup.",
   },
 } as const;
 
@@ -44,19 +44,19 @@ function buildSteps(request: AccessRequest): Step[] {
 
   return [
     {
-      title: "Request submitted",
+      title: "Pengajuan dikirim",
       detail: copy.submitted,
       state: "done",
     },
     {
-      title: "Manager approval",
+      title: "Persetujuan manager",
       detail: rejected
         ? request.type === "OFFBOARDING"
-          ? "The manager rejected the removal; the employee keeps their access."
-          : "The manager rejected this request."
+          ? "Manager menolak penghapusan; akses karyawan tetap berlaku."
+          : "Manager menolak pengajuan ini."
         : pastManager
-          ? "Approved by the reporting manager."
-          : "Waiting for the manager to transition the ticket in Jira.",
+          ? "Disetujui oleh manager."
+          : "Menunggu manager memindahkan status tiket di Jira.",
       state: rejected ? "failed" : pastManager ? "done" : "current",
       issue: request.managerIssue,
     },
@@ -125,12 +125,12 @@ export function RequestCard({ request, employee }: RequestCardProps) {
     <Card className="overflow-hidden">
       <header className="flex flex-wrap items-center gap-3 border-b border-hairline p-5">
         <div className="min-w-0">
-          <h2 className="truncate text-base font-semibold">{employee?.name ?? "Unknown employee"}</h2>
+          <h2 className="truncate text-base font-semibold">{employee?.name ?? "Karyawan tidak dikenal"}</h2>
           <p className="truncate text-xs text-ink-faint">
             {employee ? `${employee.jobTitle} · ${employee.department}` : request.employeeId}
           </p>
           {request.reason ? (
-            <p className="mt-1 truncate text-xs text-ink-muted">Reason: {request.reason}</p>
+            <p className="mt-1 truncate text-xs text-ink-muted">Alasan: {request.reason}</p>
           ) : null}
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -141,7 +141,7 @@ export function RequestCard({ request, employee }: RequestCardProps) {
                 : "border-accent/30 bg-accent/10 text-accent-soft"
             }`}
           >
-            {request.type === "OFFBOARDING" ? "Remove account" : "New account"}
+            {request.type === "OFFBOARDING" ? "Hapus akun" : "Akun baru"}
           </span>
           <StageBadge stage={request.stage} type={request.type} />
           {employee ? <StatusBadge status={employee.status} /> : null}
@@ -172,13 +172,13 @@ export function RequestCard({ request, employee }: RequestCardProps) {
         </ol>
 
         <div className="rounded-xl border border-hairline bg-canvas/40 p-4">
-          <h3 className="text-xs tracking-wide text-ink-faint uppercase">Activity</h3>
+          <h3 className="text-xs tracking-wide text-ink-faint uppercase">Aktivitas</h3>
           <ul className="mt-3 space-y-3">
             {[...request.events].reverse().map((event, index) => (
               <li key={`${event.at}-${index}`} className="text-xs">
                 <p className="text-ink-muted">{event.message}</p>
                 <p className="mt-0.5 text-ink-faint">
-                  <time dateTime={event.at}>{new Date(event.at).toLocaleString("en-GB")}</time>
+                  <time dateTime={event.at}>{new Date(event.at).toLocaleString("id-ID")}</time>
                   {event.actor ? ` · ${event.actor}` : ""}
                 </p>
               </li>

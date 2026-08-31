@@ -14,12 +14,12 @@ export type ValidationResult =
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const REQUIRED_FIELDS = [
-  ["name", "Full name", 2, 120],
-  ["email", "Work email", 5, 200],
-  ["jobTitle", "Job title", 2, 120],
-  ["department", "Department", 2, 120],
-  ["managerName", "Manager name", 2, 120],
-  ["managerEmail", "Manager email", 5, 200],
+  ["name", "Nama lengkap", 2, 120],
+  ["email", "Email kantor", 5, 200],
+  ["jobTitle", "Jabatan", 2, 120],
+  ["department", "Departemen", 2, 120],
+  ["managerName", "Nama manager", 2, 120],
+  ["managerEmail", "Email manager", 5, 200],
 ] as const;
 
 function asString(value: unknown): string {
@@ -34,23 +34,23 @@ export function parseNewUserInput(payload: unknown): ValidationResult {
   for (const [field, label, min, max] of REQUIRED_FIELDS) {
     const value = asString(body[field]);
     if (!value) {
-      errors[field] = `${label} is required.`;
+      errors[field] = `${label} wajib diisi.`;
     } else if (value.length < min) {
-      errors[field] = `${label} must be at least ${min} characters.`;
+      errors[field] = `${label} minimal ${min} karakter.`;
     } else if (value.length > max) {
-      errors[field] = `${label} must be at most ${max} characters.`;
+      errors[field] = `${label} maksimal ${max} karakter.`;
     }
     draft[field] = value;
   }
 
   if (!errors.email && !EMAIL_PATTERN.test(draft.email)) {
-    errors.email = "Enter a valid work email address.";
+    errors.email = "Masukkan alamat email kantor yang valid.";
   }
 
   // The manager's email is how the approval ticket gets assigned, which is what
   // makes Jira notify them — so it is required, not optional.
   if (!errors.managerEmail && !EMAIL_PATTERN.test(draft.managerEmail)) {
-    errors.managerEmail = "Enter a valid email address for the manager.";
+    errors.managerEmail = "Masukkan alamat email manager yang valid.";
   }
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };

@@ -6,8 +6,8 @@ import type { ReactNode } from "react";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
-  { href: "/requests", label: "Approvals" },
-  { href: "/users/new", label: "Add user" },
+  { href: "/requests", label: "Persetujuan" },
+  { href: "/users/new", label: "Tambah akun" },
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
@@ -56,12 +56,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             {IS_STATIC_DEMO ? (
               <>
                 <span className="size-1.5 rounded-full bg-warn" aria-hidden />
-                Static demo · Jira not connected
+                Demo statis · Jira tidak terhubung
               </>
             ) : (
               <>
                 <span className="size-1.5 rounded-full bg-ok" aria-hidden />
-                Jira workflow connected
+                Alur Jira terhubung
               </>
             )}
           </div>
@@ -71,7 +71,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8">{children}</main>
 
       <footer className="border-t border-hairline px-5 py-5 text-center text-xs text-ink-faint">
-        Human Capital · account requests are provisioned through Jira approvals
+        Human Capital · pengajuan akun diproses melalui persetujuan di Jira
       </footer>
     </div>
   );

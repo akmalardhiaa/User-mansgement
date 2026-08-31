@@ -108,7 +108,7 @@ export async function submitOnboardingRequest(
     stored.events.push(
       makeEvent(
         "manager.requested",
-        `Approval ticket ${issue.key} raised for ${employee.managerName}.`,
+        `Tiket persetujuan ${issue.key} dibuat untuk ${employee.managerName}.`,
         { actor: "HC Portal", issueKey: issue.key },
       ),
       notificationEvent(issue.key, assignee, employee.managerEmail),
@@ -154,7 +154,7 @@ export async function submitOffboardingRequest(
     stored.events.push(
       makeEvent(
         "manager.requested",
-        `Removal approval ticket ${issue.key} raised for ${employee.managerName}.`,
+        `Tiket persetujuan penghapusan ${issue.key} dibuat untuk ${employee.managerName}.`,
         { actor: "HC Portal", issueKey: issue.key },
       ),
       notificationEvent(issue.key, assignee, employee.managerEmail),
@@ -191,7 +191,7 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
         result: {
           outcome: "unknown_issue",
           issueKey,
-          message: `No onboarding request is tracking ${issueKey}.`,
+          message: `Tidak ada pengajuan yang memantau ${issueKey}.`,
         },
       };
     }
@@ -202,7 +202,7 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
     });
 
     if (request.processedSignals.includes(signal)) {
-      return result("duplicate", `${issueKey} → "${input.statusName}" was already processed.`);
+      return result("duplicate", `${issueKey} → "${input.statusName}" sudah pernah diproses.`);
     }
 
     const employee = draft.employees.find((candidate) => candidate.id === request.employeeId);
@@ -220,7 +220,7 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
 
       if (decision === "PENDING") {
         request.updatedAt = now;
-        return result("ignored", `"${input.statusName}" is not an approval or rejection status.`);
+        return result("ignored", `"${input.statusName}" bukan status persetujuan maupun penolakan.`);
       }
 
       request.processedSignals.push(signal);
@@ -235,7 +235,7 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
           request.type === "OFFBOARDING" ? (request.previousStatus ?? "ACTIVE") : "REJECTED";
         employee.activeRequestId = undefined;
         request.events.push(
-          makeEvent("manager.rejected", `${actor} rejected the request on ${issueKey}.`, {
+          makeEvent("manager.rejected", `${actor} menolak pengajuan di ${issueKey}.`, {
             actor,
             issueKey,
           }),
@@ -243,8 +243,8 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
         return result(
           "rejected",
           request.type === "OFFBOARDING"
-            ? `Removal rejected by ${actor}; ${employee.name} keeps their access.`
-            : `Request rejected by ${actor}.`,
+            ? `Penghapusan ditolak oleh ${actor}; akses ${employee.name} tetap berlaku.`
+            : `Pengajuan ditolak oleh ${actor}.`,
         );
       }
 
@@ -253,7 +253,7 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
       request.stage = "SECURITY_PROVISIONING";
       employee.status = FLOW[request.type].awaitingSecurity;
       request.events.push(
-        makeEvent("manager.approved", `${actor} approved the request on ${issueKey}.`, {
+        makeEvent("manager.approved", `${actor} menyetujui pengajuan di ${issueKey}.`, {
           actor,
           issueKey,
         }),
@@ -274,7 +274,7 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
 
       if (!isSecurityComplete(input.statusName, config)) {
         request.updatedAt = now;
-        return result("ignored", `"${input.statusName}" does not close the provisioning ticket.`);
+        return result("ignored", `"${input.statusName}" tidak menutup tiket IT Security.`);
       }
 
       request.processedSignals.push(signal);
@@ -283,15 +283,15 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
       employee.status = FLOW[request.type].fulfilled;
       employee.activeRequestId = undefined;
       employee.updatedAt = now;
-      const outcome = request.type === "OFFBOARDING" ? "Removed" : "Active";
+      const outcome = request.type === "OFFBOARDING" ? "Dihapus" : "Aktif";
       request.events.push(
         makeEvent(
           "security.completed",
-          `${actor} closed ${issueKey}; ${employee.name} is now ${outcome}.`,
+          `${actor} menutup ${issueKey}; ${employee.name} sekarang ${outcome}.`,
           { actor, issueKey },
         ),
       );
-      return result("completed", `${employee.name} is now ${outcome}.`);
+      return result("completed", `${employee.name} sekarang ${outcome}.`);
     }
 
     return result(
@@ -318,16 +318,16 @@ function notificationEvent(
   email: string | undefined,
 ) {
   if (assignee.problem) {
-    return makeEvent("notify.failed", `Nobody was notified: ${assignee.problem}`, {
+    return makeEvent("notify.failed", `Tidak ada yang dinotifikasi: ${assignee.problem}`, {
       actor: "HC Portal",
       issueKey,
     });
   }
 
-  const who = assignee.displayName ?? email ?? "the assignee";
+  const who = assignee.displayName ?? email ?? "assignee";
   return makeEvent(
     "notify.sent",
-    `${issueKey} was assigned to ${who}, so Jira emails them the approval request.`,
+    `${issueKey} di-assign ke ${who}, jadi Jira mengirimkan email pengajuan ini ke mereka.`,
     { actor: "HC Portal", issueKey },
   );
 }
@@ -362,9 +362,9 @@ async function raiseSecurityTicket(
 
     stored.securityIssue = issue;
     stored.updatedAt = new Date().toISOString();
-    const noun = request.type === "OFFBOARDING" ? "Deprovisioning" : "Provisioning";
+    const noun = request.type === "OFFBOARDING" ? "Pencabutan akses" : "Penyiapan akses";
     stored.events.push(
-      makeEvent("security.requested", `${noun} ticket ${issue.key} raised for IT Security.`, {
+      makeEvent("security.requested", `Tiket ${noun.toLowerCase()} ${issue.key} dibuat untuk IT Security.`, {
         actor: "HC Portal",
         issueKey: issue.key,
       }),
@@ -373,7 +373,7 @@ async function raiseSecurityTicket(
 
     return {
       outcome: "security_ticket_created",
-      message: `Approved by ${actor}; ${noun.toLowerCase()} ticket ${issue.key} raised.`,
+      message: `Disetujui oleh ${actor}; tiket ${noun.toLowerCase()} ${issue.key} dibuat.`,
       requestId: stored.id,
       issueKey: issue.key,
     };
@@ -400,7 +400,7 @@ async function rollbackApproval(requestId: string, signal: string): Promise<void
     request.events.push(
       makeEvent(
         "security.request_failed",
-        "Could not raise the IT Security ticket in Jira; the approval will be retried.",
+        "Tiket IT Security gagal dibuat di Jira; persetujuan akan dicoba ulang.",
         { actor: "HC Portal" },
       ),
     );
