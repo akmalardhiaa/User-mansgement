@@ -14,6 +14,12 @@ function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
 
+/**
+ * The static GitHub Pages build exports a single page, so the multi-route nav
+ * would only produce dead links. Inlined at build time.
+ */
+const IS_STATIC_DEMO = process.env.NEXT_PUBLIC_DEMO === "true";
+
 /** Top-level chrome: brand, primary navigation, and the page container. */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -30,7 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
 
           <nav className="flex items-center gap-1" aria-label="Primary">
-            {NAV.map((item) => (
+            {(IS_STATIC_DEMO ? [] : NAV).map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -47,8 +53,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="ml-auto hidden items-center gap-2 text-xs text-ink-faint sm:flex">
-            <span className="size-1.5 rounded-full bg-ok" aria-hidden />
-            Jira workflow connected
+            {IS_STATIC_DEMO ? (
+              <>
+                <span className="size-1.5 rounded-full bg-warn" aria-hidden />
+                Static demo · Jira not connected
+              </>
+            ) : (
+              <>
+                <span className="size-1.5 rounded-full bg-ok" aria-hidden />
+                Jira workflow connected
+              </>
+            )}
           </div>
         </div>
       </header>

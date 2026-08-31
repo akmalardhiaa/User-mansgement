@@ -120,6 +120,32 @@ If webhooks cannot reach the app, `POST /api/workflow/sync` (the **Sync from Jir
 button, and a suitable cron target) reconciles every open request instead. Transitions
 are de-duplicated, so webhook and polling can safely run side by side.
 
+## Deployment
+
+### GitHub Pages (static demo)
+
+`.github/workflows/deploy-demo.yml` publishes a **browser-only demo** to GitHub Pages on
+every push to `main`.
+
+> **This demo has no backend.** GitHub Pages serves static files only, so the API routes
+> and the real Jira integration do not run there. The workflow removes them from its own
+> checkout — the repository is untouched — and exports `src/app/demo` instead, where an
+> in-browser store and a "Jira simulator" panel stand in for the server. State resets on
+> refresh. It is a UI walkthrough, not a working system.
+
+One-time setup: **Settings → Pages → Source: GitHub Actions**. The workflow also attempts
+to enable this automatically. The site then appears at
+`https://<user>.github.io/<repo>/`.
+
+To preview the demo locally: `npm run dev`, then open `/demo`.
+
+### Running the real application
+
+The full app needs a Node host — Vercel, Railway, Fly.io, or your own server. This is the
+only way `POST /api/webhooks/jira` gets a public URL that Jira can call, which the
+approval workflow depends on. Set the environment variables from `.env.example`, run
+`npm run build && npm run start`, and register the webhook URL in Jira.
+
 ## Project structure
 
 ```
@@ -128,6 +154,7 @@ src/
 │   ├── page.tsx                        # Dashboard
 │   ├── users/new/page.tsx              # Create-user form
 │   ├── requests/page.tsx               # Approval tracker
+│   ├── demo/page.tsx                   # Static GitHub Pages demo entry point
 │   └── api/
 │       ├── users/route.ts              # GET roster · POST new request (step 1)
 │       ├── users/[id]/access/route.ts  # PATCH enable/disable
@@ -136,12 +163,15 @@ src/
 │       └── workflow/sync/route.ts      # POST polling fallback
 ├── components/
 │   ├── layout/AppShell.tsx
+│   ├── demo/DemoApp.tsx                # Browser-only demo shell + Jira simulator
 │   ├── ui/                             # StatusBadge, Button, Field, Card
 │   ├── dashboard/                      # EmployeeTable, StatsRow, SyncButton
 │   ├── users/CreateUserForm.tsx
 │   └── requests/RequestCard.tsx
 └── lib/
     ├── config/env.ts                   # Lazily-read configuration
+    ├── client/dataSource.ts            # UI write operations (API or demo mock)
+    ├── demo/demoStore.ts               # In-browser workflow used by the demo
     ├── db/                             # store.ts (JSON file) · repository.ts · seed.ts
     ├── jira/                           # jiraService.ts · jiraClient.ts · adf.ts · webhookPayload.ts
     ├── workflow/                       # onboardingWorkflow.ts · statusRules.ts
@@ -164,6 +194,8 @@ src/
 - **Storage is swappable.** Only `src/lib/db/` touches the JSON file; the rest of the app
   goes through `repository.ts`. Writes are serialised behind a mutex and committed with
   write-then-rename, so concurrent webhooks cannot interleave or truncate the file.
+- **The UI does not depend on `fetch`.** Components take a `DashboardDataSource`, so the
+  same table and form serve both the real API and the static demo's in-browser store.
 - **Status names are configuration, not code** — every team names their Jira columns
   differently.
 
