@@ -1,21 +1,30 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { SESSION_COOKIE, readSessionToken } from "@/lib/auth/session";
 
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "HC User Management",
   description:
-    "Human Capital dashboard for managing employee accounts with a Jira-driven approval workflow.",
+    "Portal Human Capital untuk pengelolaan akun karyawan dengan alur persetujuan melalui Jira.",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Read once here so the chrome knows who is signed in; middleware is what
+  // actually enforces access.
+  const store = await cookies();
+  const session = await readSessionToken(store.get(SESSION_COOKIE)?.value);
+
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="id" className="h-full antialiased">
       <body className="min-h-full">
-        <AppShell>{children}</AppShell>
+        <AppShell user={session ? { name: session.name, email: session.email } : undefined}>
+          {children}
+        </AppShell>
       </body>
     </html>
   );

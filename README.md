@@ -60,6 +60,7 @@ clickable before any credentials exist.
 
 | Route        | Purpose                                                                      |
 | ------------ | ---------------------------------------------------------------------------- |
+| `/login`     | Sign-in for HC officers. Everything else redirects here without a session.   |
 | `/`          | Employee directory — searchable table with status badges and access toggles. |
 | `/users/new` | Create-user form; submitting raises the manager approval ticket.             |
 | `/requests`  | Approval tracker — per-request stepper, Jira ticket links and audit trail.   |
@@ -68,6 +69,8 @@ clickable before any credentials exist.
 
 | Method  | Route                    | Purpose                                                        |
 | ------- | ------------------------ | -------------------------------------------------------------- |
+| `POST`  | `/api/auth/login`        | Exchanges credentials for a session cookie.                     |
+| `POST`  | `/api/auth/logout`       | Clears the session.                                             |
 | `GET`   | `/api/users`             | The roster.                                                     |
 | `POST`  | `/api/users`             | **Step 1** — records the joiner as pending and raises ticket #1. |
 | `PATCH` | `/api/users/:id/access`  | Enable/disable immediately. Body: `{ "enabled": bool }`.        |
@@ -135,6 +138,32 @@ curl -X POST http://localhost:3000/api/webhooks/jira -H 'Content-Type: applicati
 If webhooks cannot reach the app, `POST /api/workflow/sync` (the **Sync from Jira**
 button, and a suitable cron target) reconciles every open request instead. Transitions
 are de-duplicated, so webhook and polling can safely run side by side.
+
+## Login
+
+Every page and API route sits behind a session, enforced in `src/middleware.ts`. Two
+things are deliberately left open:
+
+- `/login` and the auth endpoints, for obvious reasons.
+- `POST /api/webhooks/jira`, because Jira calls it as a machine and has no session to
+  present. It authenticates with its own shared secret instead — locking it behind the
+  session would silently break the approval chain.
+
+Accounts come from `HC_AUTH_USERS`, as `email:password:Name` triples separated by commas.
+Each officer having their own login is what lets the audit trail name a person:
+
+```
+Ayu Prameswari (HC) | HC mengajukan pembuatan akun untuk Nadia Kusuma.
+```
+
+The session is a cookie signed with `AUTH_SECRET` (HMAC-SHA256, 8-hour expiry,
+httpOnly + sameSite=lax, secure in production). It is built on Web Crypto so the same
+code verifies it in middleware (Edge) and in route handlers (Node).
+
+**This is a stand-in, not an identity system.** Passwords live in an environment
+variable, and there is no reset, lockout, MFA, or revocation before expiry — rotating
+`AUTH_SECRET` is the only way to sign everyone out. Put SSO in front of it before it
+holds anything sensitive.
 
 ## How approvers are notified
 
@@ -217,8 +246,10 @@ variables from `.env.example`, then `npm run build && npm run start`.
 
 ```
 src/
+├── middleware.ts                       # Session gate for every page and API route
 ├── app/
 │   ├── page.tsx                        # Dashboard
+│   ├── login/page.tsx                  # Sign-in
 │   ├── users/new/page.tsx              # Create-user form
 │   ├── requests/page.tsx               # Approval tracker
 │   ├── demo/page.tsx                   # Static GitHub Pages demo entry point
@@ -237,6 +268,7 @@ src/
 │   ├── users/CreateUserForm.tsx
 │   └── requests/RequestCard.tsx
 └── lib/
+    ├── auth/                           # session.ts · users.ts · current.ts
     ├── config/env.ts                   # Lazily-read configuration
     ├── client/dataSource.ts            # UI write operations (API or demo mock)
     ├── demo/demoStore.ts               # In-browser workflow used by the demo
@@ -285,6 +317,11 @@ npm run typecheck  # tsc --noEmit
 ## Limitations
 
 This is a scaffold for a real integration, not a finished internal system. Before
-production use you would need: authentication and authorisation for the HC pages (every
-route is currently open), a real database in place of the JSON store, and either a
-signed webhook or an IP allowlist in front of `/api/webhooks/jira`.
+production use you would need: SSO in place of the environment-variable logins (see
+**Login** above), authorisation as well as authentication — every signed-in officer can
+do everything — a real database in place of the JSON store, and either a signed webhook
+or an IP allowlist in front of `/api/webhooks/jira`.
+
+The palette approximates Mandiri Sekuritas' navy and gold by eye, not from a brand
+guide. The values live in the `@theme` block of `src/app/globals.css` and nowhere else,
+so correcting them is a single edit.

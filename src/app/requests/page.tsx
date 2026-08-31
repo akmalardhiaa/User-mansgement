@@ -32,7 +32,7 @@ export default async function RequestsPage() {
           <p className="text-sm text-ink-muted">Belum ada pengajuan.</p>
           <Link
             href="/users/new"
-            className="mt-4 inline-flex items-center rounded-lg border border-accent/60 bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-soft"
+            className="mt-4 inline-flex items-center rounded-lg border border-accent/60 bg-accent px-3.5 py-2 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-soft"
           >
             + Tambah akun
           </Link>

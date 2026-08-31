@@ -1,3 +1,4 @@
+import { getActorName } from "@/lib/auth/current";
 import { RequestNotAllowedError } from "@/lib/db/repository";
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
 import { JiraApiError } from "@/lib/jira/jiraClient";
@@ -26,7 +27,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   try {
-    const { employee, request: transfer } = await submitTransferRequest(id, parsed.value);
+    const { employee, request: transfer } = await submitTransferRequest(
+      id,
+      parsed.value,
+      await getActorName(),
+    );
     return ok({ employee, request: transfer, managerIssue: transfer.managerIssue }, 201);
   } catch (error) {
     if (error instanceof RequestNotAllowedError) {

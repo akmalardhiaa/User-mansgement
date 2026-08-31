@@ -1,3 +1,4 @@
+import { getActorName } from "@/lib/auth/current";
 import { DuplicateEmailError, listEmployees } from "@/lib/db/repository";
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
 import { JiraApiError } from "@/lib/jira/jiraClient";
@@ -24,7 +25,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { employee, request: onboarding } = await submitOnboardingRequest(parsed.value);
+    const { employee, request: onboarding } = await submitOnboardingRequest(
+      parsed.value,
+      await getActorName(),
+    );
     return ok(
       {
         employee,

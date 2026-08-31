@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, type ReactNode } from "react";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
@@ -20,50 +20,79 @@ function isActive(pathname: string, href: string): boolean {
  */
 const IS_STATIC_DEMO = process.env.NEXT_PUBLIC_DEMO === "true";
 
+export interface SessionUser {
+  name: string;
+  email: string;
+}
+
 /** Top-level chrome: brand, primary navigation, and the page container. */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, user }: { children: ReactNode; user?: SessionUser }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  // Signed out (the login screen) gets the container without the navigation,
+  // which would only be dead links there.
+  const showNav = Boolean(user) || IS_STATIC_DEMO;
+
+  async function signOut() {
+    setSigningOut(true);
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login");
+    router.refresh();
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 border-b border-hairline bg-canvas/80 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-6xl items-center gap-6 px-5 py-3.5">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-accent to-fuchsia-500 text-sm font-bold text-white">
+          <Link href={user ? "/" : "/login"} className="flex items-center gap-2.5">
+            <span className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-accent to-accent-soft text-sm font-bold text-accent-ink">
               HC
             </span>
             <span className="text-sm font-semibold tracking-tight">User Management</span>
           </Link>
 
-          <nav className="flex items-center gap-1" aria-label="Primary">
-            {(IS_STATIC_DEMO ? [] : NAV).map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={isActive(pathname, item.href) ? "page" : undefined}
-                className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                  isActive(pathname, item.href)
-                    ? "bg-elevated text-ink"
-                    : "text-ink-muted hover:text-ink"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          {showNav ? (
+            <nav className="flex items-center gap-1" aria-label="Navigasi utama">
+              {(IS_STATIC_DEMO ? [] : NAV).map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={isActive(pathname, item.href) ? "page" : undefined}
+                  className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                    isActive(pathname, item.href)
+                      ? "bg-elevated text-ink"
+                      : "text-ink-muted hover:text-ink"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          ) : null}
 
-          <div className="ml-auto hidden items-center gap-2 text-xs text-ink-faint sm:flex">
+          <div className="ml-auto flex items-center gap-4 text-xs text-ink-faint">
             {IS_STATIC_DEMO ? (
-              <>
+              <span className="hidden items-center gap-2 sm:flex">
                 <span className="size-1.5 rounded-full bg-warn" aria-hidden />
-                Demo statis · Jira tidak terhubung
-              </>
-            ) : (
+                Preview statis · Jira tidak terhubung
+              </span>
+            ) : user ? (
               <>
-                <span className="size-1.5 rounded-full bg-ok" aria-hidden />
-                Alur Jira terhubung
+                <span className="hidden text-right sm:block">
+                  <span className="block text-ink">{user.name}</span>
+                  <span className="block">{user.email}</span>
+                </span>
+                <button
+                  onClick={signOut}
+                  disabled={signingOut}
+                  className="rounded-lg border border-hairline px-3 py-1.5 text-ink-muted transition-colors hover:border-hairline-strong hover:text-ink disabled:opacity-50"
+                >
+                  {signingOut ? "Keluar…" : "Keluar"}
+                </button>
               </>
-            )}
+            ) : null}
           </div>
         </div>
       </header>
