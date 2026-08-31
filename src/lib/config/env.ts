@@ -32,6 +32,8 @@ export interface JiraConfig {
   managerIssueType: string;
   securityIssueType: string;
   securityAssigneeAccountId?: string;
+  /** Alternative to the accountId: resolved through Jira's user search. */
+  securityAssigneeEmail?: string;
   /** Jira status names that count as a manager approval. */
   approvedStatuses: string[];
   /** Jira status names that count as a manager rejection. */
@@ -73,6 +75,7 @@ export function getJiraConfig(): JiraConfig {
     managerIssueType: read("JIRA_MANAGER_ISSUE_TYPE") ?? "Task",
     securityIssueType: read("JIRA_SECURITY_ISSUE_TYPE") ?? "Task",
     securityAssigneeAccountId: read("JIRA_SECURITY_ACCOUNT_ID"),
+    securityAssigneeEmail: read("JIRA_SECURITY_EMAIL"),
     approvedStatuses: readList("JIRA_APPROVED_STATUSES", ["Approved", "Done"]),
     rejectedStatuses: readList("JIRA_REJECTED_STATUSES", ["Rejected", "Declined"]),
     securityDoneStatuses: readList("JIRA_SECURITY_DONE_STATUSES", ["Done", "Closed", "Resolved"]),

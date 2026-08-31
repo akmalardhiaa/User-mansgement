@@ -29,7 +29,9 @@ export interface Employee {
   jobTitle: string;
   department: string;
   managerName: string;
-  /** Jira accountId of the manager, when HC knows it. Used to assign ticket #1. */
+  /** Work email of the manager. Resolved to a Jira account so ticket #1 is assigned. */
+  managerEmail: string;
+  /** Jira accountId, once resolved. Assignment is what makes Jira email them. */
   managerAccountId?: string;
   status: EmployeeStatus;
   /** Links back to the onboarding request that created this record, if any. */
@@ -64,6 +66,11 @@ export interface JiraIssueRef {
   url: string;
   /** Last status name we observed for this issue. */
   status?: string;
+  /**
+   * Who the issue is assigned to. Assignment is what makes Jira email them, so
+   * an absent value means nobody was notified.
+   */
+  assignee?: string;
 }
 
 export interface OnboardingRequest {
@@ -89,5 +96,7 @@ export interface NewUserInput {
   jobTitle: string;
   department: string;
   managerName: string;
+  managerEmail: string;
+  /** Optional override; normally resolved from `managerEmail`. */
   managerAccountId?: string;
 }

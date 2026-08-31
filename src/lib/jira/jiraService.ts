@@ -5,6 +5,53 @@ import { detailList, doc, heading, link, paragraph, rule, strong, text } from ".
 import { getJiraClient } from "./jiraClient";
 
 /**
+ * Who a ticket ended up assigned to.
+ *
+ * This matters beyond bookkeeping: Jira's notification scheme emails the
+ * assignee when an issue is created, and that email is how managers and the IT
+ * Security team learn there is something to approve. An unassigned ticket is a
+ * silent one, so the reason for a failed lookup is surfaced rather than
+ * swallowed.
+ */
+export interface AssigneeResolution {
+  accountId?: string;
+  displayName?: string;
+  /** Set when nobody could be assigned; shown to HC and in the audit trail. */
+  problem?: string;
+}
+
+/**
+ * Turns an email address into a Jira accountId. An explicit accountId always
+ * wins, so an operator can override a lookup that picks the wrong person.
+ */
+async function resolveAssignee(params: {
+  accountId?: string;
+  email?: string;
+  role: string;
+}): Promise<AssigneeResolution> {
+  if (params.accountId) return { accountId: params.accountId };
+  if (!params.email) {
+    return { problem: `No ${params.role} email was provided, so the ticket is unassigned.` };
+  }
+
+  try {
+    const user = await getJiraClient().findUserByEmail(params.email);
+    if (!user) {
+      return {
+        problem: `No Jira account matches ${params.email}, so the ticket is unassigned and Jira will not email the ${params.role}.`,
+      };
+    }
+    return { accountId: user.accountId, displayName: user.displayName };
+  } catch (error) {
+    // A failed lookup must not block the request: an unassigned ticket that
+    // exists is far better than no ticket at all.
+    return {
+      problem: `Could not look up ${params.email} in Jira (${(error as Error).message}); the ticket is unassigned.`,
+    };
+  }
+}
+
+/**
  * Domain-level Jira operations for the onboarding workflow.
  *
  * `jiraClient.ts` knows how to talk to Jira; this module knows *what* the HC
@@ -27,7 +74,7 @@ function employeeDetails(employee: Employee): Array<[string, string]> {
     ["Work email", employee.email],
     ["Job title", employee.jobTitle],
     ["Department", employee.department],
-    ["Reporting manager", employee.managerName],
+    ["Reporting manager", `${employee.managerName} (${employee.managerEmail})`],
   ];
 }
 
@@ -38,15 +85,21 @@ function employeeDetails(employee: Employee): Array<[string, string]> {
 export async function createManagerApprovalIssue(
   employee: Employee,
   request: OnboardingRequest,
-): Promise<JiraIssueRef> {
+): Promise<{ ref: JiraIssueRef; assignee: AssigneeResolution }> {
   const config = getJiraConfig();
   const client = getJiraClient();
   const approved = config.approvedStatuses.join(" / ");
   const rejected = config.rejectedStatuses.join(" / ");
 
+  const assignee = await resolveAssignee({
+    accountId: employee.managerAccountId,
+    email: employee.managerEmail,
+    role: "manager",
+  });
+
   const issue = await client.createIssue({
     issueType: config.managerIssueType,
-    assigneeAccountId: employee.managerAccountId,
+    assigneeAccountId: assignee.accountId,
     labels: ["hc-onboarding", "manager-approval"],
     summary: `[Approval] New user access for ${employee.name} (${employee.jobTitle})`,
     description: doc(
@@ -73,25 +126,39 @@ export async function createManagerApprovalIssue(
     ),
   });
 
-  return { key: issue.key, url: issue.url, status: issue.status };
+  return {
+    ref: {
+      key: issue.key,
+      url: issue.url,
+      status: issue.status,
+      assignee: assignee.displayName ?? (assignee.accountId ? employee.managerName : undefined),
+    },
+    assignee,
+  };
 }
 
 /**
  * Step 3 — raised automatically once the manager approves. Assigned to the IT
- * Security team account from `JIRA_SECURITY_ACCOUNT_ID`.
+ * Security team from `JIRA_SECURITY_ACCOUNT_ID` or `JIRA_SECURITY_EMAIL`.
  */
 export async function createSecurityProvisioningIssue(
   employee: Employee,
   request: OnboardingRequest,
   approvedBy?: string,
-): Promise<JiraIssueRef> {
+): Promise<{ ref: JiraIssueRef; assignee: AssigneeResolution }> {
   const config = getJiraConfig();
   const client = getJiraClient();
   const done = config.securityDoneStatuses.join(" / ");
 
+  const assignee = await resolveAssignee({
+    accountId: config.securityAssigneeAccountId,
+    email: config.securityAssigneeEmail,
+    role: "IT Security",
+  });
+
   const issue = await client.createIssue({
     issueType: config.securityIssueType,
-    assigneeAccountId: config.securityAssigneeAccountId,
+    assigneeAccountId: assignee.accountId,
     labels: ["hc-onboarding", "security-provisioning"],
     summary: `[Provisioning] Set up accounts and access for ${employee.name}`,
     description: doc(
@@ -124,7 +191,15 @@ export async function createSecurityProvisioningIssue(
     ),
   });
 
-  return { key: issue.key, url: issue.url, status: issue.status };
+  return {
+    ref: {
+      key: issue.key,
+      url: issue.url,
+      status: issue.status,
+      assignee: assignee.displayName ?? (assignee.accountId ? "IT Security" : undefined),
+    },
+    assignee,
+  };
 }
 
 /** Reads the current status name of an issue — used by the polling fallback. */

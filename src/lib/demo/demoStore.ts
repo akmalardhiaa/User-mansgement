@@ -99,6 +99,7 @@ export class DemoStore implements DashboardDataSource {
     const employeeId = `emp_demo_${this.ticketCounter}_${this.employees.length}`;
     const requestId = `req_demo_${this.ticketCounter}_${this.requests.length}`;
     const managerIssue = this.nextTicket();
+    managerIssue.assignee = value.managerName;
 
     const employee: Employee = {
       ...value,

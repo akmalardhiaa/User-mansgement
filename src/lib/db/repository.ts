@@ -103,6 +103,7 @@ export async function createOnboarding(
       jobTitle: input.jobTitle,
       department: input.department,
       managerName: input.managerName,
+      managerEmail: input.managerEmail,
       managerAccountId: input.managerAccountId,
       status: "PENDING_MANAGER_APPROVAL",
       onboardingRequestId: requestId,

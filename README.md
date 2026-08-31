@@ -120,6 +120,36 @@ If webhooks cannot reach the app, `POST /api/workflow/sync` (the **Sync from Jir
 button, and a suitable cron target) reconciles every open request instead. Transitions
 are de-duplicated, so webhook and polling can safely run side by side.
 
+## How approvers are notified
+
+Managers and the IT Security team are **not** emailed by this app. They are emailed by
+Jira, because each ticket is assigned to them — Jira's notification scheme sends the
+assignee an email on issue creation, and that email links straight to the ticket they
+approve from. Nothing else has to be configured, and no SMTP credentials are involved.
+
+That makes assignment the part that matters:
+
+- **Manager.** HC enters the manager's work email on the form. The backend resolves it to
+  a Jira account through `/rest/api/3/user/search` and assigns ticket #1. Setting
+  `managerAccountId` on the API request overrides the lookup.
+- **IT Security.** Set `JIRA_SECURITY_EMAIL` (or `JIRA_SECURITY_ACCOUNT_ID`, which wins)
+  so ticket #2 is assigned when it is raised automatically.
+
+When no account matches, the request still goes through — an unassigned ticket beats no
+ticket — but the confirmation panel and the audit trail both say plainly that nobody was
+emailed, so it is never a silent failure:
+
+```
+HC-1002 was assigned to IT Security, so Jira emails them the approval request.
+Nobody was notified: No Jira account matches it-security@acme.com, so the ticket is
+unassigned and Jira will not email the IT Security.
+```
+
+Jira's user search only finds people who can be assigned issues in the project, so both
+approvers need Jira accounts with permission there. If emails still do not arrive, check
+**Project settings → Notifications** — the default scheme notifies the current assignee on
+*Issue Created*, but a customised scheme may have removed it.
+
 ## Deployment
 
 ### GitHub Pages (static demo)
