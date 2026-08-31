@@ -3,13 +3,13 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { getDataFilePath } from "@/lib/config/env";
-import type { Employee, OnboardingRequest } from "@/lib/types";
+import type { Employee, AccessRequest } from "@/lib/types";
 
 import { seedEmployees } from "./seed";
 
 export interface StoreShape {
   employees: Employee[];
-  requests: OnboardingRequest[];
+  requests: AccessRequest[];
 }
 
 /**

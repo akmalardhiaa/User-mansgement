@@ -42,6 +42,10 @@ export function EmployeeTable({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<EmployeeStatus | "ALL">("ALL");
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Removal is confirmed inline rather than through window.confirm/prompt, which
+  // sandboxed embeds block outright.
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const visible = useMemo(() => {
@@ -55,6 +59,25 @@ export function EmployeeTable({
         .includes(needle);
     });
   }, [employees, query, statusFilter]);
+
+  async function requestRemoval(employee: Employee) {
+    setBusyId(employee.id);
+    setError(null);
+    try {
+      await dataSource.requestRemoval(employee.id, reason.trim() || undefined);
+      setConfirming(null);
+      setReason("");
+      if (onChanged) {
+        onChanged();
+      } else {
+        startTransition(() => router.refresh());
+      }
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   async function toggleAccess(employee: Employee) {
     setBusyId(employee.id);
@@ -126,7 +149,7 @@ export function EmployeeTable({
               const ticket = activeTickets[employee.id];
               const busy = busyId === employee.id || pending;
 
-              return (
+              const mainRow = (
                 <tr
                   key={employee.id}
                   className="border-b border-hairline/60 transition-colors last:border-0 hover:bg-elevated/50"
@@ -150,13 +173,27 @@ export function EmployeeTable({
                   </td>
                   <td className="px-4 py-3 text-right">
                     {canToggleAccess(employee.status) ? (
-                      <Button
-                        variant={employee.status === "ACTIVE" ? "danger" : "secondary"}
-                        disabled={busy}
-                        onClick={() => toggleAccess(employee)}
-                      >
-                        {busy ? "Saving…" : employee.status === "ACTIVE" ? "Disable" : "Enable"}
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="secondary"
+                          disabled={busy}
+                          onClick={() => toggleAccess(employee)}
+                          title="Suspend access immediately, without an approval"
+                        >
+                          {busy ? "Saving…" : employee.status === "ACTIVE" ? "Disable" : "Enable"}
+                        </Button>
+                        <Button
+                          variant="danger"
+                          disabled={busy}
+                          onClick={() => {
+                            setConfirming(employee.id);
+                            setReason("");
+                          }}
+                          title="Raise a Jira approval ticket to revoke this account"
+                        >
+                          Remove
+                        </Button>
+                      </div>
                     ) : ticket ? (
                       <a
                         href={ticket.url}
@@ -172,6 +209,40 @@ export function EmployeeTable({
                   </td>
                 </tr>
               );
+
+              const confirmRow =
+                confirming === employee.id ? (
+                  <tr key={`${employee.id}-confirm`} className="bg-danger/5">
+                    <td colSpan={6} className="px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-sm text-ink">
+                          Request removal for <strong>{employee.name}</strong>? This raises a Jira
+                          approval ticket for {employee.managerName} — access is revoked only after
+                          IT Security acts.
+                        </span>
+                        <input
+                          value={reason}
+                          onChange={(event) => setReason(event.target.value)}
+                          placeholder="Reason (optional)"
+                          aria-label={`Reason for removing ${employee.name}`}
+                          className="min-w-48 flex-1 rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none"
+                        />
+                        <Button
+                          variant="danger"
+                          disabled={busy}
+                          onClick={() => requestRemoval(employee)}
+                        >
+                          {busy ? "Sending…" : "Confirm removal"}
+                        </Button>
+                        <Button variant="ghost" disabled={busy} onClick={() => setConfirming(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : null;
+
+              return [mainRow, confirmRow];
             })}
 
             {visible.length === 0 ? (

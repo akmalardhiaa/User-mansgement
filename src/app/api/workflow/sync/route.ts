@@ -1,5 +1,5 @@
 import { fail, ok } from "@/lib/http/apiResponse";
-import { syncOpenRequests } from "@/lib/workflow/onboardingWorkflow";
+import { syncOpenRequests } from "@/lib/workflow/accessWorkflow";
 
 export const dynamic = "force-dynamic";
 

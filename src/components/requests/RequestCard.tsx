@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/Field";
 import { StageBadge, StatusBadge } from "@/components/ui/StatusBadge";
-import type { Employee, JiraIssueRef, OnboardingRequest } from "@/lib/types";
+import type { Employee, JiraIssueRef, AccessRequest } from "@/lib/types";
 
 type StepState = "done" | "current" | "todo" | "failed";
 
@@ -11,22 +11,49 @@ interface Step {
   issue?: JiraIssueRef;
 }
 
+/** Wording for each step, which differs between adding and removing an account. */
+const STEP_COPY = {
+  ONBOARDING: {
+    submitted: "HC captured the new joiner's details.",
+    securityTitle: "IT Security provisioning",
+    securityDone: "Accounts and access were provisioned.",
+    securityWaiting: "Waiting for IT Security to close the provisioning ticket.",
+    securityPending: "Raised automatically once the manager approves.",
+    finalTitle: "Account active",
+    finalDone: "The employee is active in the HC dashboard.",
+    finalPending: "Set automatically when the provisioning ticket closes.",
+  },
+  OFFBOARDING: {
+    submitted: "HC asked for this employee's access to be revoked.",
+    securityTitle: "IT Security deprovisioning",
+    securityDone: "Accounts and access were revoked.",
+    securityWaiting: "Waiting for IT Security to close the deprovisioning ticket.",
+    securityPending: "Raised automatically once the manager approves.",
+    finalTitle: "Access removed",
+    finalDone: "The employee is marked Removed in the HC dashboard.",
+    finalPending: "Set automatically when the deprovisioning ticket closes.",
+  },
+} as const;
+
 /** Maps a request's stage onto the four visible workflow steps. */
-function buildSteps(request: OnboardingRequest): Step[] {
+function buildSteps(request: AccessRequest): Step[] {
   const { stage } = request;
+  const copy = STEP_COPY[request.type];
   const rejected = stage === "REJECTED";
   const pastManager = stage === "SECURITY_PROVISIONING" || stage === "COMPLETED";
 
   return [
     {
       title: "Request submitted",
-      detail: "HC captured the new joiner's details.",
+      detail: copy.submitted,
       state: "done",
     },
     {
       title: "Manager approval",
       detail: rejected
-        ? "The manager rejected this request."
+        ? request.type === "OFFBOARDING"
+          ? "The manager rejected the removal; the employee keeps their access."
+          : "The manager rejected this request."
         : pastManager
           ? "Approved by the reporting manager."
           : "Waiting for the manager to transition the ticket in Jira.",
@@ -34,23 +61,20 @@ function buildSteps(request: OnboardingRequest): Step[] {
       issue: request.managerIssue,
     },
     {
-      title: "IT Security provisioning",
+      title: copy.securityTitle,
       detail:
         stage === "COMPLETED"
-          ? "Accounts and access were provisioned."
+          ? copy.securityDone
           : stage === "SECURITY_PROVISIONING"
-            ? "Waiting for IT Security to close the provisioning ticket."
-            : "Raised automatically once the manager approves.",
+            ? copy.securityWaiting
+            : copy.securityPending,
       state:
         stage === "COMPLETED" ? "done" : stage === "SECURITY_PROVISIONING" ? "current" : "todo",
       issue: request.securityIssue,
     },
     {
-      title: "Account active",
-      detail:
-        stage === "COMPLETED"
-          ? "The employee is active in the HC dashboard."
-          : "Set automatically when the provisioning ticket closes.",
+      title: copy.finalTitle,
+      detail: stage === "COMPLETED" ? copy.finalDone : copy.finalPending,
       state: stage === "COMPLETED" ? "done" : "todo",
     },
   ];
@@ -90,7 +114,7 @@ function IssueLink({ issue }: { issue: JiraIssueRef }) {
 }
 
 interface RequestCardProps {
-  request: OnboardingRequest;
+  request: AccessRequest;
   employee?: Employee;
 }
 
@@ -105,9 +129,21 @@ export function RequestCard({ request, employee }: RequestCardProps) {
           <p className="truncate text-xs text-ink-faint">
             {employee ? `${employee.jobTitle} · ${employee.department}` : request.employeeId}
           </p>
+          {request.reason ? (
+            <p className="mt-1 truncate text-xs text-ink-muted">Reason: {request.reason}</p>
+          ) : null}
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <StageBadge stage={request.stage} />
+          <span
+            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap ${
+              request.type === "OFFBOARDING"
+                ? "border-danger/30 bg-danger/10 text-danger"
+                : "border-accent/30 bg-accent/10 text-accent-soft"
+            }`}
+          >
+            {request.type === "OFFBOARDING" ? "Remove account" : "New account"}
+          </span>
+          <StageBadge stage={request.stage} type={request.type} />
           {employee ? <StatusBadge status={employee.status} /> : null}
         </div>
       </header>

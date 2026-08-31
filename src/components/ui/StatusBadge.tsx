@@ -1,4 +1,4 @@
-import type { EmployeeStatus, RequestStage } from "@/lib/types";
+import type { EmployeeStatus, RequestStage, RequestType } from "@/lib/types";
 
 /** Presentation metadata for every employee status, kept in one place. */
 const EMPLOYEE_STATUS_PRESENTATION: Record<
@@ -30,6 +30,21 @@ const EMPLOYEE_STATUS_PRESENTATION: Record<
     className: "border-danger/30 bg-danger/10 text-danger",
     dot: "bg-danger",
   },
+  PENDING_REMOVAL_APPROVAL: {
+    label: "Removal · awaiting manager",
+    className: "border-warn/30 bg-warn/10 text-warn",
+    dot: "bg-warn",
+  },
+  PENDING_REMOVAL_SETUP: {
+    label: "Removal · security",
+    className: "border-info/30 bg-info/10 text-info",
+    dot: "bg-info",
+  },
+  REMOVED: {
+    label: "Removed",
+    className: "border-hairline-strong bg-elevated text-ink-faint",
+    dot: "bg-ink-faint",
+  },
 };
 
 export function employeeStatusLabel(status: EmployeeStatus): string {
@@ -48,18 +63,25 @@ export function StatusBadge({ status }: { status: EmployeeStatus }) {
   );
 }
 
-const STAGE_PRESENTATION: Record<RequestStage, { label: string; className: string }> = {
+const STAGE_PRESENTATION: Record<
+  RequestStage,
+  { label: string; removalLabel?: string; className: string }
+> = {
   MANAGER_APPROVAL: { label: "Manager approval", className: "border-warn/30 bg-warn/10 text-warn" },
   SECURITY_PROVISIONING: {
     label: "IT Security provisioning",
+    removalLabel: "IT Security deprovisioning",
     className: "border-info/30 bg-info/10 text-info",
   },
   COMPLETED: { label: "Completed", className: "border-ok/30 bg-ok/10 text-ok" },
   REJECTED: { label: "Rejected", className: "border-danger/30 bg-danger/10 text-danger" },
 };
 
-export function StageBadge({ stage }: { stage: RequestStage }) {
-  const { label, className } = STAGE_PRESENTATION[stage];
+export function StageBadge({ stage, type }: { stage: RequestStage; type?: RequestType }) {
+  const presentation = STAGE_PRESENTATION[stage];
+  const className = presentation.className;
+  const label =
+    type === "OFFBOARDING" ? (presentation.removalLabel ?? presentation.label) : presentation.label;
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap ${className}`}

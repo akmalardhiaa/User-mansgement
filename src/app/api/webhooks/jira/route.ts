@@ -1,6 +1,6 @@
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
 import { isAuthorisedWebhook, parseJiraWebhook } from "@/lib/jira/webhookPayload";
-import { applyIssueStatus } from "@/lib/workflow/onboardingWorkflow";
+import { applyIssueStatus } from "@/lib/workflow/accessWorkflow";
 
 export const dynamic = "force-dynamic";
 

@@ -1,15 +1,21 @@
 /**
  * Core domain model for the HC User Management dashboard.
  *
- * The lifecycle of a new joiner is:
+ * Both kinds of access request run through the same two-step chain — HC raises
+ * it, the manager approves in Jira, IT Security carries it out in Jira:
  *
- *   HC submits form
- *     -> PENDING_MANAGER_APPROVAL   (Jira ticket #1 assigned to the manager)
- *     -> PENDING_SECURITY_SETUP     (Jira ticket #2 assigned to IT Security)
- *     -> ACTIVE                     (security ticket closed)
+ *   Adding an account (ONBOARDING)
+ *     PENDING_MANAGER_APPROVAL -> PENDING_SECURITY_SETUP -> ACTIVE
  *
- * A manager rejection short-circuits the flow to REJECTED, and HC can always
- * flip an ACTIVE employee to DISABLED (and back) from the dashboard.
+ *   Removing an account (OFFBOARDING)
+ *     PENDING_REMOVAL_APPROVAL -> PENDING_REMOVAL_SETUP  -> REMOVED
+ *
+ * A manager rejection ends the request: a rejected joiner becomes REJECTED,
+ * while a rejected removal simply restores the employee's previous status.
+ *
+ * REMOVED means access was revoked, not that the record was deleted — HC needs
+ * the history. DISABLED is separate and deliberately unmediated: a reversible
+ * suspension HC can apply immediately without waiting on an approval.
  */
 
 export const EMPLOYEE_STATUSES = [
@@ -18,6 +24,9 @@ export const EMPLOYEE_STATUSES = [
   "ACTIVE",
   "DISABLED",
   "REJECTED",
+  "PENDING_REMOVAL_APPROVAL",
+  "PENDING_REMOVAL_SETUP",
+  "REMOVED",
 ] as const;
 
 export type EmployeeStatus = (typeof EMPLOYEE_STATUSES)[number];
@@ -34,13 +43,18 @@ export interface Employee {
   /** Jira accountId, once resolved. Assignment is what makes Jira email them. */
   managerAccountId?: string;
   status: EmployeeStatus;
-  /** Links back to the onboarding request that created this record, if any. */
-  onboardingRequestId?: string;
+  /** The access request currently acting on this employee, if any. */
+  activeRequestId?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-/** Where an in-flight onboarding request currently sits in the approval chain. */
+/** What the request asks for. Both types share the same approval chain. */
+export const REQUEST_TYPES = ["ONBOARDING", "OFFBOARDING"] as const;
+
+export type RequestType = (typeof REQUEST_TYPES)[number];
+
+/** Where an in-flight request currently sits in the approval chain. */
 export const REQUEST_STAGES = [
   "MANAGER_APPROVAL",
   "SECURITY_PROVISIONING",
@@ -73,10 +87,18 @@ export interface JiraIssueRef {
   assignee?: string;
 }
 
-export interface OnboardingRequest {
+export interface AccessRequest {
   id: string;
   employeeId: string;
+  type: RequestType;
   stage: RequestStage;
+  /** Why the removal was asked for. Offboarding only. */
+  reason?: string;
+  /**
+   * Status to restore if a removal is rejected — an employee whose offboarding
+   * the manager turns down should go back to working normally, not to REJECTED.
+   */
+  previousStatus?: EmployeeStatus;
   managerIssue?: JiraIssueRef;
   securityIssue?: JiraIssueRef;
   events: WorkflowEvent[];
