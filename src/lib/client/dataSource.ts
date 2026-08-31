@@ -1,4 +1,10 @@
-import type { Employee, JiraIssueRef, NewUserInput, AccessRequest } from "@/lib/types";
+import type {
+  AccessRequest,
+  Employee,
+  JiraIssueRef,
+  NewUserInput,
+  TransferInput,
+} from "@/lib/types";
 
 /**
  * The write operations the dashboard UI performs.
@@ -21,8 +27,8 @@ export interface SyncResult {
 
 export interface DashboardDataSource {
   toggleAccess(employeeId: string, enabled: boolean): Promise<Employee>;
-  /** Opens an offboarding request; the account is not touched until IT Security acts. */
-  requestRemoval(employeeId: string, reason?: string): Promise<CreateUserResult>;
+  /** Opens a transfer request; the position is not changed until IT Security acts. */
+  requestTransfer(employeeId: string, target: TransferInput): Promise<CreateUserResult>;
   createUser(input: NewUserInput): Promise<CreateUserResult>;
   sync(): Promise<SyncResult>;
 }
@@ -31,7 +37,7 @@ export interface DashboardDataSource {
 export class SubmissionError extends Error {
   constructor(
     message: string,
-    readonly fieldErrors?: Partial<Record<keyof NewUserInput, string>>,
+    readonly fieldErrors?: Partial<Record<string, string>>,
   ) {
     super(message);
     this.name = "SubmissionError";
@@ -58,11 +64,11 @@ export const apiDataSource: DashboardDataSource = {
     return employee;
   },
 
-  async requestRemoval(employeeId, reason) {
-    const response = await fetch(`/api/users/${employeeId}/removal`, {
+  async requestTransfer(employeeId, target) {
+    const response = await fetch(`/api/users/${employeeId}/transfer`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify(target),
     });
     return unwrap<CreateUserResult>(response);
   },

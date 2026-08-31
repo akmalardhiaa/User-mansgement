@@ -14,8 +14,11 @@ export type ValidationResult =
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const REQUIRED_FIELDS = [
-  ["name", "Nama lengkap", 2, 120],
-  ["email", "Email kantor", 5, 200],
+  ["firstName", "Nama depan", 1, 80],
+  ["lastName", "Nama belakang", 1, 80],
+  ["displayName", "Display name", 2, 160],
+  ["fullName", "Nama lengkap", 2, 160],
+  ["email", "Email", 5, 200],
   ["jobTitle", "Jabatan", 2, 120],
   ["department", "Departemen", 2, 120],
   ["managerName", "Nama manager", 2, 120],
@@ -44,7 +47,7 @@ export function parseNewUserInput(payload: unknown): ValidationResult {
   }
 
   if (!errors.email && !EMAIL_PATTERN.test(draft.email)) {
-    errors.email = "Masukkan alamat email kantor yang valid.";
+    errors.email = "Masukkan alamat email yang valid.";
   }
 
   // The manager's email is how the approval ticket gets assigned, which is what
@@ -56,16 +59,21 @@ export function parseNewUserInput(payload: unknown): ValidationResult {
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   const managerAccountId = asString(body.managerAccountId);
+  const description = asString(body.description);
 
   return {
     ok: true,
     value: {
-      name: draft.name,
+      firstName: draft.firstName,
+      lastName: draft.lastName,
+      displayName: draft.displayName,
+      fullName: draft.fullName,
       email: draft.email.toLowerCase(),
       jobTitle: draft.jobTitle,
       department: draft.department,
       managerName: draft.managerName,
       managerEmail: draft.managerEmail.toLowerCase(),
+      description: description || undefined,
       managerAccountId: managerAccountId || undefined,
     },
   };

@@ -1,5 +1,5 @@
 import { getJiraConfig } from "@/lib/config/env";
-import type { Employee, JiraIssueRef, AccessRequest } from "@/lib/types";
+import type { AccessRequest, Employee, JiraIssueRef, TransferTarget } from "@/lib/types";
 
 import { detailList, doc, heading, link, paragraph, rule, strong, text } from "./adf";
 import { getJiraClient } from "./jiraClient";
@@ -69,12 +69,28 @@ function requestLink(request: AccessRequest) {
   return base ? link("Buka pengajuan di dashboard HC", `${base}/requests`) : text(request.id);
 }
 
+/** The "moving to" half of a transfer ticket. */
+function transferDetails(target: TransferTarget): Array<[string, string]> {
+  const rows: Array<[string, string]> = [
+    ["Divisi tujuan", target.department],
+    ["Posisi baru", target.jobTitle],
+  ];
+  if (target.managerName) {
+    rows.push([
+      "Manager baru",
+      target.managerEmail ? `${target.managerName} (${target.managerEmail})` : target.managerName,
+    ]);
+  }
+  return rows;
+}
+
 function employeeDetails(employee: Employee): Array<[string, string]> {
   return [
-    ["Nama lengkap", employee.name],
-    ["Email kantor", employee.email],
-    ["Jabatan", employee.jobTitle],
-    ["Departemen", employee.department],
+    ["Nama lengkap", employee.fullName],
+    ["Display name", employee.displayName],
+    ["Email", employee.email],
+    ["Jabatan saat ini", employee.jobTitle],
+    ["Divisi saat ini", employee.department],
     ["Manager", `${employee.managerName} (${employee.managerEmail})`],
   ];
 }
@@ -82,7 +98,7 @@ function employeeDetails(employee: Employee): Array<[string, string]> {
 /** Wording that differs between adding and removing an account. */
 const COPY = {
   ONBOARDING: {
-    approvalSummary: (e: Employee) => `[Persetujuan] Akun baru untuk ${e.name} (${e.jobTitle})`,
+    approvalSummary: (e: Employee) => `[Persetujuan] Akun baru untuk ${e.fullName} (${e.jobTitle})`,
     approvalHeading: "Butuh persetujuan manager",
     approvalIntro: "Human Capital mengajukan pembuatan akun baru untuk ",
     approvalOutcome:
@@ -90,38 +106,38 @@ const COPY = {
     approvalLabels: ["hc-onboarding", "manager-approval"],
     detailsHeading: "Data karyawan baru",
 
-    fulfilSummary: (e: Employee) => `[Penyiapan] Siapkan akun dan akses untuk ${e.name}`,
+    fulfilSummary: (e: Employee) => `[Penyiapan] Siapkan akun dan akses untuk ${e.fullName}`,
     fulfilHeading: "Permintaan penyiapan akun",
     fulfilIntro: "Mohon siapkan akun dan akses dasar untuk karyawan berikut.",
     fulfilChecklist:
       "Akun direktori, mailbox email, pendaftaran SSO, profil VPN, dan role aplikasi dasar sesuai departemen.",
     fulfilOutcome: (e: Employee) => [
       " jika penyiapan sudah selesai — dashboard HC otomatis mengubah status ",
-      e.name,
+      e.fullName,
       " menjadi Aktif.",
     ] as const,
     fulfilLabels: ["hc-onboarding", "security-provisioning"],
   },
-  OFFBOARDING: {
-    approvalSummary: (e: Employee) => `[Persetujuan] Penghapusan akun ${e.name} (${e.jobTitle})`,
-    approvalHeading: "Butuh persetujuan manager — pencabutan akses",
-    approvalIntro: "Human Capital mengajukan pencabutan seluruh akses untuk ",
+  TRANSFER: {
+    approvalSummary: (e: Employee) => `[Persetujuan] Pindah divisi ${e.fullName} (${e.jobTitle})`,
+    approvalHeading: "Butuh persetujuan manager — pindah divisi",
+    approvalIntro: "Human Capital mengajukan pemindahan divisi untuk ",
     approvalOutcome:
-      " Setelah disetujui, sistem HC otomatis membuat tiket pencabutan akses untuk IT Security.",
-    approvalLabels: ["hc-offboarding", "manager-approval"],
+      " Setelah disetujui, sistem HC otomatis membuat tiket penyesuaian akses untuk IT Security.",
+    approvalLabels: ["hc-transfer", "manager-approval"],
     detailsHeading: "Data karyawan",
 
-    fulfilSummary: (e: Employee) => `[Pencabutan] Cabut akun dan akses ${e.name}`,
-    fulfilHeading: "Permintaan pencabutan akun",
-    fulfilIntro: "Mohon cabut seluruh akun dan akses karyawan berikut.",
+    fulfilSummary: (e: Employee) => `[Penyesuaian akses] Pindah divisi ${e.fullName}`,
+    fulfilHeading: "Permintaan penyesuaian akses",
+    fulfilIntro: "Mohon sesuaikan akun dan akses karyawan berikut dengan divisi barunya.",
     fulfilChecklist:
-      "Nonaktifkan akun direktori, cabut SSO dan VPN, hapus role aplikasi, pindahkan atau arsipkan mailbox, dan tarik kredensial yang pernah diberikan.",
+      "Cabut role dan grup divisi lama, berikan role dan grup divisi baru, sesuaikan akses aplikasi dan folder bersama, lalu perbarui atasan di direktori.",
     fulfilOutcome: (e: Employee) => [
-      " jika pencabutan sudah selesai — dashboard HC otomatis menandai ",
-      e.name,
-      " sebagai Dihapus.",
+      " jika penyesuaian sudah selesai — dashboard HC otomatis memindahkan ",
+      e.displayName,
+      " ke divisi barunya.",
     ] as const,
-    fulfilLabels: ["hc-offboarding", "security-deprovisioning"],
+    fulfilLabels: ["hc-transfer", "security-access-change"],
   },
 } as const;
 
@@ -146,6 +162,8 @@ export async function createApprovalIssue(
   });
 
   const details = employeeDetails(employee);
+  if (request.transfer) details.push(...transferDetails(request.transfer));
+  if (employee.description) details.push(["Keterangan", employee.description]);
   if (request.reason) details.push(["Alasan dari HC", request.reason]);
 
   const issue = await client.createIssue({
@@ -157,7 +175,7 @@ export async function createApprovalIssue(
       heading(2, copy.approvalHeading),
       paragraph(
         text(copy.approvalIntro),
-        strong(employee.name),
+        strong(employee.fullName),
         text(". Mohon periksa detail di bawah lalu setujui atau tolak pengajuan ini."),
       ),
       heading(3, copy.detailsHeading),
@@ -209,7 +227,9 @@ export async function createFulfilmentIssue(
   });
 
   const details = employeeDetails(employee);
+  if (request.transfer) details.push(...transferDetails(request.transfer));
   details.push(["Tiket persetujuan manager", request.managerIssue?.key ?? "n/a"]);
+  if (employee.description) details.push(["Keterangan", employee.description]);
   if (request.reason) details.push(["Alasan dari HC", request.reason]);
 
   const issue = await client.createIssue({

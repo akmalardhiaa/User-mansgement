@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import type {
+  AccessRequest,
   Employee,
   EmployeeStatus,
   NewUserInput,
-  AccessRequest,
+  TransferInput,
   WorkflowEvent,
 } from "@/lib/types";
 
@@ -98,13 +99,17 @@ export async function createOnboarding(
 
     const employee: Employee = {
       id: employeeId,
-      name: input.name,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      displayName: input.displayName,
+      fullName: input.fullName,
       email: input.email,
       jobTitle: input.jobTitle,
       department: input.department,
       managerName: input.managerName,
       managerEmail: input.managerEmail,
       managerAccountId: input.managerAccountId,
+      description: input.description,
       status: "PENDING_MANAGER_APPROVAL",
       activeRequestId: requestId,
       createdAt: now,
@@ -117,7 +122,7 @@ export async function createOnboarding(
       type: "ONBOARDING",
       stage: "MANAGER_APPROVAL",
       events: [
-        makeEvent("request.created", `HC mengajukan pembuatan akun untuk ${input.name}.`, {
+        makeEvent("request.created", `HC mengajukan pembuatan akun untuk ${input.fullName}.`, {
           actor: "HC Portal",
         }),
       ],
@@ -140,25 +145,36 @@ export class RequestNotAllowedError extends Error {
 }
 
 /**
- * Opens a removal request against an employee who already exists.
+ * Opens a transfer request against an employee who already exists.
  *
- * Their current status is stashed on the request so a manager's rejection can
- * put them back exactly where they were.
+ * Nothing about their position changes yet — the target is parked on the
+ * request and only applied once IT Security closes the second ticket. Their
+ * current status is stashed so a manager's rejection can restore it.
  */
-export async function createOffboarding(
+export async function createTransfer(
   employeeId: string,
-  reason?: string,
+  target: TransferInput,
 ): Promise<{ employee: Employee; request: AccessRequest }> {
   return transaction((draft) => {
     const employee = draft.employees.find((candidate) => candidate.id === employeeId);
     if (!employee) throw new RequestNotAllowedError(`Karyawan ${employeeId} tidak ditemukan.`);
 
-    // Only a settled account can be removed: one already mid-approval would end
+    // Only a settled account can be moved: one already mid-approval would end
     // up with two requests fighting over its status.
-    const removable: EmployeeStatus[] = ["ACTIVE", "DISABLED"];
-    if (!removable.includes(employee.status)) {
+    const movable: EmployeeStatus[] = ["ACTIVE", "DISABLED"];
+    if (!movable.includes(employee.status)) {
       throw new RequestNotAllowedError(
-        `Akun ${employee.name} tidak bisa dihapus selama statusnya ${employee.status}.`,
+        `Posisi ${employee.displayName} tidak bisa diubah selama statusnya ${employee.status}.`,
+      );
+    }
+
+    if (
+      employee.department === target.department &&
+      employee.jobTitle === target.jobTitle &&
+      !target.managerEmail
+    ) {
+      throw new RequestNotAllowedError(
+        `${employee.displayName} sudah berada di posisi tersebut, tidak ada yang perlu diubah.`,
       );
     }
 
@@ -168,21 +184,29 @@ export async function createOffboarding(
     const request: AccessRequest = {
       id: requestId,
       employeeId,
-      type: "OFFBOARDING",
+      type: "TRANSFER",
       stage: "MANAGER_APPROVAL",
-      reason: reason?.trim() || undefined,
+      reason: target.reason,
+      transfer: {
+        department: target.department,
+        jobTitle: target.jobTitle,
+        managerName: target.managerName,
+        managerEmail: target.managerEmail,
+      },
       previousStatus: employee.status,
       events: [
-        makeEvent("request.created", `HC mengajukan pencabutan akses ${employee.name}.`, {
-          actor: "HC Portal",
-        }),
+        makeEvent(
+          "request.created",
+          `HC mengajukan pemindahan ${employee.displayName} ke ${target.department} sebagai ${target.jobTitle}.`,
+          { actor: "HC Portal" },
+        ),
       ],
       processedSignals: [],
       createdAt: now,
       updatedAt: now,
     };
 
-    employee.status = "PENDING_REMOVAL_APPROVAL";
+    employee.status = "PENDING_TRANSFER_APPROVAL";
     employee.activeRequestId = requestId;
     employee.updatedAt = now;
     draft.requests.push(request);
@@ -191,8 +215,8 @@ export async function createOffboarding(
   });
 }
 
-/** Reverses a removal request whose Jira ticket could not be created. */
-export async function cancelOffboarding(requestId: string): Promise<void> {
+/** Reverses a transfer request whose Jira ticket could not be created. */
+export async function cancelTransfer(requestId: string): Promise<void> {
   await transaction((draft) => {
     const request = draft.requests.find((candidate) => candidate.id === requestId);
     if (!request) return;
@@ -226,7 +250,7 @@ export async function setEmployeeAccess(id: string, enabled: boolean): Promise<E
     const allowed: EmployeeStatus[] = ["ACTIVE", "DISABLED"];
     if (!allowed.includes(employee.status)) {
       throw new Error(
-        `Akses ${employee.name} tidak bisa diubah selama statusnya ${employee.status}.`,
+        `Akses ${employee.displayName} tidak bisa diubah selama statusnya ${employee.status}.`,
       );
     }
 

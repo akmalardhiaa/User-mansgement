@@ -10,8 +10,8 @@ as Next.js API Routes.
 
 ## The workflow
 
-Adding and removing an account run the **same two-step chain**. HC never touches the
-account directly — Jira does, once the manager approves.
+Adding an account and moving someone between divisions run the **same two-step
+chain**. HC never changes anything directly — Jira does, once the manager approves.
 
 ```
                  HC raises the request
@@ -24,26 +24,26 @@ account directly — Jira does, once the manager approves.
         Rejected ◄────────┴────────► Approved
             │                            │
             ▼                            ▼
-   onboarding → REJECTED   ┌───────────────────────────────┐
-   removal    → unchanged  │ Jira ticket #2 → IT Security  │  raised automatically
-                           └───────────────────────────────┘
+   new account → REJECTED   ┌───────────────────────────────┐
+   transfer    → unchanged  │ Jira ticket #2 → IT Security  │  raised automatically
+                            └───────────────────────────────┘
                                          │  IT Security closes it
                                          ▼
-                              adding  → ACTIVE
-                              removing → REMOVED
+                          new account → ACTIVE
+                          transfer    → new department, position and manager applied
 ```
 
 | Request | HC action | While pending | When IT Security closes ticket #2 |
 | --- | --- | --- | --- |
-| **Add an account** | *Add user* form | `Awaiting manager` → `Security setup` | `Active` |
-| **Remove an account** | *Remove* on a row | `Removal · awaiting manager` → `Removal · security` | `Removed` |
+| **Add an account** | *Tambah akun* form | `Menunggu manager` → `Penyiapan IT Security` | `Aktif` |
+| **Move divisions** | *Ubah posisi* on a row | `Pindah divisi · menunggu manager` → `Pindah divisi · IT Security` | new position applied, back to `Aktif` |
 
-`Removed` means access was revoked; the employee record is kept, because HC needs the
-history. A rejected removal restores whatever status the employee had before.
+A transfer changes nothing until that last step: the target department, position and
+manager sit on the request, so the directory never shows a move that has not actually
+happened. A rejected transfer leaves the employee exactly where they were.
 
 **Disable/Enable is separate and deliberately unmediated.** It is a reversible suspension
-HC can apply immediately — useful when someone leaves on Friday and the paperwork lands
-on Monday. Removal is the one that needs approval, because it is not reversible.
+HC can apply immediately, without waiting on an approval.
 
 ## Quick start
 
@@ -71,7 +71,7 @@ clickable before any credentials exist.
 | `GET`   | `/api/users`             | The roster.                                                     |
 | `POST`  | `/api/users`             | **Step 1** — records the joiner as pending and raises ticket #1. |
 | `PATCH` | `/api/users/:id/access`  | Enable/disable immediately. Body: `{ "enabled": bool }`.        |
-| `POST`  | `/api/users/:id/removal` | Raises a removal request. Body: `{ "reason"?: string }`.        |
+| `POST`  | `/api/users/:id/transfer`| Raises a transfer request. Body: `{ department, jobTitle, … }`. |
 | `GET`   | `/api/requests`          | All onboarding requests with tickets and audit trail.            |
 | `POST`  | `/api/webhooks/jira`     | **Steps 2 & 4** — applies Jira transitions.                      |
 | `POST`  | `/api/workflow/sync`     | Polling fallback; applies the same transitions.                  |
@@ -225,7 +225,7 @@ src/
 │   └── api/
 │       ├── users/route.ts              # GET roster · POST new request (step 1)
 │       ├── users/[id]/access/route.ts  # PATCH enable/disable
-│       ├── users/[id]/removal/route.ts # POST removal request (step 1)
+│       ├── users/[id]/transfer/route.ts # POST transfer request (step 1)
 │       ├── requests/route.ts           # GET requests
 │       ├── webhooks/jira/route.ts      # POST Jira transitions (steps 2 & 4)
 │       └── workflow/sync/route.ts      # POST polling fallback
@@ -251,8 +251,11 @@ src/
 
 - **The webhook and the poller share one state machine.** Both call
   `applyIssueStatus()`, so the transition rules exist in exactly one place.
-- **Adding and removing share that machine too.** They differ only in a `FLOW` table of
-  end statuses and a `COPY` table of ticket wording, so the two flows cannot drift apart.
+- **Adding and transferring share that machine too.** They differ only in a `FLOW` table
+  of end statuses and a `COPY` table of ticket wording, so the two flows cannot drift
+  apart.
+- **A transfer is applied, not promised.** The target position lives on the request and is
+  written onto the employee only when IT Security closes their ticket.
 - **Transitions are idempotent.** Jira delivers webhooks at least once. Each
   `${issueKey}:${status}` signal is claimed inside a single store transaction *before*
   any Jira call, so a redelivered approval can never raise two provisioning tickets.
