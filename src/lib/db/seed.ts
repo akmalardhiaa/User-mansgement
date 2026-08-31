@@ -29,13 +29,11 @@ export function seedEmployees(): Employee[] {
 
   return rows.map(
     ([firstName, lastName, email, jobTitle, department, managerName, managerEmail, status], index) => {
-      const fullName = `${firstName} ${lastName}`;
       return {
         id: `emp_seed_${String(index + 1).padStart(3, "0")}`,
         firstName,
         lastName,
-        displayName: fullName,
-        fullName,
+        displayName: `${firstName} ${lastName}`,
         email,
         jobTitle,
         department,

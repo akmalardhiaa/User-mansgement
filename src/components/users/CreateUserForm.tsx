@@ -21,7 +21,6 @@ const EMPTY: NewUserInput = {
   firstName: "",
   lastName: "",
   displayName: "",
-  fullName: "",
   email: "",
   jobTitle: "",
   department: "",
@@ -53,20 +52,18 @@ export function CreateUserForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<CreateUserResult | null>(null);
-  const touchedNames = useRef({ displayName: false, fullName: false });
+  const nameEdited = useRef(false);
 
   function update(field: keyof NewUserInput, value: string) {
     setValues((current) => {
       const next = { ...current, [field]: value };
-      // Display name and full name follow first/last until HC edits them
-      // directly, which is how they are usually derived in the directory.
+      // The full name follows first/last until HC edits it directly, which is
+      // how it is usually derived in the directory.
       if (field === "firstName" || field === "lastName") {
-        const derived = `${next.firstName} ${next.lastName}`.trim();
-        if (!touchedNames.current.displayName) next.displayName = derived;
-        if (!touchedNames.current.fullName) next.fullName = derived;
+        if (!nameEdited.current) next.displayName = `${next.firstName} ${next.lastName}`.trim();
       }
-      if (field === "displayName" || field === "fullName") {
-        touchedNames.current[field] = value.trim().length > 0;
+      if (field === "displayName") {
+        nameEdited.current = value.trim().length > 0;
       }
       return next;
     });
@@ -194,22 +191,12 @@ export function CreateUserForm({
             autoComplete="off"
           />
           <Field
-            label="Display name"
+            label="Nama lengkap"
             name="displayName"
             value={values.displayName}
             onChange={(event) => update("displayName", event.target.value)}
             error={fieldErrors.displayName}
             hint="Terisi otomatis dari nama depan dan belakang; bisa diubah."
-            placeholder="Nadia Kusuma"
-            autoComplete="off"
-          />
-          <Field
-            label="Nama lengkap"
-            name="fullName"
-            value={values.fullName}
-            onChange={(event) => update("fullName", event.target.value)}
-            error={fieldErrors.fullName}
-            hint="Nama resmi yang dipakai di tiket Jira dan arsip HC."
             placeholder="Nadia Kusuma"
             autoComplete="off"
           />
