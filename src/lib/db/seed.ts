@@ -14,6 +14,7 @@ export function seedEmployees(): Employee[] {
       jobTitle: "Head of Human Capital",
       department: "Human Capital",
       managerName: "Dimas Anggara",
+      managerEmail: "dimas.anggara@example.com",
       status: "ACTIVE",
     },
     {
@@ -22,6 +23,7 @@ export function seedEmployees(): Employee[] {
       jobTitle: "Senior Backend Engineer",
       department: "Engineering",
       managerName: "Sarah Wijaya",
+      managerEmail: "sarah.wijaya@example.com",
       status: "ACTIVE",
     },
     {
@@ -30,6 +32,7 @@ export function seedEmployees(): Employee[] {
       jobTitle: "Engineering Manager",
       department: "Engineering",
       managerName: "Dimas Anggara",
+      managerEmail: "dimas.anggara@example.com",
       status: "ACTIVE",
     },
     {
@@ -38,6 +41,7 @@ export function seedEmployees(): Employee[] {
       jobTitle: "IT Security Analyst",
       department: "IT Security",
       managerName: "Dimas Anggara",
+      managerEmail: "dimas.anggara@example.com",
       status: "ACTIVE",
     },
     {
@@ -46,6 +50,7 @@ export function seedEmployees(): Employee[] {
       jobTitle: "Financial Analyst",
       department: "Finance",
       managerName: "Dimas Anggara",
+      managerEmail: "dimas.anggara@example.com",
       status: "DISABLED",
     },
     {
@@ -54,6 +59,7 @@ export function seedEmployees(): Employee[] {
       jobTitle: "Product Designer",
       department: "Product",
       managerName: "Sarah Wijaya",
+      managerEmail: "sarah.wijaya@example.com",
       status: "ACTIVE",
     },
   ];

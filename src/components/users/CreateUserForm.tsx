@@ -22,7 +22,7 @@ const EMPTY: NewUserInput = {
   jobTitle: "",
   department: "",
   managerName: "",
-  managerAccountId: "",
+  managerEmail: "",
 };
 
 const DEPARTMENTS = ["Engineering", "Human Capital", "Finance", "Product", "IT Security", "Sales"];
@@ -94,6 +94,19 @@ export function CreateUserForm({
               <strong className="text-ink">Awaiting manager</strong> and is not yet active. An
               approval ticket was raised for {success.employee.managerName}.
             </p>
+            {/* Assignment is what triggers Jira's email, so say plainly whether
+                the approver was actually reached. */}
+            {success.managerIssue?.assignee ? (
+              <p className="mt-2 text-sm text-ok">
+                Jira has emailed {success.managerIssue.assignee} — they can approve straight from
+                the ticket.
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-warn">
+                No Jira account matched {success.employee.managerEmail}, so the ticket is
+                unassigned and no email was sent. Assign it manually in Jira.
+              </p>
+            )}
           </div>
         </div>
 
@@ -197,12 +210,14 @@ export function CreateUserForm({
             autoComplete="off"
           />
           <Field
-            label="Manager Jira account ID"
-            name="managerAccountId"
-            value={values.managerAccountId ?? ""}
-            onChange={(event) => update("managerAccountId", event.target.value)}
-            hint="Optional — assigns the approval ticket directly to the manager."
-            placeholder="5b10ac8d82e05b22cc7d4ef5"
+            label="Manager email"
+            name="managerEmail"
+            type="email"
+            value={values.managerEmail}
+            onChange={(event) => update("managerEmail", event.target.value)}
+            error={fieldErrors.managerEmail}
+            hint="Used to find their Jira account, so Jira emails them the approval ticket."
+            placeholder="sarah.wijaya@example.com"
             autoComplete="off"
           />
         </div>

@@ -30,10 +30,18 @@ export interface JiraIssue {
   assignee?: string;
 }
 
+export interface JiraUser {
+  accountId: string;
+  displayName: string;
+  emailAddress?: string;
+}
+
 export interface JiraClient {
   createIssue(input: CreateIssueInput): Promise<JiraIssue>;
   getIssue(issueKey: string): Promise<JiraIssue>;
   addComment(issueKey: string, body: AdfDocument): Promise<void>;
+  /** Resolves a work email to a Jira account, so tickets can be assigned. */
+  findUserByEmail(email: string): Promise<JiraUser | undefined>;
 }
 
 export class JiraApiError extends Error {
@@ -159,6 +167,21 @@ class RestJiraClient implements JiraClient {
       body: JSON.stringify({ body }),
     });
   }
+
+  async findUserByEmail(email: string): Promise<JiraUser | undefined> {
+    const users = await this.request<JiraUser[]>(
+      `/rest/api/3/user/search?query=${encodeURIComponent(email)}`,
+    );
+    if (!users?.length) return undefined;
+
+    // Jira's privacy settings often hide emailAddress, so an exact match is not
+    // always possible. Prefer one when it is; otherwise only trust an
+    // unambiguous single hit rather than risk assigning the wrong person.
+    const wanted = email.trim().toLowerCase();
+    const exact = users.find((user) => user.emailAddress?.toLowerCase() === wanted);
+    if (exact) return exact;
+    return users.length === 1 ? users[0] : undefined;
+  }
 }
 
 /** Pulls the human-readable part out of Jira's error envelope. */
@@ -218,6 +241,21 @@ class MockJiraClient implements JiraClient {
     const issue = this.issues.get(issueKey.toUpperCase());
     issue?.comments.push(toPlainText(body));
     console.info(`[jira:mock] commented on ${issueKey}`);
+  }
+
+  /** Pretends every address belongs to a Jira account, keyed off the local part. */
+  async findUserByEmail(email: string): Promise<JiraUser | undefined> {
+    const local = email.split("@")[0] ?? email;
+    const displayName = local
+      .split(/[._-]/)
+      .filter(Boolean)
+      .map((part) => part[0].toUpperCase() + part.slice(1))
+      .join(" ");
+    return {
+      accountId: `mock-${local.replace(/[^a-z0-9]/gi, "")}`,
+      displayName: displayName || email,
+      emailAddress: email,
+    };
   }
 }
 

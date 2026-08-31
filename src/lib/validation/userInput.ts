@@ -19,6 +19,7 @@ const REQUIRED_FIELDS = [
   ["jobTitle", "Job title", 2, 120],
   ["department", "Department", 2, 120],
   ["managerName", "Manager name", 2, 120],
+  ["managerEmail", "Manager email", 5, 200],
 ] as const;
 
 function asString(value: unknown): string {
@@ -46,6 +47,12 @@ export function parseNewUserInput(payload: unknown): ValidationResult {
     errors.email = "Enter a valid work email address.";
   }
 
+  // The manager's email is how the approval ticket gets assigned, which is what
+  // makes Jira notify them — so it is required, not optional.
+  if (!errors.managerEmail && !EMAIL_PATTERN.test(draft.managerEmail)) {
+    errors.managerEmail = "Enter a valid email address for the manager.";
+  }
+
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   const managerAccountId = asString(body.managerAccountId);
@@ -58,6 +65,7 @@ export function parseNewUserInput(payload: unknown): ValidationResult {
       jobTitle: draft.jobTitle,
       department: draft.department,
       managerName: draft.managerName,
+      managerEmail: draft.managerEmail.toLowerCase(),
       managerAccountId: managerAccountId || undefined,
     },
   };

@@ -12,6 +12,7 @@ import {
   createManagerApprovalIssue,
   createSecurityProvisioningIssue,
   fetchIssueStatus,
+  type AssigneeResolution,
 } from "@/lib/jira/jiraService";
 import type { Employee, NewUserInput, OnboardingRequest } from "@/lib/types";
 
@@ -61,15 +62,17 @@ export async function submitOnboardingRequest(
 ): Promise<{ employee: Employee; request: OnboardingRequest }> {
   const { employee, request } = await createOnboarding(input);
 
-  let issue;
+  let created;
   try {
-    issue = await createManagerApprovalIssue(employee, request);
+    created = await createManagerApprovalIssue(employee, request);
   } catch (error) {
     // The employee only exists because of this request; without a manager
     // ticket it could never progress, so undo the write rather than stranding it.
     await deleteOnboarding(request.id);
     throw error;
   }
+
+  const { ref: issue, assignee } = created;
 
   return transaction((draft) => {
     const stored = draft.requests.find((candidate) => candidate.id === request.id);
@@ -83,6 +86,7 @@ export async function submitOnboardingRequest(
         `Approval ticket ${issue.key} raised for ${employee.managerName}.`,
         { actor: "HC Portal", issueKey: issue.key },
       ),
+      notificationEvent(issue.key, assignee, employee.managerEmail),
     );
 
     const storedEmployee = draft.employees.find((candidate) => candidate.id === employee.id)!;
@@ -219,6 +223,33 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
   return raiseSecurityTicket(claim, signal, actor);
 }
 
+/**
+ * Records whether the ticket actually reached a person.
+ *
+ * Jira's notification scheme emails the assignee when an issue is created, so
+ * an assigned ticket means the approver has been told. An unassigned one is
+ * silent, and HC needs to see that rather than assume the email went out.
+ */
+function notificationEvent(
+  issueKey: string,
+  assignee: AssigneeResolution,
+  email: string | undefined,
+) {
+  if (assignee.problem) {
+    return makeEvent("notify.failed", `Nobody was notified: ${assignee.problem}`, {
+      actor: "HC Portal",
+      issueKey,
+    });
+  }
+
+  const who = assignee.displayName ?? email ?? "the assignee";
+  return makeEvent(
+    "notify.sent",
+    `${issueKey} was assigned to ${who}, so Jira emails them the approval request.`,
+    { actor: "HC Portal", issueKey },
+  );
+}
+
 /** Step 3 — raise the IT Security ticket, or undo the approval if Jira refuses. */
 async function raiseSecurityTicket(
   claim: Extract<Claim, { kind: "create_security" }>,
@@ -227,13 +258,15 @@ async function raiseSecurityTicket(
 ): Promise<TransitionResult> {
   const { employee, request } = claim;
 
-  let issue;
+  let created;
   try {
-    issue = await createSecurityProvisioningIssue(employee, request, claim.approvedBy);
+    created = await createSecurityProvisioningIssue(employee, request, claim.approvedBy);
   } catch (error) {
     await rollbackApproval(request.id, signal);
     throw error;
   }
+
+  const { ref: issue, assignee } = created;
 
   const result = await transaction<TransitionResult>((draft) => {
     const stored = draft.requests.find((candidate) => candidate.id === request.id);
@@ -252,6 +285,7 @@ async function raiseSecurityTicket(
         actor: "HC Portal",
         issueKey: issue.key,
       }),
+      notificationEvent(issue.key, assignee, getJiraConfig().securityAssigneeEmail),
     );
 
     return {
