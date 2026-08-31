@@ -4,12 +4,19 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
+import { apiDataSource, type DashboardDataSource } from "@/lib/client/dataSource";
 
 /**
  * Triggers the polling fallback (`POST /api/workflow/sync`) on demand — handy
  * when the app is running locally and Jira cannot reach the webhook endpoint.
  */
-export function SyncButton() {
+export function SyncButton({
+  dataSource = apiDataSource,
+  onChanged,
+}: {
+  dataSource?: DashboardDataSource;
+  onChanged?: () => void;
+} = {}) {
   const router = useRouter();
   const [isRefreshing, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -19,16 +26,17 @@ export function SyncButton() {
     setBusy(true);
     setMessage(null);
     try {
-      const response = await fetch("/api/workflow/sync", { method: "POST" });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Sync failed.");
-      const { checked, advanced } = payload.data as { checked: number; advanced: number };
+      const { checked, advanced } = await dataSource.sync();
       setMessage(
         advanced > 0
           ? `Advanced ${advanced} of ${checked} open request(s).`
           : `Checked ${checked} open request(s); nothing changed.`,
       );
-      startTransition(() => router.refresh());
+      if (onChanged) {
+        onChanged();
+      } else {
+        startTransition(() => router.refresh());
+      }
     } catch (cause) {
       setMessage((cause as Error).message);
     } finally {

@@ -6,7 +6,13 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Card, Field } from "@/components/ui/Field";
-import type { Employee, JiraIssueRef, NewUserInput } from "@/lib/types";
+import {
+  SubmissionError,
+  apiDataSource,
+  type CreateUserResult,
+  type DashboardDataSource,
+} from "@/lib/client/dataSource";
+import type { NewUserInput } from "@/lib/types";
 
 type FieldErrors = Partial<Record<keyof NewUserInput, string>>;
 
@@ -21,24 +27,28 @@ const EMPTY: NewUserInput = {
 
 const DEPARTMENTS = ["Engineering", "Human Capital", "Finance", "Product", "IT Security", "Sales"];
 
-interface SubmitSuccess {
-  employee: Employee;
-  managerIssue?: JiraIssueRef;
-}
-
 /**
  * Step 1 of the workflow from the HC side.
  *
  * Submitting never activates an account — it hands the request to the manager
  * via Jira, which the confirmation panel makes explicit.
  */
-export function CreateUserForm() {
+export function CreateUserForm({
+  dataSource = apiDataSource,
+  onCreated,
+  onTrack,
+}: {
+  dataSource?: DashboardDataSource;
+  onCreated?: () => void;
+  /** Demo mode switches tab instead of navigating to /requests. */
+  onTrack?: () => void;
+} = {}) {
   const router = useRouter();
   const [values, setValues] = useState<NewUserInput>(EMPTY);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState<SubmitSuccess | null>(null);
+  const [success, setSuccess] = useState<CreateUserResult | null>(null);
 
   function update(field: keyof NewUserInput, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -52,22 +62,18 @@ export function CreateUserForm() {
     setFieldErrors({});
 
     try {
-      const response = await fetch("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
-      const payload = await response.json();
-
-      if (!response.ok || !payload.ok) {
-        if (payload.fieldErrors) setFieldErrors(payload.fieldErrors as FieldErrors);
-        throw new Error(payload.error ?? "Could not submit the request.");
-      }
-
-      setSuccess(payload.data as SubmitSuccess);
+      const result = await dataSource.createUser(values);
+      setSuccess(result);
       setValues(EMPTY);
-      router.refresh();
+      if (onCreated) {
+        onCreated();
+      } else {
+        router.refresh();
+      }
     } catch (cause) {
+      if (cause instanceof SubmissionError && cause.fieldErrors) {
+        setFieldErrors(cause.fieldErrors as FieldErrors);
+      }
       setFormError((cause as Error).message);
     } finally {
       setSubmitting(false);
@@ -107,12 +113,16 @@ export function CreateUserForm() {
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/requests"
-            className="inline-flex items-center rounded-lg border border-accent/60 bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-soft"
-          >
-            Track approval
-          </Link>
+          {onTrack ? (
+            <Button onClick={onTrack}>Track approval</Button>
+          ) : (
+            <Link
+              href="/requests"
+              className="inline-flex items-center rounded-lg border border-accent/60 bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-soft"
+            >
+              Track approval
+            </Link>
+          )}
           <Button variant="secondary" onClick={() => setSuccess(null)}>
             Add another user
           </Button>

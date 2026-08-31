@@ -1,0 +1,79 @@
+# Publishes the static demo to GitHub Pages.
+#
+# GitHub Pages serves static files only, so the API routes and the server-
+# rendered pages cannot run there. This workflow removes them from its own
+# checkout (the repository is untouched) and exports the browser-only demo
+# at src/app/demo instead.
+#
+# The full application — including POST /api/webhooks/jira, which Jira must be
+# able to reach — needs a Node host. See the README.
+
+name: Deploy demo to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deployment finish rather than cancelling it half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Guard the real app: the demo is only ever an addition to it.
+      - name: Verify the server build still compiles
+        run: npm run build
+
+      - name: Strip server-only routes and promote the demo to the site root
+        run: |
+          rm -rf src/app/api src/app/requests src/app/users src/app/page.tsx .next
+          mv src/app/demo/page.tsx src/app/page.tsx
+          rm -rf src/app/demo
+
+      - uses: actions/configure-pages@v5
+        with:
+          # Best effort: turns Pages on if the repository has not enabled it.
+          enablement: true
+
+      - name: Build the static export
+        env:
+          STATIC_EXPORT: "true"
+          NEXT_PUBLIC_DEMO: "true"
+          # Project Pages live under /<repo>/, so assets need that prefix.
+          PAGES_BASE_PATH: /${{ github.event.repository.name }}
+        run: npx next build
+
+      # Stops GitHub Pages' Jekyll pass from dropping Next.js' _next/ directory.
+      - run: touch out/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

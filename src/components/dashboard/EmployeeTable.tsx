@@ -5,12 +5,17 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
 import { StatusBadge, employeeStatusLabel } from "@/components/ui/StatusBadge";
+import { apiDataSource, type DashboardDataSource } from "@/lib/client/dataSource";
 import { EMPLOYEE_STATUSES, type Employee, type EmployeeStatus, type JiraIssueRef } from "@/lib/types";
 
 interface EmployeeTableProps {
   employees: Employee[];
   /** The Jira ticket a still-onboarding employee is currently blocked on. */
   activeTickets: Record<string, JiraIssueRef | undefined>;
+  /** Swapped for an in-browser mock by the static demo. */
+  dataSource?: DashboardDataSource;
+  /** Called after a successful change; defaults to refreshing the server components. */
+  onChanged?: () => void;
 }
 
 function initials(name: string): string {
@@ -26,7 +31,12 @@ function canToggleAccess(status: EmployeeStatus): boolean {
   return status === "ACTIVE" || status === "DISABLED";
 }
 
-export function EmployeeTable({ employees, activeTickets }: EmployeeTableProps) {
+export function EmployeeTable({
+  employees,
+  activeTickets,
+  dataSource = apiDataSource,
+  onChanged,
+}: EmployeeTableProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
@@ -50,17 +60,13 @@ export function EmployeeTable({ employees, activeTickets }: EmployeeTableProps) 
     setBusyId(employee.id);
     setError(null);
     try {
-      const response = await fetch(`/api/users/${employee.id}/access`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: employee.status !== "ACTIVE" }),
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? "Could not update access.");
+      await dataSource.toggleAccess(employee.id, employee.status !== "ACTIVE");
+      if (onChanged) {
+        onChanged();
+      } else {
+        // Re-render the server component so the table reflects the new status.
+        startTransition(() => router.refresh());
       }
-      // Re-render the server component so the table reflects the new status.
-      startTransition(() => router.refresh());
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
