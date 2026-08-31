@@ -1,5 +1,7 @@
 import { getJiraConfig } from "@/lib/config/env";
 import {
+  cancelOffboarding,
+  createOffboarding,
   createOnboarding,
   deleteOnboarding,
   findRequestByIssueKeyInDraft,
@@ -9,25 +11,48 @@ import {
 } from "@/lib/db/repository";
 import {
   commentOnIssue,
-  createManagerApprovalIssue,
-  createSecurityProvisioningIssue,
+  createApprovalIssue,
+  createFulfilmentIssue,
   fetchIssueStatus,
   type AssigneeResolution,
 } from "@/lib/jira/jiraService";
-import type { Employee, NewUserInput, OnboardingRequest } from "@/lib/types";
+import type {
+  AccessRequest,
+  Employee,
+  EmployeeStatus,
+  NewUserInput,
+  RequestType,
+} from "@/lib/types";
 
 import { classifyManagerStatus, isSecurityComplete } from "./statusRules";
 
 /**
  * The onboarding state machine.
  *
- *   submitOnboardingRequest()  -> creates the employee + manager approval ticket
- *   applyIssueStatus()         -> advances the request when a Jira status changes
- *   syncOpenRequests()         -> polling fallback that calls applyIssueStatus()
+ *   submitOnboardingRequest()   -> new employee + manager approval ticket
+ *   submitOffboardingRequest()  -> removal request for an existing employee
+ *   applyIssueStatus()          -> advances a request when a Jira status changes
+ *   syncOpenRequests()          -> polling fallback that calls applyIssueStatus()
  *
- * Both the webhook route and the polling route funnel into `applyIssueStatus`,
- * so the transition rules exist in exactly one place.
+ * Adding and removing an account run the same chain and differ only in the
+ * statuses they land on, so both submit functions feed one `applyIssueStatus`.
+ * The webhook route and the polling route funnel into it too, which keeps the
+ * transition rules in exactly one place.
  */
+
+/** The employee status at each point of each flow. */
+const FLOW = {
+  ONBOARDING: {
+    awaitingManager: "PENDING_MANAGER_APPROVAL",
+    awaitingSecurity: "PENDING_SECURITY_SETUP",
+    fulfilled: "ACTIVE",
+  },
+  OFFBOARDING: {
+    awaitingManager: "PENDING_REMOVAL_APPROVAL",
+    awaitingSecurity: "PENDING_REMOVAL_SETUP",
+    fulfilled: "REMOVED",
+  },
+} as const satisfies Record<RequestType, Record<string, EmployeeStatus>>;
 
 export type TransitionOutcome =
   | "unknown_issue"
@@ -59,12 +84,12 @@ export interface TransitionInput {
 
 export async function submitOnboardingRequest(
   input: NewUserInput,
-): Promise<{ employee: Employee; request: OnboardingRequest }> {
+): Promise<{ employee: Employee; request: AccessRequest }> {
   const { employee, request } = await createOnboarding(input);
 
   let created;
   try {
-    created = await createManagerApprovalIssue(employee, request);
+    created = await createApprovalIssue(employee, request);
   } catch (error) {
     // The employee only exists because of this request; without a manager
     // ticket it could never progress, so undo the write rather than stranding it.
@@ -94,6 +119,52 @@ export async function submitOnboardingRequest(
   });
 }
 
+/**
+ * HC asks for an existing employee's access to be revoked.
+ *
+ * Same chain as onboarding: the manager approves in Jira, then IT Security
+ * deprovisions. The employee keeps working until IT Security closes the second
+ * ticket — HC can still suspend them immediately with the access toggle if the
+ * departure is urgent.
+ */
+export async function submitOffboardingRequest(
+  employeeId: string,
+  reason?: string,
+): Promise<{ employee: Employee; request: AccessRequest }> {
+  const { employee, request } = await createOffboarding(employeeId, reason);
+
+  let created;
+  try {
+    created = await createApprovalIssue(employee, request);
+  } catch (error) {
+    // Without an approval ticket the removal could never progress, and the
+    // employee would be stuck showing as pending. Put them back as they were.
+    await cancelOffboarding(request.id);
+    throw error;
+  }
+
+  const { ref: issue, assignee } = created;
+
+  return transaction((draft) => {
+    const stored = draft.requests.find((candidate) => candidate.id === request.id);
+    if (!stored) throw new Error(`Access request ${request.id} disappeared mid-submit.`);
+
+    stored.managerIssue = issue;
+    stored.updatedAt = new Date().toISOString();
+    stored.events.push(
+      makeEvent(
+        "manager.requested",
+        `Removal approval ticket ${issue.key} raised for ${employee.managerName}.`,
+        { actor: "HC Portal", issueKey: issue.key },
+      ),
+      notificationEvent(issue.key, assignee, employee.managerEmail),
+    );
+
+    const storedEmployee = draft.employees.find((candidate) => candidate.id === employee.id)!;
+    return { employee: storedEmployee, request: stored };
+  });
+}
+
 /* -------------------------------------------------------------------------- */
 /* Steps 2-4 — Jira drives the request forward                                */
 /* -------------------------------------------------------------------------- */
@@ -104,7 +175,7 @@ export async function submitOnboardingRequest(
  */
 type Claim =
   | { kind: "result"; result: TransitionResult }
-  | { kind: "create_security"; employee: Employee; request: OnboardingRequest; approvedBy?: string };
+  | { kind: "create_security"; employee: Employee; request: AccessRequest; approvedBy?: string };
 
 export async function applyIssueStatus(input: TransitionInput): Promise<TransitionResult> {
   const config = getJiraConfig();
@@ -158,20 +229,29 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
 
       if (decision === "REJECTED") {
         request.stage = "REJECTED";
-        employee.status = "REJECTED";
+        // A refused joiner is REJECTED; a refused removal simply keeps working,
+        // so it goes back to whatever status it held before HC raised this.
+        employee.status =
+          request.type === "OFFBOARDING" ? (request.previousStatus ?? "ACTIVE") : "REJECTED";
+        employee.activeRequestId = undefined;
         request.events.push(
           makeEvent("manager.rejected", `${actor} rejected the request on ${issueKey}.`, {
             actor,
             issueKey,
           }),
         );
-        return result("rejected", `Request rejected by ${actor}.`);
+        return result(
+          "rejected",
+          request.type === "OFFBOARDING"
+            ? `Removal rejected by ${actor}; ${employee.name} keeps their access.`
+            : `Request rejected by ${actor}.`,
+        );
       }
 
       // Approved: move the request on optimistically. If raising the security
       // ticket fails we roll this back below.
       request.stage = "SECURITY_PROVISIONING";
-      employee.status = "PENDING_SECURITY_SETUP";
+      employee.status = FLOW[request.type].awaitingSecurity;
       request.events.push(
         makeEvent("manager.approved", `${actor} approved the request on ${issueKey}.`, {
           actor,
@@ -200,16 +280,18 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
       request.processedSignals.push(signal);
       request.stage = "COMPLETED";
       request.updatedAt = now;
-      employee.status = "ACTIVE";
+      employee.status = FLOW[request.type].fulfilled;
+      employee.activeRequestId = undefined;
       employee.updatedAt = now;
+      const outcome = request.type === "OFFBOARDING" ? "Removed" : "Active";
       request.events.push(
         makeEvent(
           "security.completed",
-          `${actor} closed ${issueKey}; ${employee.name} is now Active.`,
+          `${actor} closed ${issueKey}; ${employee.name} is now ${outcome}.`,
           { actor, issueKey },
         ),
       );
-      return result("completed", `${employee.name} is now Active.`);
+      return result("completed", `${employee.name} is now ${outcome}.`);
     }
 
     return result(
@@ -260,7 +342,7 @@ async function raiseSecurityTicket(
 
   let created;
   try {
-    created = await createSecurityProvisioningIssue(employee, request, claim.approvedBy);
+    created = await createFulfilmentIssue(employee, request, claim.approvedBy);
   } catch (error) {
     await rollbackApproval(request.id, signal);
     throw error;
@@ -280,8 +362,9 @@ async function raiseSecurityTicket(
 
     stored.securityIssue = issue;
     stored.updatedAt = new Date().toISOString();
+    const noun = request.type === "OFFBOARDING" ? "Deprovisioning" : "Provisioning";
     stored.events.push(
-      makeEvent("security.requested", `Provisioning ticket ${issue.key} raised for IT Security.`, {
+      makeEvent("security.requested", `${noun} ticket ${issue.key} raised for IT Security.`, {
         actor: "HC Portal",
         issueKey: issue.key,
       }),
@@ -290,7 +373,7 @@ async function raiseSecurityTicket(
 
     return {
       outcome: "security_ticket_created",
-      message: `Approved by ${actor}; provisioning ticket ${issue.key} raised.`,
+      message: `Approved by ${actor}; ${noun.toLowerCase()} ticket ${issue.key} raised.`,
       requestId: stored.id,
       issueKey: issue.key,
     };
@@ -323,7 +406,7 @@ async function rollbackApproval(requestId: string, signal: string): Promise<void
     );
 
     const employee = draft.employees.find((candidate) => candidate.id === request.employeeId);
-    if (employee) employee.status = "PENDING_MANAGER_APPROVAL";
+    if (employee) employee.status = FLOW[request.type].awaitingManager;
   });
 }
 

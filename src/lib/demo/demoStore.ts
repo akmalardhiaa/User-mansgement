@@ -5,7 +5,7 @@ import type {
 } from "@/lib/client/dataSource";
 import { SubmissionError } from "@/lib/client/dataSource";
 import { seedEmployees } from "@/lib/db/seed";
-import type { Employee, JiraIssueRef, NewUserInput, OnboardingRequest } from "@/lib/types";
+import type { AccessRequest, Employee, JiraIssueRef, NewUserInput } from "@/lib/types";
 import { parseNewUserInput } from "@/lib/validation/userInput";
 import { classifyManagerStatus, isSecurityComplete } from "@/lib/workflow/statusRules";
 
@@ -15,7 +15,7 @@ import { classifyManagerStatus, isSecurityComplete } from "@/lib/workflow/status
  *
  * It reuses the real validation rules, seed data and status mapping, but keeps
  * everything in memory and stands in for Jira with locally generated ticket
- * keys. The authoritative implementation is `src/lib/workflow/onboardingWorkflow.ts`.
+ * keys. The authoritative implementation is `src/lib/workflow/accessWorkflow.ts`.
  */
 
 /** Mirrors the defaults documented in `.env.example`. */
@@ -29,7 +29,7 @@ const DEMO_PROJECT_KEY = "HC";
 
 export interface DemoState {
   employees: Employee[];
-  requests: OnboardingRequest[];
+  requests: AccessRequest[];
 }
 
 function now(): string {
@@ -42,7 +42,7 @@ function event(type: string, message: string, actor?: string, issueKey?: string)
 
 export class DemoStore implements DashboardDataSource {
   private employees: Employee[] = seedEmployees();
-  private requests: OnboardingRequest[] = [];
+  private requests: AccessRequest[] = [];
   private ticketCounter = 1000;
   private listeners = new Set<() => void>();
 
@@ -105,14 +105,15 @@ export class DemoStore implements DashboardDataSource {
       ...value,
       id: employeeId,
       status: "PENDING_MANAGER_APPROVAL",
-      onboardingRequestId: requestId,
+      activeRequestId: requestId,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
 
-    const request: OnboardingRequest = {
+    const request: AccessRequest = {
       id: requestId,
       employeeId,
+      type: "ONBOARDING",
       stage: "MANAGER_APPROVAL",
       managerIssue,
       processedSignals: [],
@@ -130,6 +131,51 @@ export class DemoStore implements DashboardDataSource {
     };
 
     this.employees.push(employee);
+    this.requests.push(request);
+    this.emit();
+
+    return { employee, request, managerIssue };
+  }
+
+  async requestRemoval(employeeId: string, reason?: string): Promise<CreateUserResult> {
+    const employee = this.employees.find((candidate) => candidate.id === employeeId);
+    if (!employee) throw new Error(`Employee ${employeeId} was not found.`);
+    if (employee.status !== "ACTIVE" && employee.status !== "DISABLED") {
+      throw new Error(
+        `${employee.name} cannot be removed while the account is ${employee.status}.`,
+      );
+    }
+
+    const timestamp = now();
+    const requestId = `req_demo_removal_${this.requests.length}`;
+    const managerIssue = this.nextTicket();
+    managerIssue.assignee = employee.managerName;
+
+    const request: AccessRequest = {
+      id: requestId,
+      employeeId,
+      type: "OFFBOARDING",
+      stage: "MANAGER_APPROVAL",
+      reason: reason?.trim() || undefined,
+      previousStatus: employee.status,
+      managerIssue,
+      processedSignals: [],
+      events: [
+        event("request.created", `HC requested access removal for ${employee.name}.`, "HC Portal"),
+        event(
+          "manager.requested",
+          `Removal approval ticket ${managerIssue.key} raised for ${employee.managerName}.`,
+          "HC Portal",
+          managerIssue.key,
+        ),
+      ],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    employee.status = "PENDING_REMOVAL_APPROVAL";
+    employee.activeRequestId = requestId;
+    employee.updatedAt = timestamp;
     this.requests.push(request);
     this.emit();
 
@@ -202,7 +248,9 @@ export class DemoStore implements DashboardDataSource {
 
       if (decision === "REJECTED") {
         request.stage = "REJECTED";
-        employee.status = "REJECTED";
+        employee.status =
+          request.type === "OFFBOARDING" ? (request.previousStatus ?? "ACTIVE") : "REJECTED";
+        employee.activeRequestId = undefined;
         request.events.push(
           event("manager.rejected", `${actor} rejected the request on ${issueKey}.`, actor, issueKey),
         );
@@ -214,7 +262,8 @@ export class DemoStore implements DashboardDataSource {
       const securityIssue = this.nextTicket();
       request.stage = "SECURITY_PROVISIONING";
       request.securityIssue = securityIssue;
-      employee.status = "PENDING_SECURITY_SETUP";
+      employee.status =
+        request.type === "OFFBOARDING" ? "PENDING_REMOVAL_SETUP" : "PENDING_SECURITY_SETUP";
       request.events.push(
         event("manager.approved", `${actor} approved the request on ${issueKey}.`, actor, issueKey),
         event(
@@ -243,18 +292,19 @@ export class DemoStore implements DashboardDataSource {
       request.processedSignals.push(signal);
       request.stage = "COMPLETED";
       request.updatedAt = timestamp;
-      employee.status = "ACTIVE";
+      employee.status = request.type === "OFFBOARDING" ? "REMOVED" : "ACTIVE";
+      employee.activeRequestId = undefined;
       employee.updatedAt = timestamp;
       request.events.push(
         event(
           "security.completed",
-          `${actor} closed ${issueKey}; ${employee.name} is now Active.`,
+          `${actor} closed ${issueKey}; ${employee.name} is now ${employee.status === "REMOVED" ? "Removed" : "Active"}.`,
           actor,
           issueKey,
         ),
       );
       this.emit();
-      return `${employee.name} is now Active.`;
+      return `${employee.name} is now ${employee.status === "REMOVED" ? "Removed" : "Active"}.`;
     }
 
     return `${issueKey} moved to "${statusName}" but the request is at stage ${request.stage}.`;
@@ -278,7 +328,10 @@ export class DemoStore implements DashboardDataSource {
           {
             issue: request.securityIssue,
             employeeName: employee?.name ?? "",
-            stage: "IT Security provisioning",
+            stage:
+              request.type === "OFFBOARDING"
+                ? "IT Security deprovisioning"
+                : "IT Security provisioning",
           },
         ];
       }

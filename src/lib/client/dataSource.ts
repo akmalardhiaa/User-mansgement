@@ -1,4 +1,4 @@
-import type { Employee, JiraIssueRef, NewUserInput, OnboardingRequest } from "@/lib/types";
+import type { Employee, JiraIssueRef, NewUserInput, AccessRequest } from "@/lib/types";
 
 /**
  * The write operations the dashboard UI performs.
@@ -10,7 +10,7 @@ import type { Employee, JiraIssueRef, NewUserInput, OnboardingRequest } from "@/
 
 export interface CreateUserResult {
   employee: Employee;
-  request: OnboardingRequest;
+  request: AccessRequest;
   managerIssue?: JiraIssueRef;
 }
 
@@ -21,6 +21,8 @@ export interface SyncResult {
 
 export interface DashboardDataSource {
   toggleAccess(employeeId: string, enabled: boolean): Promise<Employee>;
+  /** Opens an offboarding request; the account is not touched until IT Security acts. */
+  requestRemoval(employeeId: string, reason?: string): Promise<CreateUserResult>;
   createUser(input: NewUserInput): Promise<CreateUserResult>;
   sync(): Promise<SyncResult>;
 }
@@ -54,6 +56,15 @@ export const apiDataSource: DashboardDataSource = {
     });
     const { employee } = await unwrap<{ employee: Employee }>(response);
     return employee;
+  },
+
+  async requestRemoval(employeeId, reason) {
+    const response = await fetch(`/api/users/${employeeId}/removal`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    });
+    return unwrap<CreateUserResult>(response);
   },
 
   async createUser(input) {

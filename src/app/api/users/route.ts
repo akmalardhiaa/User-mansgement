@@ -2,7 +2,7 @@ import { DuplicateEmailError, listEmployees } from "@/lib/db/repository";
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
 import { JiraApiError } from "@/lib/jira/jiraClient";
 import { parseNewUserInput } from "@/lib/validation/userInput";
-import { submitOnboardingRequest } from "@/lib/workflow/onboardingWorkflow";
+import { submitOnboardingRequest } from "@/lib/workflow/accessWorkflow";
 
 export const dynamic = "force-dynamic";
 

@@ -4,7 +4,7 @@ import type {
   Employee,
   EmployeeStatus,
   NewUserInput,
-  OnboardingRequest,
+  AccessRequest,
   WorkflowEvent,
 } from "@/lib/types";
 
@@ -43,7 +43,7 @@ export async function listEmployees(): Promise<Employee[]> {
   return [...employees].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export async function listRequests(): Promise<OnboardingRequest[]> {
+export async function listRequests(): Promise<AccessRequest[]> {
   const { requests } = await readStore();
   return [...requests].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
@@ -53,13 +53,13 @@ export async function getEmployeeById(id: string): Promise<Employee | undefined>
   return employees.find((employee) => employee.id === id);
 }
 
-export async function getRequestById(id: string): Promise<OnboardingRequest | undefined> {
+export async function getRequestById(id: string): Promise<AccessRequest | undefined> {
   const { requests } = await readStore();
   return requests.find((request) => request.id === id);
 }
 
 /** Requests still waiting on Jira — the working set for the polling fallback. */
-export async function listOpenRequests(): Promise<OnboardingRequest[]> {
+export async function listOpenRequests(): Promise<AccessRequest[]> {
   const { requests } = await readStore();
   return requests.filter(
     (request) => request.stage === "MANAGER_APPROVAL" || request.stage === "SECURITY_PROVISIONING",
@@ -70,7 +70,7 @@ export async function listOpenRequests(): Promise<OnboardingRequest[]> {
 export function findRequestByIssueKeyInDraft(
   draft: StoreShape,
   issueKey: string,
-): OnboardingRequest | undefined {
+): AccessRequest | undefined {
   const key = issueKey.toUpperCase();
   return draft.requests.find(
     (request) =>
@@ -85,7 +85,7 @@ export function findRequestByIssueKeyInDraft(
  */
 export async function createOnboarding(
   input: NewUserInput,
-): Promise<{ employee: Employee; request: OnboardingRequest }> {
+): Promise<{ employee: Employee; request: AccessRequest }> {
   return transaction((draft) => {
     const email = input.email.toLowerCase();
     if (draft.employees.some((employee) => employee.email.toLowerCase() === email)) {
@@ -106,14 +106,15 @@ export async function createOnboarding(
       managerEmail: input.managerEmail,
       managerAccountId: input.managerAccountId,
       status: "PENDING_MANAGER_APPROVAL",
-      onboardingRequestId: requestId,
+      activeRequestId: requestId,
       createdAt: now,
       updatedAt: now,
     };
 
-    const request: OnboardingRequest = {
+    const request: AccessRequest = {
       id: requestId,
       employeeId,
+      type: "ONBOARDING",
       stage: "MANAGER_APPROVAL",
       events: [
         makeEvent("request.created", `HC submitted an onboarding request for ${input.name}.`, {
@@ -128,6 +129,79 @@ export async function createOnboarding(
     draft.employees.push(employee);
     draft.requests.push(request);
     return { employee, request };
+  });
+}
+
+export class RequestNotAllowedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RequestNotAllowedError";
+  }
+}
+
+/**
+ * Opens a removal request against an employee who already exists.
+ *
+ * Their current status is stashed on the request so a manager's rejection can
+ * put them back exactly where they were.
+ */
+export async function createOffboarding(
+  employeeId: string,
+  reason?: string,
+): Promise<{ employee: Employee; request: AccessRequest }> {
+  return transaction((draft) => {
+    const employee = draft.employees.find((candidate) => candidate.id === employeeId);
+    if (!employee) throw new RequestNotAllowedError(`Employee ${employeeId} was not found.`);
+
+    // Only a settled account can be removed: one already mid-approval would end
+    // up with two requests fighting over its status.
+    const removable: EmployeeStatus[] = ["ACTIVE", "DISABLED"];
+    if (!removable.includes(employee.status)) {
+      throw new RequestNotAllowedError(
+        `${employee.name} cannot be removed while the account is ${employee.status}.`,
+      );
+    }
+
+    const now = timestamp();
+    const requestId = `req_${randomUUID()}`;
+
+    const request: AccessRequest = {
+      id: requestId,
+      employeeId,
+      type: "OFFBOARDING",
+      stage: "MANAGER_APPROVAL",
+      reason: reason?.trim() || undefined,
+      previousStatus: employee.status,
+      events: [
+        makeEvent("request.created", `HC requested access removal for ${employee.name}.`, {
+          actor: "HC Portal",
+        }),
+      ],
+      processedSignals: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    employee.status = "PENDING_REMOVAL_APPROVAL";
+    employee.activeRequestId = requestId;
+    employee.updatedAt = now;
+    draft.requests.push(request);
+
+    return { employee, request };
+  });
+}
+
+/** Reverses a removal request whose Jira ticket could not be created. */
+export async function cancelOffboarding(requestId: string): Promise<void> {
+  await transaction((draft) => {
+    const request = draft.requests.find((candidate) => candidate.id === requestId);
+    if (!request) return;
+    const employee = draft.employees.find((candidate) => candidate.id === request.employeeId);
+    if (employee) {
+      employee.status = request.previousStatus ?? "ACTIVE";
+      employee.activeRequestId = undefined;
+    }
+    draft.requests = draft.requests.filter((candidate) => candidate.id !== requestId);
   });
 }
 
