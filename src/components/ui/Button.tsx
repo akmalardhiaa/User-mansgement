@@ -3,10 +3,11 @@ import type { ButtonHTMLAttributes } from "react";
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
 const VARIANTS: Record<Variant, string> = {
+  // Gold is a light surface, so its label takes the navy ground rather than white.
   primary:
-    "bg-accent text-white hover:bg-accent-soft border border-accent/60 shadow-[0_1px_0_0_rgba(255,255,255,0.12)_inset]",
+    "bg-accent text-accent-ink font-semibold hover:bg-accent-soft border border-accent/70",
   secondary: "bg-elevated text-ink border border-hairline-strong hover:border-accent/50",
-  ghost: "bg-transparent text-ink-muted border border-transparent hover:bg-elevated hover:text-ink",
+  ghost: "bg-transparent text-ink-muted border border-hairline hover:bg-elevated hover:text-ink",
   danger: "bg-danger/10 text-danger border border-danger/30 hover:bg-danger/20",
 };
 

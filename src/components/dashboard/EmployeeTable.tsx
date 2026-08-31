@@ -200,15 +200,17 @@ export function EmployeeTable({
                     {canToggleAccess(employee.status) ? (
                       <div className="flex justify-end gap-2">
                         <Button
-                          variant="secondary"
+                          variant="ghost"
                           disabled={busy}
                           onClick={() => toggleAccess(employee)}
                           title="Nonaktifkan akses seketika, tanpa persetujuan"
                         >
                           {busy ? "Menyimpan…" : employee.status === "ACTIVE" ? "Nonaktifkan" : "Aktifkan"}
                         </Button>
+                        {/* Gold is reserved for the one primary action per screen, so a
+                            per-row action stays outlined rather than filled. */}
                         <Button
-                          variant="primary"
+                          variant="secondary"
                           disabled={busy}
                           onClick={() => openTransfer(employee)}
                           title="Buat tiket persetujuan di Jira untuk memindahkan divisi"

@@ -86,6 +86,7 @@ export function findRequestByIssueKeyInDraft(
  */
 export async function createOnboarding(
   input: NewUserInput,
+  actor = "HC Portal",
 ): Promise<{ employee: Employee; request: AccessRequest }> {
   return transaction((draft) => {
     const email = input.email.toLowerCase();
@@ -122,7 +123,7 @@ export async function createOnboarding(
       stage: "MANAGER_APPROVAL",
       events: [
         makeEvent("request.created", `HC mengajukan pembuatan akun untuk ${input.displayName}.`, {
-          actor: "HC Portal",
+          actor,
         }),
       ],
       processedSignals: [],
@@ -153,6 +154,7 @@ export class RequestNotAllowedError extends Error {
 export async function createTransfer(
   employeeId: string,
   target: TransferInput,
+  actor = "HC Portal",
 ): Promise<{ employee: Employee; request: AccessRequest }> {
   return transaction((draft) => {
     const employee = draft.employees.find((candidate) => candidate.id === employeeId);
@@ -197,7 +199,7 @@ export async function createTransfer(
         makeEvent(
           "request.created",
           `HC mengajukan pemindahan ${employee.displayName} ke ${target.department} sebagai ${target.jobTitle}.`,
-          { actor: "HC Portal" },
+          { actor },
         ),
       ],
       processedSignals: [],

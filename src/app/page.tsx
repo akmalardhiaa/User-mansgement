@@ -36,7 +36,7 @@ export default async function DashboardPage() {
           <SyncButton />
           <Link
             href="/users/new"
-            className="inline-flex items-center rounded-lg border border-accent/60 bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-soft"
+            className="inline-flex items-center rounded-lg border border-accent/60 bg-accent px-3.5 py-2 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-soft"
           >
             + Tambah akun
           </Link>

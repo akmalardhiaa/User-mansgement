@@ -5,22 +5,34 @@
  * to one look rather than shipping a light/dark pair.
  */
 @theme {
-  --color-canvas: #08090c;
-  --color-surface: #0e1015;
-  --color-elevated: #14171f;
-  --color-hairline: #1e2330;
-  --color-hairline-strong: #2a3040;
+  /*
+   * Palette approximating Mandiri Sekuritas' house colours: a deep navy ground
+   * with a gold accent. These are matched by eye from the publicly recognisable
+   * brand, not taken from a brand guide — replace the hex values here (and
+   * nowhere else) once the official ones are to hand.
+   */
+  --color-canvas: #001233;
+  --color-surface: #041b3d;
+  --color-elevated: #0a2551;
+  --color-hairline: #12325f;
+  --color-hairline-strong: #1c4478;
 
-  --color-ink: #e9ecf4;
-  --color-ink-muted: #98a1b8;
-  --color-ink-faint: #6b7488;
+  --color-ink: #e9f0fa;
+  --color-ink-muted: #9cb2d2;
+  --color-ink-faint: #6d86ac;
 
-  --color-accent: #6366f1;
-  --color-accent-soft: #818cf8;
+  /* Gold is light, so anything sitting on it takes the navy ground as its ink. */
+  --color-accent: #ffb612;
+  --color-accent-soft: #ffc94d;
+  --color-accent-ink: #001233;
 
+  /*
+   * Semantic colours stay separate from the accent. "Waiting" is deliberately
+   * orange rather than amber so a pending badge never reads as a gold button.
+   */
   --color-ok: #34d399;
-  --color-warn: #fbbf24;
-  --color-info: #38bdf8;
+  --color-warn: #fb923c;
+  --color-info: #56b8f5;
   --color-danger: #fb7185;
 
   --font-sans:
@@ -38,16 +50,18 @@ body {
   background-color: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  /* Two very soft washes of colour so the flat near-black has some depth. */
+  /* A cool wash on one side, a warm gold one on the other, so the flat navy
+     has depth without either colour competing with the content. */
   background-image:
-    radial-gradient(60rem 32rem at 12% -8%, color-mix(in oklab, var(--color-accent) 16%, transparent), transparent),
-    radial-gradient(48rem 28rem at 92% 0%, color-mix(in oklab, #a855f7 12%, transparent), transparent);
+    radial-gradient(60rem 32rem at 10% -8%, color-mix(in oklab, #1e5fa8 22%, transparent), transparent),
+    radial-gradient(46rem 26rem at 94% 0%, color-mix(in oklab, var(--color-accent) 10%, transparent), transparent);
   background-repeat: no-repeat;
   background-attachment: fixed;
 }
 
 ::selection {
-  background-color: color-mix(in oklab, var(--color-accent) 45%, transparent);
+  background-color: color-mix(in oklab, var(--color-accent) 40%, transparent);
+  color: var(--color-accent-ink);
 }
 
 /* Slim scrollbars, so wide tables scrolling horizontally stay unobtrusive. */

@@ -86,8 +86,10 @@ export interface TransitionInput {
 
 export async function submitOnboardingRequest(
   input: NewUserInput,
+  /** The signed-in HC officer, so the audit trail names a person not a portal. */
+  actor = "HC Portal",
 ): Promise<{ employee: Employee; request: AccessRequest }> {
-  const { employee, request } = await createOnboarding(input);
+  const { employee, request } = await createOnboarding(input, actor);
 
   let created;
   try {
@@ -111,7 +113,7 @@ export async function submitOnboardingRequest(
       makeEvent(
         "manager.requested",
         `Tiket persetujuan ${issue.key} dibuat untuk ${employee.managerName}.`,
-        { actor: "HC Portal", issueKey: issue.key },
+        { actor, issueKey: issue.key },
       ),
       notificationEvent(issue.key, assignee, employee.managerEmail),
     );
@@ -132,8 +134,9 @@ export async function submitOnboardingRequest(
 export async function submitTransferRequest(
   employeeId: string,
   target: TransferInput,
+  actor = "HC Portal",
 ): Promise<{ employee: Employee; request: AccessRequest }> {
-  const { employee, request } = await createTransfer(employeeId, target);
+  const { employee, request } = await createTransfer(employeeId, target, actor);
 
   let created;
   try {
@@ -157,7 +160,7 @@ export async function submitTransferRequest(
       makeEvent(
         "manager.requested",
         `Tiket persetujuan pindah divisi ${issue.key} dibuat untuk ${employee.managerName}.`,
-        { actor: "HC Portal", issueKey: issue.key },
+        { actor, issueKey: issue.key },
       ),
       notificationEvent(issue.key, assignee, employee.managerEmail),
     );
