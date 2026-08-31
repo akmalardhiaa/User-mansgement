@@ -20,7 +20,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const parsed = parseNewUserInput(await readJson(request));
   if (!parsed.ok) {
-    return fail("Please correct the highlighted fields.", 422, { fieldErrors: parsed.errors });
+    return fail("Perbaiki isian yang ditandai.", 422, { fieldErrors: parsed.errors });
   }
 
   try {
@@ -39,11 +39,11 @@ export async function POST(request: Request) {
     }
     if (error instanceof JiraApiError) {
       return fail(
-        `The request could not be sent to Jira, so nothing was saved. ${error.message}`,
+        `Pengajuan gagal dikirim ke Jira, jadi tidak ada data yang tersimpan. ${error.message}`,
         502,
       );
     }
     console.error("[api/users] submit failed:", error);
-    return fail("Could not submit the onboarding request.", 500);
+    return fail("Pengajuan gagal dikirim.", 500);
   }
 }

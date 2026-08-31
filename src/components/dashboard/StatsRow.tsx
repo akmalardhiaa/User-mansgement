@@ -6,16 +6,16 @@ export function StatsRow({ employees }: { employees: Employee[] }) {
   const count = (predicate: (employee: Employee) => boolean) => employees.filter(predicate).length;
 
   const stats = [
-    { label: "Total employees", value: employees.length, tone: "text-ink" },
-    { label: "Active", value: count((e) => e.status === "ACTIVE"), tone: "text-ok" },
+    { label: "Total karyawan", value: employees.length, tone: "text-ink" },
+    { label: "Aktif", value: count((e) => e.status === "ACTIVE"), tone: "text-ok" },
     {
-      label: "In approval",
+      label: "Dalam persetujuan",
       value: count(
         (e) => e.status === "PENDING_MANAGER_APPROVAL" || e.status === "PENDING_SECURITY_SETUP",
       ),
       tone: "text-warn",
     },
-    { label: "Disabled", value: count((e) => e.status === "DISABLED"), tone: "text-ink-muted" },
+    { label: "Dinonaktifkan", value: count((e) => e.status === "DISABLED"), tone: "text-ink-muted" },
   ];
 
   return (

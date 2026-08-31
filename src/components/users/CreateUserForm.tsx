@@ -88,23 +88,23 @@ export function CreateUserForm({
             ✓
           </span>
           <div>
-            <h2 className="text-lg font-semibold">Request sent for approval</h2>
+            <h2 className="text-lg font-semibold">Pengajuan terkirim</h2>
             <p className="mt-1 text-sm text-ink-muted">
-              {success.employee.name} has been added as{" "}
-              <strong className="text-ink">Awaiting manager</strong> and is not yet active. An
-              approval ticket was raised for {success.employee.managerName}.
+              {success.employee.name} tercatat sebagai{" "}
+              <strong className="text-ink">Menunggu manager</strong> dan belum aktif. Tiket
+              persetujuan sudah dibuat untuk {success.employee.managerName}.
             </p>
             {/* Assignment is what triggers Jira's email, so say plainly whether
                 the approver was actually reached. */}
             {success.managerIssue?.assignee ? (
               <p className="mt-2 text-sm text-ok">
-                Jira has emailed {success.managerIssue.assignee} — they can approve straight from
-                the ticket.
+                Jira sudah mengirim email ke {success.managerIssue.assignee} — persetujuan bisa
+                langsung dilakukan dari tiketnya.
               </p>
             ) : (
               <p className="mt-2 text-sm text-warn">
-                No Jira account matched {success.employee.managerEmail}, so the ticket is
-                unassigned and no email was sent. Assign it manually in Jira.
+                Tidak ada akun Jira yang cocok dengan {success.employee.managerEmail}, jadi tiket
+                belum ter-assign dan email tidak terkirim. Assign manual di Jira.
               </p>
             )}
           </div>
@@ -118,26 +118,26 @@ export function CreateUserForm({
             className="mt-5 flex items-center justify-between rounded-xl border border-hairline-strong bg-elevated px-4 py-3 transition-colors hover:border-accent/50"
           >
             <span>
-              <span className="block text-xs text-ink-faint">Manager approval ticket</span>
+              <span className="block text-xs text-ink-faint">Tiket persetujuan manager</span>
               <span className="font-mono text-sm text-accent-soft">{success.managerIssue.key}</span>
             </span>
-            <span className="text-sm text-ink-muted">Open in Jira ↗</span>
+            <span className="text-sm text-ink-muted">Buka di Jira ↗</span>
           </a>
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-3">
           {onTrack ? (
-            <Button onClick={onTrack}>Track approval</Button>
+            <Button onClick={onTrack}>Lihat progres</Button>
           ) : (
             <Link
               href="/requests"
               className="inline-flex items-center rounded-lg border border-accent/60 bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-soft"
             >
-              Track approval
+              Lihat progres
             </Link>
           )}
           <Button variant="secondary" onClick={() => setSuccess(null)}>
-            Add another user
+            Tambah akun lain
           </Button>
         </div>
       </Card>
@@ -158,7 +158,7 @@ export function CreateUserForm({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <Field
-            label="Full name"
+            label="Nama lengkap"
             name="name"
             value={values.name}
             onChange={(event) => update("name", event.target.value)}
@@ -167,7 +167,7 @@ export function CreateUserForm({
             autoComplete="off"
           />
           <Field
-            label="Work email"
+            label="Email kantor"
             name="email"
             type="email"
             value={values.email}
@@ -177,7 +177,7 @@ export function CreateUserForm({
             autoComplete="off"
           />
           <Field
-            label="Job title"
+            label="Jabatan"
             name="jobTitle"
             value={values.jobTitle}
             onChange={(event) => update("jobTitle", event.target.value)}
@@ -186,7 +186,7 @@ export function CreateUserForm({
             autoComplete="off"
           />
           <Field
-            label="Department"
+            label="Departemen"
             name="department"
             list="department-options"
             value={values.department}
@@ -201,7 +201,7 @@ export function CreateUserForm({
             ))}
           </datalist>
           <Field
-            label="Manager name"
+            label="Nama manager"
             name="managerName"
             value={values.managerName}
             onChange={(event) => update("managerName", event.target.value)}
@@ -210,13 +210,13 @@ export function CreateUserForm({
             autoComplete="off"
           />
           <Field
-            label="Manager email"
+            label="Email manager"
             name="managerEmail"
             type="email"
             value={values.managerEmail}
             onChange={(event) => update("managerEmail", event.target.value)}
             error={fieldErrors.managerEmail}
-            hint="Used to find their Jira account, so Jira emails them the approval ticket."
+            hint="Dipakai untuk mencari akun Jira-nya, agar Jira mengirim email tiket persetujuan."
             placeholder="sarah.wijaya@example.com"
             autoComplete="off"
           />
@@ -224,13 +224,13 @@ export function CreateUserForm({
 
         <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
           <Button type="submit" disabled={submitting}>
-            {submitting ? "Sending to Jira…" : "Submit for approval"}
+            {submitting ? "Mengirim ke Jira…" : "Ajukan persetujuan"}
           </Button>
           <Link href="/" className="text-sm text-ink-muted hover:text-ink">
-            Cancel
+            Batal
           </Link>
           <p className="w-full text-xs text-ink-faint sm:ml-auto sm:w-auto">
-            Submitting raises a Jira approval ticket — it does not create an active account.
+            Mengirim form ini membuat tiket persetujuan di Jira — bukan langsung membuat akun aktif.
           </p>
         </div>
       </form>

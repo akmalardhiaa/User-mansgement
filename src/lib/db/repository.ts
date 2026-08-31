@@ -20,7 +20,7 @@ export const transaction = mutateStore;
 
 export class DuplicateEmailError extends Error {
   constructor(email: string) {
-    super(`An employee with the email ${email} already exists.`);
+    super(`Karyawan dengan email ${email} sudah terdaftar.`);
     this.name = "DuplicateEmailError";
   }
 }
@@ -117,7 +117,7 @@ export async function createOnboarding(
       type: "ONBOARDING",
       stage: "MANAGER_APPROVAL",
       events: [
-        makeEvent("request.created", `HC submitted an onboarding request for ${input.name}.`, {
+        makeEvent("request.created", `HC mengajukan pembuatan akun untuk ${input.name}.`, {
           actor: "HC Portal",
         }),
       ],
@@ -151,14 +151,14 @@ export async function createOffboarding(
 ): Promise<{ employee: Employee; request: AccessRequest }> {
   return transaction((draft) => {
     const employee = draft.employees.find((candidate) => candidate.id === employeeId);
-    if (!employee) throw new RequestNotAllowedError(`Employee ${employeeId} was not found.`);
+    if (!employee) throw new RequestNotAllowedError(`Karyawan ${employeeId} tidak ditemukan.`);
 
     // Only a settled account can be removed: one already mid-approval would end
     // up with two requests fighting over its status.
     const removable: EmployeeStatus[] = ["ACTIVE", "DISABLED"];
     if (!removable.includes(employee.status)) {
       throw new RequestNotAllowedError(
-        `${employee.name} cannot be removed while the account is ${employee.status}.`,
+        `Akun ${employee.name} tidak bisa dihapus selama statusnya ${employee.status}.`,
       );
     }
 
@@ -173,7 +173,7 @@ export async function createOffboarding(
       reason: reason?.trim() || undefined,
       previousStatus: employee.status,
       events: [
-        makeEvent("request.created", `HC requested access removal for ${employee.name}.`, {
+        makeEvent("request.created", `HC mengajukan pencabutan akses ${employee.name}.`, {
           actor: "HC Portal",
         }),
       ],
@@ -220,13 +220,13 @@ export async function setEmployeeAccess(id: string, enabled: boolean): Promise<E
   return transaction((draft) => {
     const employee = draft.employees.find((candidate) => candidate.id === id);
     if (!employee) {
-      throw new Error(`Employee ${id} was not found.`);
+      throw new Error(`Karyawan ${id} tidak ditemukan.`);
     }
 
     const allowed: EmployeeStatus[] = ["ACTIVE", "DISABLED"];
     if (!allowed.includes(employee.status)) {
       throw new Error(
-        `Access for ${employee.name} cannot be changed while the account is ${employee.status}.`,
+        `Akses ${employee.name} tidak bisa diubah selama statusnya ${employee.status}.`,
       );
     }
 

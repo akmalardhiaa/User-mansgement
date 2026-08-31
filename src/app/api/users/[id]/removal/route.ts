@@ -28,11 +28,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
     if (error instanceof JiraApiError) {
       return fail(
-        `The removal could not be sent to Jira, so nothing was changed. ${error.message}`,
+        `Pengajuan penghapusan gagal dikirim ke Jira, jadi tidak ada yang berubah. ${error.message}`,
         502,
       );
     }
     console.error("[api/users/:id/removal] failed:", error);
-    return fail("Could not raise the removal request.", 500);
+    return fail("Pengajuan penghapusan gagal dibuat.", 500);
   }
 }

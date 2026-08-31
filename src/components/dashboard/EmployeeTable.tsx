@@ -104,17 +104,17 @@ export function EmployeeTable({
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search name, email, role or department"
-          aria-label="Search employees"
+          placeholder="Cari nama, email, jabatan, atau departemen"
+          aria-label="Cari karyawan"
           className="w-full rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none sm:max-w-sm"
         />
         <select
           value={statusFilter}
           onChange={(event) => setStatusFilter(event.target.value as EmployeeStatus | "ALL")}
-          aria-label="Filter by status"
+          aria-label="Saring berdasarkan status"
           className="rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
         >
-          <option value="ALL">All statuses</option>
+          <option value="ALL">Semua status</option>
           {EMPLOYEE_STATUSES.map((status) => (
             <option key={status} value={status}>
               {employeeStatusLabel(status)}
@@ -122,7 +122,7 @@ export function EmployeeTable({
           ))}
         </select>
         <span className="text-xs text-ink-faint sm:ml-auto">
-          {visible.length} of {employees.length}
+          {visible.length} dari {employees.length}
         </span>
       </div>
 
@@ -136,12 +136,12 @@ export function EmployeeTable({
         <table className="w-full min-w-[56rem] text-left text-sm">
           <thead>
             <tr className="border-b border-hairline text-xs tracking-wide text-ink-faint uppercase">
-              <th scope="col" className="px-4 py-3 font-medium">Name</th>
-              <th scope="col" className="px-4 py-3 font-medium">Role</th>
-              <th scope="col" className="px-4 py-3 font-medium">Department</th>
+              <th scope="col" className="px-4 py-3 font-medium">Nama</th>
+              <th scope="col" className="px-4 py-3 font-medium">Jabatan</th>
+              <th scope="col" className="px-4 py-3 font-medium">Departemen</th>
               <th scope="col" className="px-4 py-3 font-medium">Manager</th>
               <th scope="col" className="px-4 py-3 font-medium">Status</th>
-              <th scope="col" className="px-4 py-3 text-right font-medium">Access</th>
+              <th scope="col" className="px-4 py-3 text-right font-medium">Akses</th>
             </tr>
           </thead>
           <tbody>
@@ -178,9 +178,9 @@ export function EmployeeTable({
                           variant="secondary"
                           disabled={busy}
                           onClick={() => toggleAccess(employee)}
-                          title="Suspend access immediately, without an approval"
+                          title="Nonaktifkan akses seketika, tanpa persetujuan"
                         >
-                          {busy ? "Saving…" : employee.status === "ACTIVE" ? "Disable" : "Enable"}
+                          {busy ? "Menyimpan…" : employee.status === "ACTIVE" ? "Nonaktifkan" : "Aktifkan"}
                         </Button>
                         <Button
                           variant="danger"
@@ -189,9 +189,9 @@ export function EmployeeTable({
                             setConfirming(employee.id);
                             setReason("");
                           }}
-                          title="Raise a Jira approval ticket to revoke this account"
+                          title="Buat tiket persetujuan di Jira untuk mencabut akun ini"
                         >
-                          Remove
+                          Hapus
                         </Button>
                       </div>
                     ) : ticket ? (
@@ -216,15 +216,15 @@ export function EmployeeTable({
                     <td colSpan={6} className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-3">
                         <span className="text-sm text-ink">
-                          Request removal for <strong>{employee.name}</strong>? This raises a Jira
-                          approval ticket for {employee.managerName} — access is revoked only after
-                          IT Security acts.
+                          Ajukan penghapusan akun <strong>{employee.name}</strong>? Ini membuat tiket
+                          persetujuan di Jira untuk {employee.managerName} — akses baru dicabut
+                          setelah IT Security mengerjakannya.
                         </span>
                         <input
                           value={reason}
                           onChange={(event) => setReason(event.target.value)}
-                          placeholder="Reason (optional)"
-                          aria-label={`Reason for removing ${employee.name}`}
+                          placeholder="Alasan (opsional)"
+                          aria-label={`Alasan penghapusan akun ${employee.name}`}
                           className="min-w-48 flex-1 rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none"
                         />
                         <Button
@@ -232,10 +232,10 @@ export function EmployeeTable({
                           disabled={busy}
                           onClick={() => requestRemoval(employee)}
                         >
-                          {busy ? "Sending…" : "Confirm removal"}
+                          {busy ? "Mengirim…" : "Konfirmasi penghapusan"}
                         </Button>
                         <Button variant="ghost" disabled={busy} onClick={() => setConfirming(null)}>
-                          Cancel
+                          Batal
                         </Button>
                       </div>
                     </td>
@@ -248,7 +248,7 @@ export function EmployeeTable({
             {visible.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-12 text-center text-sm text-ink-faint">
-                  No employees match the current filters.
+                  Tidak ada karyawan yang cocok dengan filter ini.
                 </td>
               </tr>
             ) : null}

@@ -27,9 +27,9 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Employee directory</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Direktori karyawan</h1>
           <p className="mt-1 text-sm text-ink-muted">
-            Manage access for existing staff and track new joiners through Jira approvals.
+            Kelola akses karyawan dan pantau pengajuan akun melalui persetujuan di Jira.
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-3">
@@ -38,7 +38,7 @@ export default async function DashboardPage() {
             href="/users/new"
             className="inline-flex items-center rounded-lg border border-accent/60 bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-soft"
           >
-            + Add user
+            + Tambah akun
           </Link>
         </div>
       </div>

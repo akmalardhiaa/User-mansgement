@@ -7,7 +7,7 @@ import { listEmployees, listRequests } from "@/lib/db/repository";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Approvals · HC User Management" };
+export const metadata = { title: "Persetujuan · HC User Management" };
 
 export default async function RequestsPage() {
   const [requests, employees] = await Promise.all([listRequests(), listEmployees()]);
@@ -17,9 +17,9 @@ export default async function RequestsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Onboarding approvals</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Persetujuan pengajuan</h1>
           <p className="mt-1 text-sm text-ink-muted">
-            Every request with its Jira tickets and the audit trail of each transition.
+            Semua pengajuan beserta tiket Jira dan jejak audit setiap perubahannya.
           </p>
         </div>
         <div className="ml-auto">
@@ -29,12 +29,12 @@ export default async function RequestsPage() {
 
       {requests.length === 0 ? (
         <Card className="p-12 text-center">
-          <p className="text-sm text-ink-muted">No onboarding requests yet.</p>
+          <p className="text-sm text-ink-muted">Belum ada pengajuan.</p>
           <Link
             href="/users/new"
             className="mt-4 inline-flex items-center rounded-lg border border-accent/60 bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-soft"
           >
-            + Add user
+            + Tambah akun
           </Link>
         </Card>
       ) : (

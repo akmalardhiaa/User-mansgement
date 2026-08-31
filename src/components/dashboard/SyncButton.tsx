@@ -29,8 +29,8 @@ export function SyncButton({
       const { checked, advanced } = await dataSource.sync();
       setMessage(
         advanced > 0
-          ? `Advanced ${advanced} of ${checked} open request(s).`
-          : `Checked ${checked} open request(s); nothing changed.`,
+          ? `${advanced} dari ${checked} pengajuan terbuka diperbarui.`
+          : `${checked} pengajuan terbuka dicek; tidak ada perubahan.`,
       );
       if (onChanged) {
         onChanged();
@@ -48,7 +48,7 @@ export function SyncButton({
     <div className="flex items-center gap-3">
       {message ? <span className="text-xs text-ink-faint">{message}</span> : null}
       <Button variant="secondary" onClick={sync} disabled={busy || isRefreshing}>
-        {busy ? "Syncing…" : "Sync from Jira"}
+        {busy ? "Menyinkronkan…" : "Sinkronkan dari Jira"}
       </Button>
     </div>
   );
