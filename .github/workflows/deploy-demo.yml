@@ -48,11 +48,11 @@ jobs:
           mv src/app/demo/page.tsx src/app/page.tsx
           rm -rf src/app/demo
 
-      - uses: actions/configure-pages@v5
-        with:
-          # Best effort: turns Pages on if the repository has not enabled it.
-          enablement: true
-
+      # actions/configure-pages is deliberately not used: its outputs are not
+      # needed (the base path is derived from the repository name below), and
+      # it cannot switch Pages on by itself — the workflow token is not allowed
+      # to create a Pages site. Enable it once by hand instead:
+      #   Settings -> Pages -> Source: GitHub Actions
       - name: Build the static export
         env:
           STATIC_EXPORT: "true"

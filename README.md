@@ -133,8 +133,12 @@ every push to `main`.
 > in-browser store and a "Jira simulator" panel stand in for the server. State resets on
 > refresh. It is a UI walkthrough, not a working system.
 
-One-time setup: **Settings → Pages → Source: GitHub Actions**. The workflow also attempts
-to enable this automatically. The site then appears at
+**Required one-time setup: Settings → Pages → Source: "GitHub Actions".**
+
+The workflow cannot do this for you — creating a Pages site is not something the
+`GITHUB_TOKEN` is permitted to do, so the deploy fails with
+`Resource not accessible by integration` until the setting is switched on by hand. Once
+it is, re-run the workflow from the Actions tab; the site is then published at
 `https://<user>.github.io/<repo>/`.
 
 To preview the demo locally: `npm run dev`, then open `/demo`.
