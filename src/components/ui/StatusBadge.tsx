@@ -30,20 +30,15 @@ const EMPLOYEE_STATUS_PRESENTATION: Record<
     className: "border-danger/30 bg-danger/10 text-danger",
     dot: "bg-danger",
   },
-  PENDING_REMOVAL_APPROVAL: {
-    label: "Penghapusan · menunggu manager",
+  PENDING_TRANSFER_APPROVAL: {
+    label: "Pindah divisi · menunggu manager",
     className: "border-warn/30 bg-warn/10 text-warn",
     dot: "bg-warn",
   },
-  PENDING_REMOVAL_SETUP: {
-    label: "Penghapusan · IT Security",
+  PENDING_TRANSFER_SETUP: {
+    label: "Pindah divisi · IT Security",
     className: "border-info/30 bg-info/10 text-info",
     dot: "bg-info",
-  },
-  REMOVED: {
-    label: "Dihapus",
-    className: "border-hairline-strong bg-elevated text-ink-faint",
-    dot: "bg-ink-faint",
   },
 };
 
@@ -65,12 +60,12 @@ export function StatusBadge({ status }: { status: EmployeeStatus }) {
 
 const STAGE_PRESENTATION: Record<
   RequestStage,
-  { label: string; removalLabel?: string; className: string }
+  { label: string; transferLabel?: string; className: string }
 > = {
   MANAGER_APPROVAL: { label: "Persetujuan manager", className: "border-warn/30 bg-warn/10 text-warn" },
   SECURITY_PROVISIONING: {
     label: "Penyiapan akses IT Security",
-    removalLabel: "Pencabutan akses IT Security",
+    transferLabel: "Penyesuaian akses IT Security",
     className: "border-info/30 bg-info/10 text-info",
   },
   COMPLETED: { label: "Selesai", className: "border-ok/30 bg-ok/10 text-ok" },
@@ -81,7 +76,7 @@ export function StageBadge({ stage, type }: { stage: RequestStage; type?: Reques
   const presentation = STAGE_PRESENTATION[stage];
   const className = presentation.className;
   const label =
-    type === "OFFBOARDING" ? (presentation.removalLabel ?? presentation.label) : presentation.label;
+    type === "TRANSFER" ? (presentation.transferLabel ?? presentation.label) : presentation.label;
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap ${className}`}

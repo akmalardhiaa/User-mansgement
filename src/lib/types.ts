@@ -7,15 +7,16 @@
  *   Adding an account (ONBOARDING)
  *     PENDING_MANAGER_APPROVAL -> PENDING_SECURITY_SETUP -> ACTIVE
  *
- *   Removing an account (OFFBOARDING)
- *     PENDING_REMOVAL_APPROVAL -> PENDING_REMOVAL_SETUP  -> REMOVED
+ *   Moving between divisions (TRANSFER)
+ *     PENDING_TRANSFER_APPROVAL -> PENDING_TRANSFER_SETUP -> back to ACTIVE,
+ *     with the new department, position and manager applied.
  *
  * A manager rejection ends the request: a rejected joiner becomes REJECTED,
- * while a rejected removal simply restores the employee's previous status.
+ * while a rejected transfer simply restores the employee's previous status and
+ * leaves their position untouched.
  *
- * REMOVED means access was revoked, not that the record was deleted — HC needs
- * the history. DISABLED is separate and deliberately unmediated: a reversible
- * suspension HC can apply immediately without waiting on an approval.
+ * DISABLED is separate and deliberately unmediated: a reversible suspension HC
+ * can apply immediately without waiting on an approval.
  */
 
 export const EMPLOYEE_STATUSES = [
@@ -24,16 +25,22 @@ export const EMPLOYEE_STATUSES = [
   "ACTIVE",
   "DISABLED",
   "REJECTED",
-  "PENDING_REMOVAL_APPROVAL",
-  "PENDING_REMOVAL_SETUP",
-  "REMOVED",
+  "PENDING_TRANSFER_APPROVAL",
+  "PENDING_TRANSFER_SETUP",
 ] as const;
 
 export type EmployeeStatus = (typeof EMPLOYEE_STATUSES)[number];
 
 export interface Employee {
   id: string;
-  name: string;
+  /** Given name — Active Directory `givenName`. */
+  firstName: string;
+  /** Surname — Active Directory `sn`. */
+  lastName: string;
+  /** How the person is shown in lists and directories — AD `displayName`. */
+  displayName: string;
+  /** Formal full name used on tickets and records — AD `cn`. */
+  fullName: string;
   email: string;
   jobTitle: string;
   department: string;
@@ -42,6 +49,8 @@ export interface Employee {
   managerEmail: string;
   /** Jira accountId, once resolved. Assignment is what makes Jira email them. */
   managerAccountId?: string;
+  /** Free-text note HC captured when the account was requested. */
+  description?: string;
   status: EmployeeStatus;
   /** The access request currently acting on this employee, if any. */
   activeRequestId?: string;
@@ -50,7 +59,7 @@ export interface Employee {
 }
 
 /** What the request asks for. Both types share the same approval chain. */
-export const REQUEST_TYPES = ["ONBOARDING", "OFFBOARDING"] as const;
+export const REQUEST_TYPES = ["ONBOARDING", "TRANSFER"] as const;
 
 export type RequestType = (typeof REQUEST_TYPES)[number];
 
@@ -63,6 +72,15 @@ export const REQUEST_STAGES = [
 ] as const;
 
 export type RequestStage = (typeof REQUEST_STAGES)[number];
+
+/** The position an employee is moving into. */
+export interface TransferTarget {
+  department: string;
+  jobTitle: string;
+  /** Optional: a move between divisions usually means a new manager too. */
+  managerName?: string;
+  managerEmail?: string;
+}
 
 export interface WorkflowEvent {
   at: string;
@@ -92,11 +110,13 @@ export interface AccessRequest {
   employeeId: string;
   type: RequestType;
   stage: RequestStage;
-  /** Why the removal was asked for. Offboarding only. */
+  /** Why HC raised the request. Transfers only. */
   reason?: string;
+  /** Where the employee is moving to. Transfers only. */
+  transfer?: TransferTarget;
   /**
-   * Status to restore if a removal is rejected — an employee whose offboarding
-   * the manager turns down should go back to working normally, not to REJECTED.
+   * Status to restore if a transfer is rejected — an employee whose move the
+   * manager turns down keeps working where they are, not becoming REJECTED.
    */
   previousStatus?: EmployeeStatus;
   managerIssue?: JiraIssueRef;
@@ -113,12 +133,22 @@ export interface AccessRequest {
 
 /** Payload accepted by `POST /api/users`. */
 export interface NewUserInput {
-  name: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  fullName: string;
   email: string;
   jobTitle: string;
   department: string;
   managerName: string;
   managerEmail: string;
+  /** Free-text note carried onto both Jira tickets. */
+  description?: string;
   /** Optional override; normally resolved from `managerEmail`. */
   managerAccountId?: string;
+}
+
+/** Payload accepted by `POST /api/users/:id/transfer`. */
+export interface TransferInput extends TransferTarget {
+  reason?: string;
 }

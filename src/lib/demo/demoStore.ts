@@ -5,7 +5,13 @@ import type {
 } from "@/lib/client/dataSource";
 import { SubmissionError } from "@/lib/client/dataSource";
 import { seedEmployees } from "@/lib/db/seed";
-import type { AccessRequest, Employee, JiraIssueRef, NewUserInput } from "@/lib/types";
+import type {
+  AccessRequest,
+  Employee,
+  JiraIssueRef,
+  NewUserInput,
+  TransferInput,
+} from "@/lib/types";
 import { parseNewUserInput } from "@/lib/validation/userInput";
 import { classifyManagerStatus, isSecurityComplete } from "@/lib/workflow/statusRules";
 
@@ -118,7 +124,7 @@ export class DemoStore implements DashboardDataSource {
       managerIssue,
       processedSignals: [],
       events: [
-        event("request.created", `HC submitted an onboarding request for ${value.name}.`, "HC Portal"),
+        event("request.created", `HC submitted an onboarding request for ${value.fullName}.`, "HC Portal"),
         event(
           "manager.requested",
           `Approval ticket ${managerIssue.key} raised for ${value.managerName}.`,
@@ -137,34 +143,47 @@ export class DemoStore implements DashboardDataSource {
     return { employee, request, managerIssue };
   }
 
-  async requestRemoval(employeeId: string, reason?: string): Promise<CreateUserResult> {
+  async requestTransfer(employeeId: string, target: TransferInput): Promise<CreateUserResult> {
     const employee = this.employees.find((candidate) => candidate.id === employeeId);
-    if (!employee) throw new Error(`Employee ${employeeId} was not found.`);
+    if (!employee) throw new Error(`Karyawan ${employeeId} tidak ditemukan.`);
     if (employee.status !== "ACTIVE" && employee.status !== "DISABLED") {
       throw new Error(
-        `${employee.name} cannot be removed while the account is ${employee.status}.`,
+        `Posisi ${employee.displayName} tidak bisa diubah selama statusnya ${employee.status}.`,
       );
+    }
+    if (!target.department.trim() || !target.jobTitle.trim()) {
+      throw new SubmissionError("Divisi tujuan dan posisi baru wajib diisi.");
     }
 
     const timestamp = now();
-    const requestId = `req_demo_removal_${this.requests.length}`;
+    const requestId = `req_demo_transfer_${this.requests.length}`;
     const managerIssue = this.nextTicket();
     managerIssue.assignee = employee.managerName;
 
     const request: AccessRequest = {
       id: requestId,
       employeeId,
-      type: "OFFBOARDING",
+      type: "TRANSFER",
       stage: "MANAGER_APPROVAL",
-      reason: reason?.trim() || undefined,
+      reason: target.reason?.trim() || undefined,
+      transfer: {
+        department: target.department,
+        jobTitle: target.jobTitle,
+        managerName: target.managerName,
+        managerEmail: target.managerEmail,
+      },
       previousStatus: employee.status,
       managerIssue,
       processedSignals: [],
       events: [
-        event("request.created", `HC requested access removal for ${employee.name}.`, "HC Portal"),
+        event(
+          "request.created",
+          `HC mengajukan pemindahan ${employee.displayName} ke ${target.department} sebagai ${target.jobTitle}.`,
+          "HC Portal",
+        ),
         event(
           "manager.requested",
-          `Removal approval ticket ${managerIssue.key} raised for ${employee.managerName}.`,
+          `Tiket persetujuan pindah divisi ${managerIssue.key} dibuat untuk ${employee.managerName}.`,
           "HC Portal",
           managerIssue.key,
         ),
@@ -173,7 +192,7 @@ export class DemoStore implements DashboardDataSource {
       updatedAt: timestamp,
     };
 
-    employee.status = "PENDING_REMOVAL_APPROVAL";
+    employee.status = "PENDING_TRANSFER_APPROVAL";
     employee.activeRequestId = requestId;
     employee.updatedAt = timestamp;
     this.requests.push(request);
@@ -187,7 +206,7 @@ export class DemoStore implements DashboardDataSource {
     if (!employee) throw new Error(`Employee ${employeeId} was not found.`);
     if (employee.status !== "ACTIVE" && employee.status !== "DISABLED") {
       throw new Error(
-        `Access for ${employee.name} cannot be changed while the account is ${employee.status}.`,
+        `Access for ${employee.displayName} cannot be changed while the account is ${employee.status}.`,
       );
     }
     employee.status = enabled ? "ACTIVE" : "DISABLED";
@@ -249,7 +268,7 @@ export class DemoStore implements DashboardDataSource {
       if (decision === "REJECTED") {
         request.stage = "REJECTED";
         employee.status =
-          request.type === "OFFBOARDING" ? (request.previousStatus ?? "ACTIVE") : "REJECTED";
+          request.type === "TRANSFER" ? (request.previousStatus ?? "ACTIVE") : "REJECTED";
         employee.activeRequestId = undefined;
         request.events.push(
           event("manager.rejected", `${actor} rejected the request on ${issueKey}.`, actor, issueKey),
@@ -263,7 +282,7 @@ export class DemoStore implements DashboardDataSource {
       request.stage = "SECURITY_PROVISIONING";
       request.securityIssue = securityIssue;
       employee.status =
-        request.type === "OFFBOARDING" ? "PENDING_REMOVAL_SETUP" : "PENDING_SECURITY_SETUP";
+        request.type === "TRANSFER" ? "PENDING_TRANSFER_SETUP" : "PENDING_SECURITY_SETUP";
       request.events.push(
         event("manager.approved", `${actor} approved the request on ${issueKey}.`, actor, issueKey),
         event(
@@ -292,19 +311,26 @@ export class DemoStore implements DashboardDataSource {
       request.processedSignals.push(signal);
       request.stage = "COMPLETED";
       request.updatedAt = timestamp;
-      employee.status = request.type === "OFFBOARDING" ? "REMOVED" : "ACTIVE";
+      if (request.type === "TRANSFER" && request.transfer) {
+        employee.department = request.transfer.department;
+        employee.jobTitle = request.transfer.jobTitle;
+        if (request.transfer.managerName) employee.managerName = request.transfer.managerName;
+        if (request.transfer.managerEmail) employee.managerEmail = request.transfer.managerEmail;
+      }
+      employee.status =
+        request.type === "TRANSFER" ? (request.previousStatus ?? "ACTIVE") : "ACTIVE";
       employee.activeRequestId = undefined;
       employee.updatedAt = timestamp;
       request.events.push(
         event(
           "security.completed",
-          `${actor} closed ${issueKey}; ${employee.name} is now ${employee.status === "REMOVED" ? "Removed" : "Active"}.`,
+          `${actor} menutup ${issueKey}; ${employee.displayName} sekarang ${request.type === "TRANSFER" ? `di ${employee.department} sebagai ${employee.jobTitle}` : "Aktif"}.`,
           actor,
           issueKey,
         ),
       );
       this.emit();
-      return `${employee.name} is now ${employee.status === "REMOVED" ? "Removed" : "Active"}.`;
+      return `${employee.displayName} sekarang ${request.type === "TRANSFER" ? `di ${employee.department} sebagai ${employee.jobTitle}` : "Aktif"}.`;
     }
 
     return `${issueKey} moved to "${statusName}" but the request is at stage ${request.stage}.`;
@@ -318,8 +344,8 @@ export class DemoStore implements DashboardDataSource {
         return [
           {
             issue: request.managerIssue,
-            employeeName: employee?.name ?? "",
-            stage: "Manager approval",
+            employeeName: employee?.displayName ?? "",
+            stage: request.type === "TRANSFER" ? "Persetujuan manager · pindah divisi" : "Persetujuan manager",
           },
         ];
       }
@@ -327,11 +353,11 @@ export class DemoStore implements DashboardDataSource {
         return [
           {
             issue: request.securityIssue,
-            employeeName: employee?.name ?? "",
+            employeeName: employee?.displayName ?? "",
             stage:
-              request.type === "OFFBOARDING"
-                ? "IT Security deprovisioning"
-                : "IT Security provisioning",
+              request.type === "TRANSFER"
+                ? "Penyesuaian akses IT Security"
+                : "Penyiapan akses IT Security",
           },
         ];
       }

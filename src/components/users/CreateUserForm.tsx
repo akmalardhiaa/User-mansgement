@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
+import { DEPARTMENTS } from "@/lib/db/seed";
 import { Button } from "@/components/ui/Button";
 import { Card, Field } from "@/components/ui/Field";
 import {
@@ -17,15 +18,18 @@ import type { NewUserInput } from "@/lib/types";
 type FieldErrors = Partial<Record<keyof NewUserInput, string>>;
 
 const EMPTY: NewUserInput = {
-  name: "",
+  firstName: "",
+  lastName: "",
+  displayName: "",
+  fullName: "",
   email: "",
   jobTitle: "",
   department: "",
   managerName: "",
   managerEmail: "",
+  description: "",
 };
 
-const DEPARTMENTS = ["Engineering", "Human Capital", "Finance", "Product", "IT Security", "Sales"];
 
 /**
  * Step 1 of the workflow from the HC side.
@@ -49,9 +53,23 @@ export function CreateUserForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<CreateUserResult | null>(null);
+  const touchedNames = useRef({ displayName: false, fullName: false });
 
   function update(field: keyof NewUserInput, value: string) {
-    setValues((current) => ({ ...current, [field]: value }));
+    setValues((current) => {
+      const next = { ...current, [field]: value };
+      // Display name and full name follow first/last until HC edits them
+      // directly, which is how they are usually derived in the directory.
+      if (field === "firstName" || field === "lastName") {
+        const derived = `${next.firstName} ${next.lastName}`.trim();
+        if (!touchedNames.current.displayName) next.displayName = derived;
+        if (!touchedNames.current.fullName) next.fullName = derived;
+      }
+      if (field === "displayName" || field === "fullName") {
+        touchedNames.current[field] = value.trim().length > 0;
+      }
+      return next;
+    });
     setFieldErrors((current) => ({ ...current, [field]: undefined }));
   }
 
@@ -90,7 +108,7 @@ export function CreateUserForm({
           <div>
             <h2 className="text-lg font-semibold">Pengajuan terkirim</h2>
             <p className="mt-1 text-sm text-ink-muted">
-              {success.employee.name} tercatat sebagai{" "}
+              {success.employee.displayName} tercatat sebagai{" "}
               <strong className="text-ink">Menunggu manager</strong> dan belum aktif. Tiket
               persetujuan sudah dibuat untuk {success.employee.managerName}.
             </p>
@@ -158,16 +176,45 @@ export function CreateUserForm({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <Field
-            label="Nama lengkap"
-            name="name"
-            value={values.name}
-            onChange={(event) => update("name", event.target.value)}
-            error={fieldErrors.name}
+            label="Nama depan"
+            name="firstName"
+            value={values.firstName}
+            onChange={(event) => update("firstName", event.target.value)}
+            error={fieldErrors.firstName}
+            placeholder="Nadia"
+            autoComplete="off"
+          />
+          <Field
+            label="Nama belakang"
+            name="lastName"
+            value={values.lastName}
+            onChange={(event) => update("lastName", event.target.value)}
+            error={fieldErrors.lastName}
+            placeholder="Kusuma"
+            autoComplete="off"
+          />
+          <Field
+            label="Display name"
+            name="displayName"
+            value={values.displayName}
+            onChange={(event) => update("displayName", event.target.value)}
+            error={fieldErrors.displayName}
+            hint="Terisi otomatis dari nama depan dan belakang; bisa diubah."
             placeholder="Nadia Kusuma"
             autoComplete="off"
           />
           <Field
-            label="Email kantor"
+            label="Nama lengkap"
+            name="fullName"
+            value={values.fullName}
+            onChange={(event) => update("fullName", event.target.value)}
+            error={fieldErrors.fullName}
+            hint="Nama resmi yang dipakai di tiket Jira dan arsip HC."
+            placeholder="Nadia Kusuma"
+            autoComplete="off"
+          />
+          <Field
+            label="Email"
             name="email"
             type="email"
             value={values.email}
@@ -220,6 +267,22 @@ export function CreateUserForm({
             placeholder="sarah.wijaya@example.com"
             autoComplete="off"
           />
+        </div>
+
+        <div className="mt-5">
+          <label htmlFor="description" className="mb-1.5 block text-sm font-medium text-ink">
+            Keterangan
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            rows={3}
+            value={values.description ?? ""}
+            onChange={(event) => update("description", event.target.value)}
+            placeholder="Catatan tambahan untuk manager dan IT Security — opsional"
+            className="w-full rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink placeholder:text-ink-faint transition-colors focus:border-accent focus:outline-none"
+          />
+          <p className="mt-1.5 text-xs text-ink-faint">Ikut tercantum di kedua tiket Jira.</p>
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-hairline pt-5">

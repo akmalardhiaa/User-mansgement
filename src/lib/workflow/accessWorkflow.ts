@@ -1,7 +1,7 @@
 import { getJiraConfig } from "@/lib/config/env";
 import {
-  cancelOffboarding,
-  createOffboarding,
+  cancelTransfer,
+  createTransfer,
   createOnboarding,
   deleteOnboarding,
   findRequestByIssueKeyInDraft,
@@ -22,6 +22,7 @@ import type {
   EmployeeStatus,
   NewUserInput,
   RequestType,
+  TransferInput,
 } from "@/lib/types";
 
 import { classifyManagerStatus, isSecurityComplete } from "./statusRules";
@@ -47,10 +48,11 @@ const FLOW = {
     awaitingSecurity: "PENDING_SECURITY_SETUP",
     fulfilled: "ACTIVE",
   },
-  OFFBOARDING: {
-    awaitingManager: "PENDING_REMOVAL_APPROVAL",
-    awaitingSecurity: "PENDING_REMOVAL_SETUP",
-    fulfilled: "REMOVED",
+  TRANSFER: {
+    awaitingManager: "PENDING_TRANSFER_APPROVAL",
+    awaitingSecurity: "PENDING_TRANSFER_SETUP",
+    // A transfer ends by putting the employee back to work, in the new role.
+    fulfilled: "ACTIVE",
   },
 } as const satisfies Record<RequestType, Record<string, EmployeeStatus>>;
 
@@ -120,26 +122,26 @@ export async function submitOnboardingRequest(
 }
 
 /**
- * HC asks for an existing employee's access to be revoked.
+ * HC moves an existing employee to another division.
  *
  * Same chain as onboarding: the manager approves in Jira, then IT Security
- * deprovisions. The employee keeps working until IT Security closes the second
- * ticket — HC can still suspend them immediately with the access toggle if the
- * departure is urgent.
+ * adjusts the access. Nothing about the employee's position changes until IT
+ * Security closes the second ticket, so the directory never shows a move that
+ * has not actually happened.
  */
-export async function submitOffboardingRequest(
+export async function submitTransferRequest(
   employeeId: string,
-  reason?: string,
+  target: TransferInput,
 ): Promise<{ employee: Employee; request: AccessRequest }> {
-  const { employee, request } = await createOffboarding(employeeId, reason);
+  const { employee, request } = await createTransfer(employeeId, target);
 
   let created;
   try {
     created = await createApprovalIssue(employee, request);
   } catch (error) {
-    // Without an approval ticket the removal could never progress, and the
+    // Without an approval ticket the transfer could never progress, and the
     // employee would be stuck showing as pending. Put them back as they were.
-    await cancelOffboarding(request.id);
+    await cancelTransfer(request.id);
     throw error;
   }
 
@@ -154,7 +156,7 @@ export async function submitOffboardingRequest(
     stored.events.push(
       makeEvent(
         "manager.requested",
-        `Tiket persetujuan penghapusan ${issue.key} dibuat untuk ${employee.managerName}.`,
+        `Tiket persetujuan pindah divisi ${issue.key} dibuat untuk ${employee.managerName}.`,
         { actor: "HC Portal", issueKey: issue.key },
       ),
       notificationEvent(issue.key, assignee, employee.managerEmail),
@@ -229,10 +231,10 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
 
       if (decision === "REJECTED") {
         request.stage = "REJECTED";
-        // A refused joiner is REJECTED; a refused removal simply keeps working,
-        // so it goes back to whatever status it held before HC raised this.
+        // A refused joiner is REJECTED; a refused transfer simply keeps working
+        // where they are, so it goes back to the status held before HC raised this.
         employee.status =
-          request.type === "OFFBOARDING" ? (request.previousStatus ?? "ACTIVE") : "REJECTED";
+          request.type === "TRANSFER" ? (request.previousStatus ?? "ACTIVE") : "REJECTED";
         employee.activeRequestId = undefined;
         request.events.push(
           makeEvent("manager.rejected", `${actor} menolak pengajuan di ${issueKey}.`, {
@@ -242,8 +244,8 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
         );
         return result(
           "rejected",
-          request.type === "OFFBOARDING"
-            ? `Penghapusan ditolak oleh ${actor}; akses ${employee.name} tetap berlaku.`
+          request.type === "TRANSFER"
+            ? `Pemindahan ditolak oleh ${actor}; ${employee.displayName} tetap di posisi semula.`
             : `Pengajuan ditolak oleh ${actor}.`,
         );
       }
@@ -280,18 +282,38 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
       request.processedSignals.push(signal);
       request.stage = "COMPLETED";
       request.updatedAt = now;
-      employee.status = FLOW[request.type].fulfilled;
+      // A transfer only takes effect here: the new position is applied at the
+      // moment IT Security confirms the access actually changed.
+      if (request.type === "TRANSFER" && request.transfer) {
+        employee.department = request.transfer.department;
+        employee.jobTitle = request.transfer.jobTitle;
+        if (request.transfer.managerName) employee.managerName = request.transfer.managerName;
+        if (request.transfer.managerEmail) {
+          employee.managerEmail = request.transfer.managerEmail;
+          // The cached accountId belongs to the old manager; drop it so the next
+          // request resolves the new one from their email.
+          employee.managerAccountId = undefined;
+        }
+      }
+
+      employee.status =
+        request.type === "TRANSFER"
+          ? (request.previousStatus ?? "ACTIVE")
+          : FLOW[request.type].fulfilled;
       employee.activeRequestId = undefined;
       employee.updatedAt = now;
-      const outcome = request.type === "OFFBOARDING" ? "Dihapus" : "Aktif";
+      const outcome =
+        request.type === "TRANSFER"
+          ? `pindah ke ${employee.department} sebagai ${employee.jobTitle}`
+          : "Aktif";
       request.events.push(
         makeEvent(
           "security.completed",
-          `${actor} menutup ${issueKey}; ${employee.name} sekarang ${outcome}.`,
+          `${actor} menutup ${issueKey}; ${employee.displayName} sekarang ${outcome}.`,
           { actor, issueKey },
         ),
       );
-      return result("completed", `${employee.name} sekarang ${outcome}.`);
+      return result("completed", `${employee.displayName} sekarang ${outcome}.`);
     }
 
     return result(
@@ -362,7 +384,7 @@ async function raiseSecurityTicket(
 
     stored.securityIssue = issue;
     stored.updatedAt = new Date().toISOString();
-    const noun = request.type === "OFFBOARDING" ? "Pencabutan akses" : "Penyiapan akses";
+    const noun = request.type === "TRANSFER" ? "Penyesuaian akses" : "Penyiapan akses";
     stored.events.push(
       makeEvent("security.requested", `Tiket ${noun.toLowerCase()} ${issue.key} dibuat untuk IT Security.`, {
         actor: "HC Portal",

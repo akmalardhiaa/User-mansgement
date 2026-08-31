@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { StatusBadge, employeeStatusLabel } from "@/components/ui/StatusBadge";
 import { apiDataSource, type DashboardDataSource } from "@/lib/client/dataSource";
+import { DEPARTMENTS } from "@/lib/db/seed";
 import { EMPLOYEE_STATUSES, type Employee, type EmployeeStatus, type JiraIssueRef } from "@/lib/types";
 
 interface EmployeeTableProps {
@@ -42,10 +43,16 @@ export function EmployeeTable({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<EmployeeStatus | "ALL">("ALL");
   const [busyId, setBusyId] = useState<string | null>(null);
-  // Removal is confirmed inline rather than through window.confirm/prompt, which
-  // sandboxed embeds block outright.
-  const [confirming, setConfirming] = useState<string | null>(null);
-  const [reason, setReason] = useState("");
+  // The transfer is captured inline rather than in a dialog, which sandboxed
+  // embeds block outright.
+  const [transferring, setTransferring] = useState<string | null>(null);
+  const [target, setTarget] = useState({
+    department: "",
+    jobTitle: "",
+    managerName: "",
+    managerEmail: "",
+    reason: "",
+  });
   const [error, setError] = useState<string | null>(null);
 
   const visible = useMemo(() => {
@@ -53,20 +60,38 @@ export function EmployeeTable({
     return employees.filter((employee) => {
       if (statusFilter !== "ALL" && employee.status !== statusFilter) return false;
       if (!needle) return true;
-      return [employee.name, employee.email, employee.jobTitle, employee.department]
+      return [employee.displayName, employee.email, employee.jobTitle, employee.department]
         .join(" ")
         .toLowerCase()
         .includes(needle);
     });
   }, [employees, query, statusFilter]);
 
-  async function requestRemoval(employee: Employee) {
+  function openTransfer(employee: Employee) {
+    setTransferring(employee.id);
+    setError(null);
+    // Pre-fill with where they are now, so HC only edits what actually changes.
+    setTarget({
+      department: employee.department,
+      jobTitle: employee.jobTitle,
+      managerName: "",
+      managerEmail: "",
+      reason: "",
+    });
+  }
+
+  async function requestTransfer(employee: Employee) {
     setBusyId(employee.id);
     setError(null);
     try {
-      await dataSource.requestRemoval(employee.id, reason.trim() || undefined);
-      setConfirming(null);
-      setReason("");
+      await dataSource.requestTransfer(employee.id, {
+        department: target.department.trim(),
+        jobTitle: target.jobTitle.trim(),
+        managerName: target.managerName.trim() || undefined,
+        managerEmail: target.managerEmail.trim() || undefined,
+        reason: target.reason.trim() || undefined,
+      });
+      setTransferring(null);
       if (onChanged) {
         onChanged();
       } else {
@@ -157,10 +182,10 @@ export function EmployeeTable({
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <span className="grid size-9 shrink-0 place-items-center rounded-full border border-hairline-strong bg-elevated text-xs font-semibold text-ink-muted">
-                        {initials(employee.name)}
+                        {initials(employee.displayName)}
                       </span>
                       <span className="min-w-0">
-                        <span className="block truncate font-medium text-ink">{employee.name}</span>
+                        <span className="block truncate font-medium text-ink">{employee.displayName}</span>
                         <span className="block truncate text-xs text-ink-faint">{employee.email}</span>
                       </span>
                     </div>
@@ -183,15 +208,12 @@ export function EmployeeTable({
                           {busy ? "Menyimpan…" : employee.status === "ACTIVE" ? "Nonaktifkan" : "Aktifkan"}
                         </Button>
                         <Button
-                          variant="danger"
+                          variant="primary"
                           disabled={busy}
-                          onClick={() => {
-                            setConfirming(employee.id);
-                            setReason("");
-                          }}
-                          title="Buat tiket persetujuan di Jira untuk mencabut akun ini"
+                          onClick={() => openTransfer(employee)}
+                          title="Buat tiket persetujuan di Jira untuk memindahkan divisi"
                         >
-                          Hapus
+                          Ubah posisi
                         </Button>
                       </div>
                     ) : ticket ? (
@@ -210,31 +232,87 @@ export function EmployeeTable({
                 </tr>
               );
 
-              const confirmRow =
-                confirming === employee.id ? (
-                  <tr key={`${employee.id}-confirm`} className="bg-danger/5">
-                    <td colSpan={6} className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <span className="text-sm text-ink">
-                          Ajukan penghapusan akun <strong>{employee.name}</strong>? Ini membuat tiket
-                          persetujuan di Jira untuk {employee.managerName} — akses baru dicabut
-                          setelah IT Security mengerjakannya.
-                        </span>
-                        <input
-                          value={reason}
-                          onChange={(event) => setReason(event.target.value)}
-                          placeholder="Alasan (opsional)"
-                          aria-label={`Alasan penghapusan akun ${employee.name}`}
-                          className="min-w-48 flex-1 rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none"
-                        />
-                        <Button
-                          variant="danger"
-                          disabled={busy}
-                          onClick={() => requestRemoval(employee)}
-                        >
-                          {busy ? "Mengirim…" : "Konfirmasi penghapusan"}
+              const transferRow =
+                transferring === employee.id ? (
+                  <tr key={`${employee.id}-transfer`} className="bg-info/5">
+                    <td colSpan={6} className="px-4 py-4">
+                      <p className="text-sm text-ink">
+                        Pindahkan <strong>{employee.displayName}</strong> dari {employee.department} ·{" "}
+                        {employee.jobTitle}. Perubahan baru berlaku setelah manager menyetujui dan IT
+                        Security menyesuaikan aksesnya.
+                      </p>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <label className="text-xs text-ink-faint">
+                          Divisi tujuan
+                          <select
+                            value={target.department}
+                            onChange={(event) =>
+                              setTarget((current) => ({ ...current, department: event.target.value }))
+                            }
+                            className="mt-1 w-full rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+                          >
+                            {DEPARTMENTS.map((department) => (
+                              <option key={department} value={department}>
+                                {department}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="text-xs text-ink-faint">
+                          Posisi baru
+                          <input
+                            value={target.jobTitle}
+                            onChange={(event) =>
+                              setTarget((current) => ({ ...current, jobTitle: event.target.value }))
+                            }
+                            placeholder="Security Analyst"
+                            className="mt-1 w-full rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+                          />
+                        </label>
+                        <label className="text-xs text-ink-faint">
+                          Alasan (opsional)
+                          <input
+                            value={target.reason}
+                            onChange={(event) =>
+                              setTarget((current) => ({ ...current, reason: event.target.value }))
+                            }
+                            placeholder="Rotasi internal"
+                            className="mt-1 w-full rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+                          />
+                        </label>
+                        <label className="text-xs text-ink-faint">
+                          Nama manager baru (opsional)
+                          <input
+                            value={target.managerName}
+                            onChange={(event) =>
+                              setTarget((current) => ({ ...current, managerName: event.target.value }))
+                            }
+                            placeholder="Bagus Nugroho"
+                            className="mt-1 w-full rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+                          />
+                        </label>
+                        <label className="text-xs text-ink-faint">
+                          Email manager baru (opsional)
+                          <input
+                            type="email"
+                            value={target.managerEmail}
+                            onChange={(event) =>
+                              setTarget((current) => ({ ...current, managerEmail: event.target.value }))
+                            }
+                            placeholder="bagus.nugroho@example.com"
+                            className="mt-1 w-full rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+                          />
+                        </label>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <Button disabled={busy} onClick={() => requestTransfer(employee)}>
+                          {busy ? "Mengirim…" : "Ajukan pindah divisi"}
                         </Button>
-                        <Button variant="ghost" disabled={busy} onClick={() => setConfirming(null)}>
+                        <Button
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => setTransferring(null)}
+                        >
                           Batal
                         </Button>
                       </div>
@@ -242,7 +320,7 @@ export function EmployeeTable({
                   </tr>
                 ) : null;
 
-              return [mainRow, confirmRow];
+              return [mainRow, transferRow];
             })}
 
             {visible.length === 0 ? (

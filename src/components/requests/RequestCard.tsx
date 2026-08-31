@@ -23,15 +23,15 @@ const STEP_COPY = {
     finalDone: "Karyawan sudah aktif di dashboard HC.",
     finalPending: "Diubah otomatis saat tiket penyiapan ditutup.",
   },
-  OFFBOARDING: {
-    submitted: "HC mengajukan pencabutan akses karyawan ini.",
-    securityTitle: "Pencabutan akses IT Security",
-    securityDone: "Akun dan akses sudah dicabut.",
-    securityWaiting: "Menunggu IT Security menutup tiket pencabutan akses.",
+  TRANSFER: {
+    submitted: "HC mengajukan pemindahan divisi karyawan ini.",
+    securityTitle: "Penyesuaian akses IT Security",
+    securityDone: "Akses sudah disesuaikan dengan divisi baru.",
+    securityWaiting: "Menunggu IT Security menutup tiket penyesuaian akses.",
     securityPending: "Dibuat otomatis setelah manager menyetujui.",
-    finalTitle: "Akses dicabut",
-    finalDone: "Karyawan ditandai Dihapus di dashboard HC.",
-    finalPending: "Diubah otomatis saat tiket pencabutan ditutup.",
+    finalTitle: "Posisi diperbarui",
+    finalDone: "Divisi dan jabatan baru sudah berlaku di dashboard HC.",
+    finalPending: "Diterapkan otomatis saat tiket penyesuaian ditutup.",
   },
 } as const;
 
@@ -51,8 +51,8 @@ function buildSteps(request: AccessRequest): Step[] {
     {
       title: "Persetujuan manager",
       detail: rejected
-        ? request.type === "OFFBOARDING"
-          ? "Manager menolak penghapusan; akses karyawan tetap berlaku."
+        ? request.type === "TRANSFER"
+          ? "Manager menolak pemindahan; karyawan tetap di posisi semula."
           : "Manager menolak pengajuan ini."
         : pastManager
           ? "Disetujui oleh manager."
@@ -125,10 +125,16 @@ export function RequestCard({ request, employee }: RequestCardProps) {
     <Card className="overflow-hidden">
       <header className="flex flex-wrap items-center gap-3 border-b border-hairline p-5">
         <div className="min-w-0">
-          <h2 className="truncate text-base font-semibold">{employee?.name ?? "Karyawan tidak dikenal"}</h2>
+          <h2 className="truncate text-base font-semibold">{employee?.displayName ?? "Karyawan tidak dikenal"}</h2>
           <p className="truncate text-xs text-ink-faint">
             {employee ? `${employee.jobTitle} · ${employee.department}` : request.employeeId}
           </p>
+          {request.transfer ? (
+            <p className="mt-1 truncate text-xs text-info">
+              → {request.transfer.department} · {request.transfer.jobTitle}
+              {request.transfer.managerName ? ` · manager ${request.transfer.managerName}` : ""}
+            </p>
+          ) : null}
           {request.reason ? (
             <p className="mt-1 truncate text-xs text-ink-muted">Alasan: {request.reason}</p>
           ) : null}
@@ -136,12 +142,12 @@ export function RequestCard({ request, employee }: RequestCardProps) {
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <span
             className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap ${
-              request.type === "OFFBOARDING"
-                ? "border-danger/30 bg-danger/10 text-danger"
+              request.type === "TRANSFER"
+                ? "border-info/30 bg-info/10 text-info"
                 : "border-accent/30 bg-accent/10 text-accent-soft"
             }`}
           >
-            {request.type === "OFFBOARDING" ? "Hapus akun" : "Akun baru"}
+            {request.type === "TRANSFER" ? "Pindah divisi" : "Akun baru"}
           </span>
           <StageBadge stage={request.stage} type={request.type} />
           {employee ? <StatusBadge status={employee.status} /> : null}
