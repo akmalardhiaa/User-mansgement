@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
+import { BrandMark } from "@/components/ui/BrandMark";
+
 const NAV = [
   { href: "/", label: "Dashboard" },
   { href: "/requests", label: "Persetujuan" },
@@ -46,11 +48,8 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 border-b border-hairline bg-canvas/80 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-6xl items-center gap-6 px-5 py-3.5">
-          <Link href={user ? "/" : "/login"} className="flex items-center gap-2.5">
-            <span className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-accent to-accent-soft text-sm font-bold text-accent-ink">
-              HC
-            </span>
-            <span className="text-sm font-semibold tracking-tight">User Management</span>
+          <Link href={user ? "/" : "/login"} className="flex items-center">
+            <BrandMark />
           </Link>
 
           {showNav ? (
