@@ -139,6 +139,23 @@ If webhooks cannot reach the app, `POST /api/workflow/sync` (the **Sync from Jir
 button, and a suitable cron target) reconciles every open request instead. Transitions
 are de-duplicated, so webhook and polling can safely run side by side.
 
+## Company logo
+
+The header and the sign-in screen render your organisation's logo from
+`public/brand/`, pointed at by `NEXT_PUBLIC_BRAND_LOGO`:
+
+```
+NEXT_PUBLIC_BRAND_LOGO=/brand/logo.svg
+NEXT_PUBLIC_BRAND_NAME=Mandiri Sekuritas
+```
+
+Without that file the app falls back to a neutral "HC" mark. **Nothing here
+redraws a trademark** — a logo reproduced from memory is wrong in exactly the
+details a brand is recognised by, so the real asset from your brand team is the
+only correct input. See `public/brand/README.md`.
+
+`NEXT_PUBLIC_*` values are inlined at build time, so changing them needs a rebuild.
+
 ## Login
 
 Every page and API route sits behind a session, enforced in `src/middleware.ts`. Two

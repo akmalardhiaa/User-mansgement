@@ -44,6 +44,14 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except Next's own assets and the favicon.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  /*
+   * Everything except Next's own assets and static files served from /public.
+   *
+   * The extension check matters: without it the login page's own logo is
+   * redirected to /login and renders broken, because the browser fetches it
+   * while nobody is signed in yet.
+   */
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|woff|woff2|ttf)$).*)",
+  ],
 };

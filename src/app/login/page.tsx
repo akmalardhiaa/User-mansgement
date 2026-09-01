@@ -1,4 +1,5 @@
 import { LoginForm } from "@/components/auth/LoginForm";
+import { BrandMark } from "@/components/ui/BrandMark";
 import { Card } from "@/components/ui/Field";
 import { isAuthConfigured } from "@/lib/auth/users";
 
@@ -18,11 +19,8 @@ export default async function LoginPage({
 
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-sm flex-col justify-center">
-      <div className="mb-6 flex items-center gap-2.5">
-        <span className="grid size-9 place-items-center rounded-lg bg-gradient-to-br from-accent to-accent-soft text-sm font-bold text-accent-ink">
-          HC
-        </span>
-        <span className="font-semibold tracking-tight">User Management</span>
+      <div className="mb-6">
+        <BrandMark size="lg" />
       </div>
 
       <h1 className="text-2xl font-semibold tracking-tight">Masuk</h1>
