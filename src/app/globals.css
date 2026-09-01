@@ -6,25 +6,28 @@
  */
 @theme {
   /*
-   * Palette approximating Mandiri Sekuritas' house colours: a deep navy ground
-   * with a gold accent. These are matched by eye from the publicly recognisable
-   * brand, not taken from a brand guide — replace the hex values here (and
-   * nowhere else) once the official ones are to hand.
+   * Mandiri Sekuritas' house colours, sampled from the supplied logo file rather
+   * than matched by eye: navy #173d6e (89% of the mark's pixels) and gold
+   * #fdb713 (the wave). Every navy below is one ramp on the logo's own hue and
+   * saturation — 214deg, ~63% — so no surface reads as a different navy from
+   * the mark sitting on it. Change these here and nowhere else.
    */
-  --color-canvas: #001233;
-  --color-surface: #041b3d;
-  --color-elevated: #0a2551;
-  --color-hairline: #12325f;
-  --color-hairline-strong: #1c4478;
+  --color-canvas: #071321;
+  --color-surface: #0c1e36;
+  --color-elevated: #112a4b;
+  /* The logo's navy exactly, spent as the line colour so the brand tone edges
+     every card rather than sitting in one patch. */
+  --color-hairline: #173d6e;
+  --color-hairline-strong: #25528d;
 
-  --color-ink: #e9f0fa;
-  --color-ink-muted: #9cb2d2;
-  --color-ink-faint: #6d86ac;
+  --color-ink: #ebf1f9;
+  --color-ink-muted: #a2b5cd;
+  --color-ink-faint: #7389a5;
 
   /* Gold is light, so anything sitting on it takes the navy ground as its ink. */
-  --color-accent: #ffb612;
-  --color-accent-soft: #ffc94d;
-  --color-accent-ink: #001233;
+  --color-accent: #fdb713;
+  --color-accent-soft: #ffce5c;
+  --color-accent-ink: #071321;
 
   /*
    * Semantic colours stay separate from the accent. "Waiting" is deliberately
@@ -53,7 +56,7 @@ body {
   /* A cool wash on one side, a warm gold one on the other, so the flat navy
      has depth without either colour competing with the content. */
   background-image:
-    radial-gradient(60rem 32rem at 10% -8%, color-mix(in oklab, #1e5fa8 22%, transparent), transparent),
+    radial-gradient(60rem 32rem at 10% -8%, color-mix(in oklab, #2e6ab8 22%, transparent), transparent),
     radial-gradient(46rem 26rem at 94% 0%, color-mix(in oklab, var(--color-accent) 10%, transparent), transparent);
   background-repeat: no-repeat;
   background-attachment: fixed;
