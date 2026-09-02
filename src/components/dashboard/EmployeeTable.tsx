@@ -260,13 +260,22 @@ export function EmployeeTable({
                         rather than stacking words. */}
                     {canToggleAccess(employee.status) ? (
                       <div className="flex justify-end gap-2 whitespace-nowrap">
+                        {/* Red to suspend, green to restore: the two states sit
+                            in the same spot down a long column, so colour is
+                            what tells them apart at a glance. The label still
+                            carries the meaning on its own — nothing here
+                            depends on distinguishing the two hues. */}
                         <Button
-                          variant="ghost"
+                          variant={employee.status === "ACTIVE" ? "danger" : "success"}
                           size="sm"
                           loading={busy}
                           icon={<IconPower />}
                           onClick={() => toggleAccess(employee)}
-                          title="Nonaktifkan akses seketika, tanpa persetujuan"
+                          title={
+                            employee.status === "ACTIVE"
+                              ? "Nonaktifkan akses seketika, tanpa persetujuan"
+                              : "Aktifkan kembali akses seketika, tanpa persetujuan"
+                          }
                         >
                           {employee.status === "ACTIVE" ? "Nonaktifkan" : "Aktifkan"}
                         </Button>
