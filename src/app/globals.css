@@ -43,6 +43,14 @@
     "Noto Sans", sans-serif;
   --font-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /*
+   * One shared motion vocabulary. Framer Motion and GSAP each carry their own
+   * defaults; naming the curves here keeps CSS transitions moving on the same
+   * timing as the scripted ones, so a hover and an entrance feel like one system.
+   */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
 }
 
 :root {
@@ -67,13 +75,90 @@ body {
   color: var(--color-accent-ink);
 }
 
-/* Slim scrollbars, so wide tables scrolling horizontally stay unobtrusive. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-hairline-strong) transparent;
+/*
+ * Slim scrollbars, so wide tables scrolling horizontally stay unobtrusive.
+ *
+ * Inside `@layer base` deliberately. Unlayered CSS beats every layered rule no
+ * matter how specific, so as a bare `*` selector this quietly overrode the
+ * `no-scrollbar` utility — Tailwind emits utilities into a layer, and the
+ * cascade settled it before specificity was ever consulted.
+ */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-hairline-strong) transparent;
+  }
 }
 
 :focus-visible {
   outline: 2px solid var(--color-accent-soft);
   outline-offset: 2px;
+}
+
+/*
+ * Numbers that tick — counters, table figures — must not reflow their
+ * neighbours as digits change width.
+ */
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * For strips that scroll sideways but are not documents — the nav row on
+ * narrow screens. The global thin scrollbar reads as a heavy rule under a
+ * three-item nav, and the items are visibly cut off, which says "scroll" on
+ * its own.
+ */
+@utility no-scrollbar {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/*
+ * The loading placeholder. A sweep rather than a pulse, because a pulse at card
+ * size reads as something failing rather than something arriving.
+ */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@utility skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: color-mix(in oklab, var(--color-elevated) 70%, transparent);
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--color-hairline-strong) 45%, transparent),
+      transparent
+    );
+    animation: shimmer 1.6s infinite;
+  }
+}
+
+/*
+ * The one global escape hatch. Framer Motion and GSAP are told about the same
+ * preference in code (see src/lib/motion), but a user who asks for less motion
+ * must get it even from a stylesheet the components do not control.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

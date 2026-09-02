@@ -1,14 +1,16 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { useMemo, useState, useSyncExternalStore } from "react";
 
-import { EmployeeTable } from "@/components/dashboard/EmployeeTable";
-import { StatsRow } from "@/components/dashboard/StatsRow";
+import { DirectoryView } from "@/components/dashboard/DirectoryView";
 import { RequestCard } from "@/components/requests/RequestCard";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Field";
+import { IconAlert } from "@/components/ui/Icons";
 import { CreateUserForm } from "@/components/users/CreateUserForm";
 import { DemoStore } from "@/lib/demo/demoStore";
+import { TRANSITION_LAYOUT } from "@/lib/motion";
 import type { JiraIssueRef } from "@/lib/types";
 
 /**
@@ -58,35 +60,45 @@ export function DemoApp() {
     <div className="space-y-6">
       <DemoBanner />
 
-      <nav className="flex gap-1 rounded-xl border border-hairline bg-surface/60 p-1" aria-label="Demo sections">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setTab(item.id)}
-            aria-current={tab === item.id ? "page" : undefined}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              tab === item.id ? "bg-elevated text-ink" : "text-ink-muted hover:text-ink"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
+      <nav
+        className="flex gap-1 rounded-xl border border-hairline bg-surface/60 p-1"
+        aria-label="Demo sections"
+      >
+        {TABS.map((item) => {
+          const selected = tab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setTab(item.id)}
+              aria-current={selected ? "page" : undefined}
+              className={`relative flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ${
+                selected ? "text-ink" : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              {selected ? (
+                <motion.span
+                  layoutId="demo-tab"
+                  transition={TRANSITION_LAYOUT}
+                  className="absolute inset-0 rounded-lg bg-elevated"
+                />
+              ) : null}
+              <span className="relative">{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
       <JiraSimulator openTickets={openTickets} log={log} onTransition={transition} />
 
       {tab === "directory" ? (
-        <div className="space-y-6">
-          <StatsRow employees={state.employees} />
-          <Card className="overflow-hidden">
-            <EmployeeTable
-              employees={state.employees}
-              activeTickets={activeTickets}
-              dataSource={store}
-              onChanged={() => undefined}
-            />
-          </Card>
-        </div>
+        <DirectoryView
+          employees={state.employees}
+          activeTickets={activeTickets}
+          dataSource={store}
+          // The store notifies its own subscribers, so there is nothing for the
+          // components to refresh by hand.
+          onChanged={() => undefined}
+        />
       ) : null}
 
       {tab === "add" ? (
@@ -126,7 +138,10 @@ export function DemoApp() {
 function DemoBanner() {
   return (
     <div className="rounded-2xl border border-warn/30 bg-warn/10 p-4">
-      <p className="text-sm font-medium text-warn">Static demo — no backend</p>
+      <p className="flex items-center gap-2 text-sm font-medium text-warn">
+        <IconAlert className="size-4" />
+        Static demo — no backend
+      </p>
       <p className="mt-1 text-xs text-ink-muted">
         This page is a GitHub Pages export, so the API routes and the real Jira integration are not
         running. Tickets are generated locally and the panel below stands in for the Jira webhook.

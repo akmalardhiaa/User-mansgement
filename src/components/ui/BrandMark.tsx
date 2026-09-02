@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 import { getBrand } from "@/lib/config/brand";
 
 /**
@@ -14,6 +18,15 @@ import { getBrand } from "@/lib/config/brand";
 export function BrandMark({ size = "sm" }: { size?: "sm" | "lg" }) {
   const brand = getBrand();
   const named = brand.name !== "User Management";
+  /*
+   * NEXT_PUBLIC_BRAND_LOGO is a path nothing validates — it is inlined at build
+   * time and only fails when a browser asks for it. Pointing it at a file that
+   * is not there used to put a broken-image icon in the header of every page,
+   * which is worse than any of the fallbacks below. So the fallback happens on
+   * the actual load error rather than on trusting the setting.
+   */
+  const [logoFailed, setLogoFailed] = useState(false);
+  const showLogo = Boolean(brand.logo) && !logoFailed;
 
   const logoHeight = size === "lg" ? "h-9" : "h-7";
   const wordmarkSize = size === "lg" ? "text-lg" : "text-sm";
@@ -21,11 +34,16 @@ export function BrandMark({ size = "sm" }: { size?: "sm" | "lg" }) {
 
   return (
     <span className="flex items-center gap-2.5">
-      {brand.logo ? (
+      {showLogo ? (
         // An author-supplied SVG or PNG of unknown intrinsic size; next/image
         // cannot optimise SVG anyway, so a plain img is correct here.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={brand.logo} alt={brand.name} className={`${logoHeight} w-auto object-contain`} />
+        <img
+          src={brand.logo}
+          alt={brand.name}
+          onError={() => setLogoFailed(true)}
+          className={`${logoHeight} w-auto object-contain`}
+        />
       ) : named ? (
         <span className={`${wordmarkSize} font-semibold tracking-tight text-ink`}>
           {brand.name}
