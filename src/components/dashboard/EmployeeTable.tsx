@@ -197,8 +197,11 @@ export function EmployeeTable({
                     <StatusBadge status={employee.status} />
                   </td>
                   <td className="px-4 py-3 text-right">
+                    {/* The nav rail leaves the table narrower than the row labels
+                        want, so actions stay on one line and the table scrolls
+                        rather than stacking words. */}
                     {canToggleAccess(employee.status) ? (
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-2 whitespace-nowrap">
                         <Button
                           variant="ghost"
                           disabled={busy}
