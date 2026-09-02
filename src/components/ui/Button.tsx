@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "success";
 type Size = "sm" | "md";
 
 const VARIANTS: Record<Variant, string> = {
@@ -12,6 +12,9 @@ const VARIANTS: Record<Variant, string> = {
     "bg-elevated text-ink border border-hairline-strong hover:border-accent/50 hover:bg-elevated/70",
   ghost: "bg-transparent text-ink-muted border border-hairline hover:bg-elevated hover:text-ink",
   danger: "bg-danger/10 text-danger border border-danger/30 hover:bg-danger/20",
+  // Mirrors `danger` so a red/green pair reads as one control in two states
+  // rather than two differently-weighted buttons.
+  success: "bg-ok/10 text-ok border border-ok/30 hover:bg-ok/20",
 };
 
 const SIZES: Record<Size, string> = {
