@@ -191,6 +191,41 @@ export function IconClock(props: IconProps) {
   );
 }
 
+export function IconSun(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4" />
+    </Icon>
+  );
+}
+
+export function IconMoon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z" />
+    </Icon>
+  );
+}
+
+export function IconBell(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 9a6 6 0 0 1 12 0c0 3.2.6 5 1.5 6h-15C5.4 14 6 12.2 6 9Z" />
+      <path d="M10 18.5a2 2 0 0 0 4 0" />
+    </Icon>
+  );
+}
+
+export function IconInbox(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3.5 13.5h4l1.5 2.5h6l1.5-2.5h4" />
+      <path d="M5.6 5.5h12.8l2.1 8v3.5a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2V13.5l2.1-8Z" />
+    </Icon>
+  );
+}
+
 /*
  * Form-field glyphs.
  *

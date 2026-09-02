@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ComponentType, type ReactNode } from "react";
 
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { BrandMark } from "@/components/ui/BrandMark";
 import {
   IconApprovals,
@@ -86,7 +87,7 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
       <header
         className={`sticky top-0 z-30 border-b bg-canvas/80 backdrop-blur-md transition-[border-color,box-shadow] duration-300 ${
           scrolled
-            ? "border-hairline-strong shadow-[0_8px_30px_-12px_rgba(0,0,0,0.7)]"
+            ? "border-hairline-strong shadow-[var(--shadow-header)]"
             : "border-hairline shadow-none"
         }`}
       >
@@ -99,6 +100,10 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
           </Link>
 
           <div className="ml-auto flex items-center gap-3 text-xs text-ink-faint">
+            {/* Outside the session branch: the login screen gets the switch too,
+                since that is the first thing anyone sees. */}
+            <ThemeToggle />
+
             {IS_STATIC_DEMO ? (
               <span className="hidden items-center gap-2 sm:flex">
                 <span className="relative flex size-1.5">

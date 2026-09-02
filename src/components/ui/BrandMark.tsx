@@ -42,7 +42,7 @@ export function BrandMark({ size = "sm" }: { size?: "sm" | "lg" }) {
           src={brand.logo}
           alt={brand.name}
           onError={() => setLogoFailed(true)}
-          className={`${logoHeight} w-auto object-contain`}
+          className={`brand-lockup ${logoHeight} w-auto object-contain`}
         />
       ) : named ? (
         <span className={`${wordmarkSize} font-semibold tracking-tight text-ink`}>
