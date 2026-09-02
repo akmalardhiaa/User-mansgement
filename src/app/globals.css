@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
 /*
- * Single dark palette. The dashboard is a focused internal tool, so it commits
- * to one look rather than shipping a light/dark pair.
+ * Two palettes on one set of names.
+ *
+ * `@theme` below is the dark one and stays the default; the light one overrides
+ * the same custom properties under `[data-theme="light"]`. Every component
+ * reads the token, never a literal, so switching themes is one attribute on
+ * <html> and nothing in the components changes.
+ *
+ * The attribute is always written explicitly — see the inline script in
+ * layout.tsx, which resolves the stored choice or the OS preference before the
+ * first paint. That is why there is no `prefers-color-scheme` block here: by
+ * the time this stylesheet matters, the answer is already on the element.
  */
 @theme {
   /*
@@ -53,21 +62,98 @@
   --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
 }
 
+/*
+ * Kept out of `@theme` because these are not utility-generating tokens — they
+ * are values two components and the body interpolate directly.
+ */
 :root {
   color-scheme: dark;
+
+  /* Overlay shadows. Named rather than written inline because the dark theme
+     casts near-black and the light one cannot: black at that opacity over white
+     reads as dirt rather than depth. */
+  --shadow-header: 0 8px 30px -12px rgb(0 0 0 / 0.7);
+  --shadow-panel: 0 24px 60px -20px rgb(0 0 0 / 0.8);
+
+  /* The two washes on the body, so the light theme can soften them. */
+  --wash-cool: color-mix(in oklab, #2e6ab8 22%, transparent);
+  --wash-warm: color-mix(in oklab, #fdb713 10%, transparent);
+}
+
+/*
+ * The light palette.
+ *
+ * Same navy and gold, re-ramped against white rather than lightened versions of
+ * the dark values — a dark theme's inks and surfaces do not invert into a
+ * usable light one. Two tokens deliberately swap roles:
+ *
+ *   accent-soft  is a lighter gold on dark and a darker one here. It serves
+ *                both the primary button's hover and the Jira link's text, and
+ *                on white only a darker gold can do the second job.
+ *   ok/warn/info/danger  darken sharply. #34d399 on white is 1.9:1; the badges
+ *                that tint their own background need ink that survives it.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --color-canvas: #f4f7fb;
+  /* Cards are white against the tinted ground, so a surface reads as raised
+     without needing a shadow to say so. */
+  --color-surface: #ffffff;
+  --color-elevated: #eaf0f8;
+  --color-hairline: #d5e0ee;
+  --color-hairline-strong: #b3c6de;
+
+  --color-ink: #0a1c33;
+  --color-ink-muted: #44607f;
+  --color-ink-faint: #506b8a;
+
+  --color-accent: #fdb713;
+  --color-accent-soft: #8a5c00;
+  --color-accent-ink: #071321;
+
+  --color-ok: #047857;
+  --color-warn: #b23c0a;
+  --color-info: #0369a1;
+  --color-danger: #be123c;
+
+  --shadow-header: 0 8px 24px -14px rgb(10 28 51 / 0.28);
+  --shadow-panel: 0 20px 50px -20px rgb(10 28 51 / 0.3);
+
+  --wash-cool: color-mix(in oklab, #2e6ab8 7%, transparent);
+  --wash-warm: color-mix(in oklab, #fdb713 8%, transparent);
 }
 
 body {
   background-color: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  /* A cool wash on one side, a warm gold one on the other, so the flat navy
+  /* A cool wash on one side, a warm gold one on the other, so the flat ground
      has depth without either colour competing with the content. */
   background-image:
-    radial-gradient(60rem 32rem at 10% -8%, color-mix(in oklab, #2e6ab8 22%, transparent), transparent),
-    radial-gradient(46rem 26rem at 94% 0%, color-mix(in oklab, var(--color-accent) 10%, transparent), transparent);
+    radial-gradient(60rem 32rem at 10% -8%, var(--wash-cool), transparent),
+    radial-gradient(46rem 26rem at 94% 0%, var(--wash-warm), transparent);
   background-repeat: no-repeat;
   background-attachment: fixed;
+}
+
+/*
+ * The supplied lockup is a white wordmark cut out of an asset whose navy field
+ * was the mark's own ground. That reads on the dark theme and disappears on the
+ * light one, so light mode gives the navy back as a plaque — the mark is put
+ * back on its own colour rather than recoloured, which would be redrawing it.
+ *
+ * The padding is unconditional so both themes share one geometry and the header
+ * does not change height when the theme does; only the background differs.
+ */
+.brand-lockup {
+  box-sizing: content-box;
+  padding: 0.25rem 0.375rem;
+  border-radius: 0.375rem;
+}
+
+:root[data-theme="light"] .brand-lockup {
+  background-color: #173d6e;
 }
 
 ::selection {
