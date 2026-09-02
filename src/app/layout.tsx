@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { MotionProvider } from "@/components/motion/MotionProvider";
+import { ToastProvider } from "@/components/ui/Toast";
 import { SESSION_COOKIE, readSessionToken } from "@/lib/auth/session";
 
 import "./globals.css";
@@ -22,9 +24,15 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang="id" className="h-full antialiased">
       <body className="min-h-full">
-        <AppShell user={session ? { name: session.name, email: session.email } : undefined}>
-          {children}
-        </AppShell>
+        {/* Motion config outermost, so every animation below it — including the
+            toasts, which sit outside the shell — honours "reduce motion". */}
+        <MotionProvider>
+          <ToastProvider>
+            <AppShell user={session ? { name: session.name, email: session.email } : undefined}>
+              {children}
+            </AppShell>
+          </ToastProvider>
+        </MotionProvider>
       </body>
     </html>
   );

@@ -1,9 +1,9 @@
 import Link from "next/link";
 
-import { EmployeeTable } from "@/components/dashboard/EmployeeTable";
-import { StatsRow } from "@/components/dashboard/StatsRow";
+import { DirectoryView } from "@/components/dashboard/DirectoryView";
 import { SyncButton } from "@/components/dashboard/SyncButton";
-import { Card } from "@/components/ui/Field";
+import { IconUserPlus } from "@/components/ui/Icons";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { listEmployees, listRequests } from "@/lib/db/repository";
 import type { JiraIssueRef } from "@/lib/types";
 
@@ -25,29 +25,25 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Direktori karyawan</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            Kelola akses karyawan dan pantau pengajuan akun melalui persetujuan di Jira.
-          </p>
-        </div>
-        <div className="ml-auto flex flex-wrap items-center gap-3">
-          <SyncButton />
-          <Link
-            href="/users/new"
-            className="inline-flex items-center rounded-lg border border-accent/60 bg-accent px-3.5 py-2 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-soft"
-          >
-            + Tambah akun
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Human Capital"
+        title="Direktori karyawan"
+        description="Kelola akses karyawan dan pantau pengajuan akun melalui persetujuan di Jira."
+        actions={
+          <>
+            <SyncButton />
+            <Link
+              href="/users/new"
+              className="inline-flex items-center gap-2 rounded-lg border border-accent/70 bg-accent px-3.5 py-2 text-sm font-semibold text-accent-ink transition-all duration-200 hover:bg-accent-soft hover:shadow-[0_0_20px_-4px_var(--color-accent)] active:scale-[0.97]"
+            >
+              <IconUserPlus className="size-4" />
+              Tambah akun
+            </Link>
+          </>
+        }
+      />
 
-      <StatsRow employees={employees} />
-
-      <Card className="overflow-hidden">
-        <EmployeeTable employees={employees} activeTickets={activeTickets} />
-      </Card>
+      <DirectoryView employees={employees} activeTickets={activeTickets} />
     </div>
   );
 }
