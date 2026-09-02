@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, type ComponentType, type ReactNode } from "react";
 
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { BrandMark } from "@/components/ui/BrandMark";
 import {
   IconApprovals,
@@ -114,6 +115,8 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
               </span>
             ) : user ? (
               <>
+                {/* The static demo has no API routes for the bell to poll. */}
+                {IS_STATIC_DEMO ? null : <NotificationBell />}
                 <span className="hidden items-center gap-2.5 sm:flex">
                   <span
                     className="grid size-8 place-items-center rounded-full border border-accent/30 bg-accent/10 text-[11px] font-semibold text-accent-soft"
