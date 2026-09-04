@@ -23,7 +23,7 @@ import { useToast } from "@/components/ui/Toast";
 import { apiDataSource, type DashboardDataSource } from "@/lib/client/dataSource";
 import { SORT_LABELS, type SortDirection, type SortKey } from "@/lib/dashboard/directory";
 import { DEPARTMENTS } from "@/lib/db/seed";
-import { TRANSITION_FAST, collapse } from "@/lib/motion";
+import { TRANSITION, TRANSITION_FAST, TRANSITION_LAYOUT, collapse } from "@/lib/motion";
 import type { Employee, EmployeeStatus, JiraIssueRef } from "@/lib/types";
 
 interface EmployeeTableProps {
@@ -214,7 +214,7 @@ export function EmployeeTable({
 
         <tbody>
           <AnimatePresence initial={false}>
-            {employees.map((employee) => {
+            {employees.map((employee, index) => {
               const ticket = activeTickets[employee.id];
               // Scoped to the row being saved. It used to include the whole
               // page's `useTransition` flag, so one toggle greyed out every
@@ -225,10 +225,34 @@ export function EmployeeTable({
               const mainRow = (
                 <motion.tr
                   key={employee.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={TRANSITION_FAST}
+                  /*
+                   * Rows arrive dealt out rather than all at once. Switching a
+                   * stat card rewrites most of the table, and a whole list
+                   * appearing on one frame reads as a page reload — the
+                   * sequence is what says these are the same rows, filtered.
+                   *
+                   * Capped at 0.24s: the delay is per row, so an unbounded
+                   * ramp would leave the fiftieth name arriving a second and a
+                   * half after the first.
+                   */
+                  initial={{ opacity: 0, y: 10, scale: 0.99 }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                    transition: { ...TRANSITION, delay: Math.min(index * 0.025, 0.24) },
+                  }}
+                  /* No delay leaving: a row on its way out has nothing to say,
+                     and staggering the exit only holds up the rows arriving. */
+                  exit={{ opacity: 0, y: -6, transition: TRANSITION_FAST }}
+                  /*
+                   * "position" rather than plain `layout`: the rows that survive
+                   * a filter change glide to where they belong instead of
+                   * snapping, but their height is left alone — a <tr> being
+                   * measured and scaled by Framer distorts the text inside it.
+                   */
+                  layout="position"
+                  transition={TRANSITION_LAYOUT}
                   className={`border-b border-hairline/60 transition-colors last:border-0 ${
                     open ? "bg-elevated/40" : "hover:bg-elevated/50"
                   }`}
@@ -441,12 +465,23 @@ export function EmployeeTable({
           </AnimatePresence>
 
           {employees.length === 0 ? (
-            <tr>
+            <motion.tr
+              // Reached by narrowing a filter, so it should arrive the way the
+              // rows it replaced did rather than blinking into place.
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={TRANSITION}
+            >
               <td colSpan={6} className="px-4 py-16">
                 <div className="flex flex-col items-center gap-3 text-center">
-                  <span className="grid size-12 place-items-center rounded-full border border-hairline bg-elevated/60 text-ink-faint">
+                  <motion.span
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ ...TRANSITION, delay: 0.06 }}
+                    className="grid size-12 place-items-center rounded-full border border-hairline bg-elevated/60 text-ink-faint"
+                  >
                     <IconSearch className="size-5" />
-                  </span>
+                  </motion.span>
                   <p className="text-sm text-ink-muted">
                     {filtered
                       ? "Tidak ada karyawan yang cocok dengan filter ini."
@@ -459,7 +494,7 @@ export function EmployeeTable({
                   ) : null}
                 </div>
               </td>
-            </tr>
+            </motion.tr>
           ) : null}
         </tbody>
       </table>
