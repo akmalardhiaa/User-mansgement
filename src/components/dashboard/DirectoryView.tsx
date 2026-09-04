@@ -14,8 +14,7 @@ import {
   departmentsOf,
   filterEmployees,
   isDefaultFilters,
-  sortEmployees,
-  toCsv,
+  sortEmployees,
   type DirectoryFilters,
   type SortKey,
 } from "@/lib/dashboard/directory";
@@ -43,6 +42,7 @@ export function DirectoryView({
 }) {
   const { toast } = useToast();
   const [filters, setFilters] = useState<DirectoryFilters>(DEFAULT_FILTERS);
+  const [exporting, setExporting] = useState(false);
 
   const departments = useMemo(() => departmentsOf(employees), [employees]);
 
@@ -70,17 +70,40 @@ export function DirectoryView({
     );
   }, []);
 
-  function exportCsv() {
-    const blob = new Blob([toCsv(visible)], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `direktori-karyawan-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    // Revoking immediately is safe: the browser has already taken its own
-    // reference by the time `click()` returns.
-    URL.revokeObjectURL(url);
-    toast(`${visible.length} baris diekspor ke CSV.`, "info");
+  /**
+   * The workbook is built on the server: ExcelJS is about a megabyte, and
+   * shipping it to every visitor to save one request would cost every page load
+   * in the app. Only the filter state crosses the wire — the server re-runs the
+   * same filter and sort, so the file matches the screen.
+   */
+  async function exportWorkbook() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const response = await fetch("/api/directory/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filters }),
+      });
+      if (!response.ok) throw new Error("Ekspor gagal.");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      // Taken from the response, so the server names the file and the client
+      // never has to guess at the extension it is about to save.
+      link.download =
+        response.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] ??
+        `direktori-karyawan-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast(`${visible.length} baris diekspor ke Excel.`, "info");
+    } catch (cause) {
+      toast((cause as Error).message, "error");
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -97,7 +120,8 @@ export function DirectoryView({
             filters={filters}
             onChange={change}
             onReset={reset}
-            onExport={exportCsv}
+            onExport={exportWorkbook}
+            exporting={exporting}
             departments={departments}
             shown={visible.length}
             total={employees.length}
