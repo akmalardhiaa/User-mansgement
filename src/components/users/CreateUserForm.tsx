@@ -19,10 +19,10 @@ import {
   IconMail,
   IconNote,
   IconUser,
-  IconUserCheck,
   IconUserPlus,
 } from "@/components/ui/Icons";
 import { useToast } from "@/components/ui/Toast";
+import { ManagerPicker } from "@/components/users/ManagerPicker";
 import {
   SubmissionError,
   apiDataSource,
@@ -30,7 +30,7 @@ import {
   type DashboardDataSource,
 } from "@/lib/client/dataSource";
 import { TRANSITION, TRANSITION_FAST, stagger, staggerItem } from "@/lib/motion";
-import type { NewUserInput } from "@/lib/types";
+import type { Employee, NewUserInput } from "@/lib/types";
 
 type FieldErrors = Partial<Record<keyof NewUserInput, string>>;
 
@@ -70,10 +70,16 @@ const REQUIRED: ReadonlyArray<keyof NewUserInput> = [
  */
 export function CreateUserForm({
   dataSource = apiDataSource,
+  employees = [],
   onCreated,
   onTrack,
 }: {
   dataSource?: DashboardDataSource;
+  /**
+   * The roster the manager picker offers. Empty is a valid state — it just
+   * leaves HC typing the approver, which is what the form did before.
+   */
+  employees?: Employee[];
   onCreated?: () => void;
   /** Demo mode switches tab instead of navigating to /requests. */
   onTrack?: () => void;
@@ -342,36 +348,21 @@ export function CreateUserForm({
             Atasan yang menyetujui
           </motion.p>
 
-          <div className="grid gap-5 sm:grid-cols-2">
-            <motion.div variants={staggerItem}>
-              <Field
-                label="Nama manager"
-                name="managerName"
-                // The tick separates the approver from the six plain-person
-                // fields above: this is the one who has to say yes.
-                icon={<IconUserCheck className="size-4" />}
-                value={values.managerName}
-                onChange={(event) => update("managerName", event.target.value)}
-                error={fieldErrors.managerName}
-                placeholder="Sarah Wijaya"
-                autoComplete="off"
-              />
-            </motion.div>
-            <motion.div variants={staggerItem}>
-              <Field
-                label="Email manager"
-                name="managerEmail"
-                type="email"
-                icon={<IconMail className="size-4" />}
-                value={values.managerEmail}
-                onChange={(event) => update("managerEmail", event.target.value)}
-                error={fieldErrors.managerEmail}
-                hint="Dipakai untuk mencari akun Jira-nya, agar Jira mengirim email tiket persetujuan."
-                placeholder="sarah.wijaya@example.com"
-                autoComplete="off"
-              />
-            </motion.div>
-          </div>
+          <motion.div variants={staggerItem}>
+            <ManagerPicker
+              employees={employees}
+              value={{ managerName: values.managerName, managerEmail: values.managerEmail }}
+              onChange={(next) =>
+                setValues((current) => ({
+                  ...current,
+                  managerName: next.managerName,
+                  managerEmail: next.managerEmail,
+                }))
+              }
+              nameError={fieldErrors.managerName}
+              emailError={fieldErrors.managerEmail}
+            />
+          </motion.div>
 
           <motion.div variants={staggerItem} className="mt-8">
             <TextareaField

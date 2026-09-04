@@ -4,6 +4,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { CreateUserForm } from "@/components/users/CreateUserForm";
 import { IconClock } from "@/components/ui/Icons";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { listEmployees } from "@/lib/db/repository";
 
 export const metadata = { title: "Tambah akun · HC User Management" };
 
@@ -14,7 +15,13 @@ const WORKFLOW = [
   ["4", "Akun aktif", "Menutup tiket penyiapan mengubah status menjadi Aktif."],
 ] as const;
 
-export default function NewUserPage() {
+export const dynamic = "force-dynamic";
+
+export default async function NewUserPage() {
+  // The roster the manager picker offers, read here so the form has it on the
+  // first paint rather than fetching it after mount.
+  const employees = await listEmployees();
+
   return (
     <div className="space-y-6">
       <div>
@@ -36,7 +43,7 @@ export default function NewUserPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
         <Reveal delay={0.06}>
-          <CreateUserForm />
+          <CreateUserForm employees={employees} />
         </Reveal>
 
         <Reveal delay={0.14}>
