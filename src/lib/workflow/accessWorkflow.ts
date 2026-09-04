@@ -7,6 +7,7 @@ import {
   findRequestByIssueKeyInDraft,
   listOpenRequests,
   makeEvent,
+  recordActivityInDraft,
   transaction,
 } from "@/lib/db/repository";
 import {
@@ -118,6 +119,14 @@ export async function submitOnboardingRequest(
       notificationEvent(issue.key, assignee, employee.managerEmail),
     );
 
+    recordActivityInDraft(draft, {
+      actor,
+      action: "user.created",
+      employeeId: employee.id,
+      employeeName: employee.displayName,
+      detail: `Mengajukan akun baru untuk ${employee.displayName} — ${employee.jobTitle}, ${employee.department}. Tiket ${issue.key}.`,
+    });
+
     const storedEmployee = draft.employees.find((candidate) => candidate.id === employee.id)!;
     return { employee: storedEmployee, request: stored };
   });
@@ -164,6 +173,14 @@ export async function submitTransferRequest(
       ),
       notificationEvent(issue.key, assignee, employee.managerEmail),
     );
+
+    recordActivityInDraft(draft, {
+      actor,
+      action: "transfer.requested",
+      employeeId: employee.id,
+      employeeName: employee.displayName,
+      detail: `Mengajukan pindah divisi untuk ${employee.displayName} ke ${stored.transfer?.department ?? "divisi baru"}. Tiket ${issue.key}.`,
+    });
 
     const storedEmployee = draft.employees.find((candidate) => candidate.id === employee.id)!;
     return { employee: storedEmployee, request: stored };
@@ -245,6 +262,13 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
             issueKey,
           }),
         );
+        recordActivityInDraft(draft, {
+          actor,
+          action: "request.rejected",
+          employeeId: employee.id,
+          employeeName: employee.displayName,
+          detail: `Menolak pengajuan untuk ${employee.displayName} di ${issueKey}.`,
+        });
         return result(
           "rejected",
           request.type === "TRANSFER"
@@ -263,6 +287,14 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
           issueKey,
         }),
       );
+
+      recordActivityInDraft(draft, {
+        actor,
+        action: "request.approved",
+        employeeId: employee.id,
+        employeeName: employee.displayName,
+        detail: `Menyetujui pengajuan untuk ${employee.displayName} di ${issueKey}.`,
+      });
 
       return {
         kind: "create_security",
@@ -316,6 +348,13 @@ export async function applyIssueStatus(input: TransitionInput): Promise<Transiti
           { actor, issueKey },
         ),
       );
+      recordActivityInDraft(draft, {
+        actor,
+        action: "request.completed",
+        employeeId: employee.id,
+        employeeName: employee.displayName,
+        detail: `Menutup tiket penyiapan ${issueKey}; ${employee.displayName} sekarang ${outcome}.`,
+      });
       return result("completed", `${employee.displayName} sekarang ${outcome}.`);
     }
 

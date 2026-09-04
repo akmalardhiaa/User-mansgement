@@ -1,10 +1,11 @@
 import { cookies } from "next/headers";
 
 import { SESSION_COOKIE, readSessionToken } from "@/lib/auth/session";
+import { getActorName } from "@/lib/auth/current";
 import { getBrand } from "@/lib/config/brand";
 import { filterEmployees, sanitiseFilters, sortEmployees } from "@/lib/dashboard/directory";
-import { listEmployees } from "@/lib/db/repository";
-import { buildDirectoryWorkbook } from "@/lib/dashboard/workbook";
+import { listEmployees, recordActivity } from "@/lib/db/repository";
+import { buildDirectoryWorkbook, describeFilters } from "@/lib/dashboard/workbook";
 import { fail } from "@/lib/http/apiResponse";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,14 @@ export async function POST(request: Request) {
     filters,
     exportedBy: session.name,
     brandName: getBrand().name,
+  });
+
+  await recordActivity({
+    // The same credit the workflow trail uses, so one name identifies one
+    // person across both. The file itself keeps the plainer form.
+    actor: await getActorName(),
+    action: "directory.exported",
+    detail: `Mengekspor ${visible.length} dari ${employees.length} baris direktori — ${describeFilters(filters)}.`,
   });
 
   const stamp = new Date().toISOString().slice(0, 10);

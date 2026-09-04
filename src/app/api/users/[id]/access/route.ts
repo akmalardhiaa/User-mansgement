@@ -1,3 +1,4 @@
+import { getActorName } from "@/lib/auth/current";
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
 import { setEmployeeAccess } from "@/lib/db/repository";
 
@@ -16,7 +17,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   try {
-    return ok({ employee: await setEmployeeAccess(id, body.enabled) });
+    return ok({ employee: await setEmployeeAccess(id, body.enabled, await getActorName()) });
   } catch (error) {
     return fail((error as Error).message, 409);
   }

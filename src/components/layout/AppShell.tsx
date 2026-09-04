@@ -10,6 +10,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { BrandMark } from "@/components/ui/BrandMark";
 import {
   IconApprovals,
+  IconClock,
   IconDirectory,
   IconSignOut,
   IconUserPlus,
@@ -24,6 +25,7 @@ const NAV: ReadonlyArray<{
   { href: "/", label: "Dashboard", icon: IconDirectory },
   { href: "/requests", label: "Persetujuan", icon: IconApprovals },
   { href: "/users/new", label: "Tambah akun", icon: IconUserPlus },
+  { href: "/aktivitas", label: "Aktivitas", icon: IconClock },
 ];
 
 function isActive(pathname: string, href: string): boolean {
