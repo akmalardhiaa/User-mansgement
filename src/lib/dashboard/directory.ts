@@ -1,5 +1,5 @@
 import { employeeStatusLabel } from "@/components/ui/StatusBadge";
-import type { Employee, EmployeeStatus } from "@/lib/types";
+import { EMPLOYEE_STATUSES, type Employee, type EmployeeStatus } from "@/lib/types";
 
 /**
  * Filtering, sorting and export for the employee directory.
@@ -46,6 +46,41 @@ export const DEFAULT_FILTERS: DirectoryFilters = {
   sort: "name",
   direction: "asc",
 };
+
+/**
+ * Coerces anything that arrives over the wire into a usable filter.
+ *
+ * The UI can only ever produce valid values, but the export endpoint takes the
+ * filter as a request body, and an unrecognised status used to reach
+ * `employeeStatusLabel` — which indexes a Record and returned undefined, so the
+ * route answered 500 where every other endpoint answers 400. Unknown values are
+ * dropped to their default rather than rejected: a filter is a view, and the
+ * worst an unreadable one deserves is the unfiltered list.
+ */
+export function sanitiseFilters(input: unknown): DirectoryFilters {
+  const raw = (input ?? {}) as Partial<Record<keyof DirectoryFilters, unknown>>;
+  const oneOf = <T extends string>(value: unknown, allowed: ReadonlyArray<T>, fallback: T): T =>
+    typeof value === "string" && (allowed as ReadonlyArray<string>).includes(value)
+      ? (value as T)
+      : fallback;
+
+  return {
+    query: typeof raw.query === "string" ? raw.query.slice(0, 200) : DEFAULT_FILTERS.query,
+    status: oneOf<StatusFilter>(
+      raw.status,
+      ["ALL", "PENDING", ...EMPLOYEE_STATUSES],
+      DEFAULT_FILTERS.status,
+    ),
+    // Departments are free text by design, so anything printable is allowed —
+    // it simply matches nobody when it is not a real division.
+    department:
+      typeof raw.department === "string" && raw.department.length <= 200
+        ? raw.department
+        : DEFAULT_FILTERS.department,
+    sort: oneOf<SortKey>(raw.sort, SORT_KEYS, DEFAULT_FILTERS.sort),
+    direction: oneOf<SortDirection>(raw.direction, ["asc", "desc"], DEFAULT_FILTERS.direction),
+  };
+}
 
 export function isDefaultFilters(filters: DirectoryFilters): boolean {
   return (
