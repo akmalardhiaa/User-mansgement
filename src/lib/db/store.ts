@@ -3,13 +3,15 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { getDataFilePath } from "@/lib/config/env";
-import type { Employee, AccessRequest } from "@/lib/types";
+import type { Employee, AccessRequest, ActivityEntry } from "@/lib/types";
 
 import { seedEmployees } from "./seed";
 
 export interface StoreShape {
   employees: Employee[];
   requests: AccessRequest[];
+  /** Newest first. See ActivityEntry for why this exists alongside events. */
+  activity: ActivityEntry[];
 }
 
 /**
@@ -20,7 +22,7 @@ export interface StoreShape {
  */
 
 function emptyStore(): StoreShape {
-  return { employees: seedEmployees(), requests: [] };
+  return { employees: seedEmployees(), requests: [], activity: [] };
 }
 
 function resolvePath(): string {
@@ -41,6 +43,9 @@ async function load(): Promise<StoreShape> {
     return {
       employees: parsed.employees ?? [],
       requests: parsed.requests ?? [],
+      // Defaulted rather than required, so a store written before the log
+      // existed loads instead of throwing.
+      activity: parsed.activity ?? [],
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {

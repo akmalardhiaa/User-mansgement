@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type {
   AccessRequest,
+  ActivityEntry,
   Employee,
   EmployeeStatus,
   NewUserInput,
@@ -36,6 +37,44 @@ export function makeEvent(
   extra: Pick<WorkflowEvent, "actor" | "issueKey"> = {},
 ): WorkflowEvent {
   return { at: timestamp(), type, message, ...extra };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Activity log                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Appends to the log inside an existing transaction.
+ *
+ * Takes the draft rather than opening its own write, so the record and the
+ * change it describes commit together — a log that can disagree with the data
+ * is worse than no log, because it is trusted.
+ */
+export function recordActivityInDraft(
+  draft: StoreShape,
+  entry: Omit<ActivityEntry, "id" | "at">,
+): ActivityEntry {
+  const activity: ActivityEntry = { id: `act_${randomUUID()}`, at: timestamp(), ...entry };
+  draft.activity.unshift(activity);
+  // Kept bounded: this is a JSON file loaded whole on every read, and an
+  // unbounded log would eventually make every request slower. The approval
+  // chain's own audit trail lives on the request and is never trimmed.
+  if (draft.activity.length > ACTIVITY_LIMIT) draft.activity.length = ACTIVITY_LIMIT;
+  return activity;
+}
+
+/** Standalone append, for callers that are not already inside a transaction. */
+export async function recordActivity(
+  entry: Omit<ActivityEntry, "id" | "at">,
+): Promise<ActivityEntry> {
+  return transaction((draft) => recordActivityInDraft(draft, entry));
+}
+
+const ACTIVITY_LIMIT = 500;
+
+export async function listActivity(): Promise<ActivityEntry[]> {
+  const { activity } = await readStore();
+  return [...activity].sort((a, b) => b.at.localeCompare(a.at));
 }
 
 export async function listEmployees(): Promise<Employee[]> {
@@ -241,7 +280,19 @@ export async function deleteOnboarding(requestId: string): Promise<void> {
 }
 
 /** HC toggling access on an existing employee from the dashboard. */
-export async function setEmployeeAccess(id: string, enabled: boolean): Promise<Employee> {
+/**
+ * Suspend or restore access, immediately.
+ *
+ * The one change no approval stands behind, so the log is the only record that
+ * it happened at all — hence `actor` is required rather than optional. Before
+ * this, the status flipped and `updatedAt` moved, which cannot distinguish an
+ * HC suspension from any other write.
+ */
+export async function setEmployeeAccess(
+  id: string,
+  enabled: boolean,
+  actor: string,
+): Promise<Employee> {
   return transaction((draft) => {
     const employee = draft.employees.find((candidate) => candidate.id === id);
     if (!employee) {
@@ -257,6 +308,17 @@ export async function setEmployeeAccess(id: string, enabled: boolean): Promise<E
 
     employee.status = enabled ? "ACTIVE" : "DISABLED";
     employee.updatedAt = timestamp();
+
+    recordActivityInDraft(draft, {
+      actor,
+      action: enabled ? "access.enabled" : "access.disabled",
+      employeeId: employee.id,
+      employeeName: employee.displayName,
+      detail: enabled
+        ? `Akses ${employee.displayName} diaktifkan kembali tanpa melalui persetujuan.`
+        : `Akses ${employee.displayName} ditangguhkan seketika tanpa melalui persetujuan.`,
+    });
+
     return employee;
   });
 }

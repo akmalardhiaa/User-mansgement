@@ -149,3 +149,47 @@ export interface NewUserInput {
 export interface TransferInput extends TransferTarget {
   reason?: string;
 }
+
+/**
+ * The activity log: who did what, and when.
+ *
+ * A request's `events` already record the approval chain, but only for things
+ * that go through it. Suspending an account does not — it is deliberately
+ * unmediated, so HC can cut access immediately — which left the one action
+ * nobody has to approve as the one action nothing recorded. `updatedAt` moved
+ * and that was all: no actor, no reason, no way to tell an HC suspension from a
+ * workflow step.
+ *
+ * This is the stream that answers "who touched this, and when", across every
+ * action rather than per request.
+ */
+export const ACTIVITY_ACTIONS = [
+  "user.created",
+  "transfer.requested",
+  "access.disabled",
+  "access.enabled",
+  "request.approved",
+  "request.rejected",
+  "request.completed",
+  "directory.exported",
+] as const;
+
+export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];
+
+export interface ActivityEntry {
+  id: string;
+  /** ISO timestamp. The log is read newest-first. */
+  at: string;
+  /**
+   * The HC officer's name for anything done in this app, the Jira display name
+   * for anything a webhook brought in. Never blank: an entry nobody can be
+   * attributed to is not worth recording.
+   */
+  actor: string;
+  action: ActivityAction;
+  /** Who it was done to. Absent for actions that are not about one person. */
+  employeeId?: string;
+  employeeName?: string;
+  /** One human-readable line, already in Indonesian. */
+  detail: string;
+}
