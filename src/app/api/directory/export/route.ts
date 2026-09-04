@@ -2,12 +2,7 @@ import { cookies } from "next/headers";
 
 import { SESSION_COOKIE, readSessionToken } from "@/lib/auth/session";
 import { getBrand } from "@/lib/config/brand";
-import {
-  DEFAULT_FILTERS,
-  filterEmployees,
-  sortEmployees,
-  type DirectoryFilters,
-} from "@/lib/dashboard/directory";
+import { filterEmployees, sanitiseFilters, sortEmployees } from "@/lib/dashboard/directory";
 import { listEmployees } from "@/lib/db/repository";
 import { buildDirectoryWorkbook } from "@/lib/dashboard/workbook";
 import { fail } from "@/lib/http/apiResponse";
@@ -30,8 +25,10 @@ export async function POST(request: Request) {
   // making the export attributable.
   if (!session) return fail("Sesi tidak ditemukan.", 401);
 
-  const body = (await request.json().catch(() => ({}))) as { filters?: Partial<DirectoryFilters> };
-  const filters: DirectoryFilters = { ...DEFAULT_FILTERS, ...(body.filters ?? {}) };
+  // Sanitised, not spread: this is a request body, and an unrecognised status
+  // spread straight into the defaults reached a lookup that assumed a real one.
+  const body = (await request.json().catch(() => ({}))) as { filters?: unknown };
+  const filters = sanitiseFilters(body.filters);
 
   const employees = await listEmployees();
   const visible = sortEmployees(
