@@ -33,6 +33,8 @@ interface DirectoryToolbarProps {
   onChange: (next: Partial<DirectoryFilters>) => void;
   onReset: () => void;
   onExport: () => void;
+  /** Building the workbook is a round trip, so the button says so. */
+  exporting?: boolean;
   /** Departments actually present in the roster. */
   departments: string[];
   shown: number;
@@ -53,6 +55,7 @@ export function DirectoryToolbar({
   onChange,
   onReset,
   onExport,
+  exporting = false,
   departments,
   shown,
   total,
@@ -242,9 +245,10 @@ export function DirectoryToolbar({
             variant="ghost"
             size="sm"
             onClick={onExport}
-            disabled={shown === 0}
+            disabled={shown === 0 || exporting}
+            loading={exporting}
             icon={<IconDownload />}
-            title="Unduh baris yang terlihat sebagai CSV"
+            title="Unduh baris yang terlihat sebagai file Excel"
           >
             Ekspor
           </Button>
