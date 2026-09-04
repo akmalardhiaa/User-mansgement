@@ -199,9 +199,15 @@ export function Card({
 }) {
   return (
     <section
+      /*
+       * The lift is CSS rather than Framer: this file is a server component,
+       * and a hover is exactly the case where the browser can do it alone. The
+       * curve is the shared one from globals.css, so a card rising matches a
+       * card arriving even though different engines drive them.
+       */
       className={`rounded-2xl border border-hairline bg-surface/80 backdrop-blur-sm ${
         interactive
-          ? "transition-colors duration-200 hover:border-hairline-strong hover:bg-surface"
+          ? "transition-[transform,border-color,background-color,box-shadow] duration-200 ease-(--ease-out-quint) hover:-translate-y-0.5 hover:border-hairline-strong hover:bg-surface hover:shadow-[var(--shadow-header)]"
           : ""
       } ${className}`}
     >

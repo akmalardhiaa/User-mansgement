@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 
 import { AnimatedNumber } from "@/components/motion/AnimatedNumber";
 import { IconApprovals, IconCheck, IconDirectory, IconPower } from "@/components/ui/Icons";
-import { TRANSITION_LAYOUT, stagger, staggerItem } from "@/lib/motion";
+import { TRANSITION_LAYOUT, hoverLift, pressSettle, stagger, staggerItem } from "@/lib/motion";
 import { isPending, type StatusFilter } from "@/lib/dashboard/directory";
 import type { Employee } from "@/lib/types";
 
@@ -100,6 +100,12 @@ export function StatsRow({
             key={stat.key}
             type="button"
             variants={staggerItem}
+            // These are the four biggest targets on the page and until now the
+            // only thing that answered the pointer was a border colour. The
+            // guards matter: a disabled tile is not a control, so it should not
+            // move under the cursor and invite a click that does nothing.
+            whileHover={onSelect ? hoverLift : undefined}
+            whileTap={onSelect ? pressSettle : undefined}
             onClick={() => onSelect?.(selected && stat.key !== "ALL" ? "ALL" : stat.key)}
             // A toggle, not a link: it turns a filter on and off in place.
             aria-pressed={selected}
