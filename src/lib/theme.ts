@@ -35,11 +35,37 @@ export function readTheme(): Theme {
   return document.documentElement.getAttribute(THEME_ATTR) === "light" ? "light" : "dark";
 }
 
-export function applyTheme(theme: Theme): void {
+function commit(theme: Theme): void {
   document.documentElement.setAttribute(THEME_ATTR, theme);
   try {
     localStorage.setItem(THEME_KEY, theme);
   } catch {
     // The choice simply will not survive a reload.
   }
+}
+
+/**
+ * Swaps the theme, crossfading the page where the browser can.
+ *
+ * Every colour on screen changes at once, and snapping the lot is the one
+ * moment in this app where a transition is doing real work rather than
+ * decorating. Framer cannot help: these are CSS custom properties on <html>,
+ * not component state. The View Transitions API can, by snapshotting the old
+ * frame and fading it out over the new one — and where it is missing, the
+ * assignment simply happens, which is exactly the behaviour without it.
+ *
+ * Skipped outright for "reduce motion". A full-page crossfade is precisely the
+ * kind of thing that setting is asking not to see.
+ */
+export function applyTheme(theme: Theme): void {
+  const startViewTransition = (
+    document as Document & { startViewTransition?: (cb: () => void) => unknown }
+  ).startViewTransition;
+
+  if (!startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    commit(theme);
+    return;
+  }
+
+  startViewTransition.call(document, () => commit(theme));
 }

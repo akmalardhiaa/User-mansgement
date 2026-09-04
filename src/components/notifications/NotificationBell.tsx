@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { IconAlert, IconBell, IconCheck, IconClock, IconExternal, IconInbox } from "@/components/ui/Icons";
-import { TRANSITION_FAST } from "@/lib/motion";
+import { TRANSITION_FAST, TRANSITION_LAYOUT, stagger, staggerItem } from "@/lib/motion";
 import { unreadSince, type Feed, type FeedItem } from "@/lib/notifications/feed";
 
 /**
@@ -164,14 +164,23 @@ export function NotificationBell() {
         }`}
       >
         <IconBell className="size-4" />
-        {unread.length > 0 ? (
-          <span
-            className="absolute -top-1.5 -right-1.5 grid min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-ink"
-            aria-hidden
-          >
-            {unread.length > 9 ? "9+" : unread.length}
-          </span>
-        ) : null}
+        {/* The count arrives on a poll, with nobody looking at the button. It
+            springs in so the change is noticed, and leaves by simply fading —
+            a badge counting down to nothing should not draw the eye back. */}
+        <AnimatePresence>
+          {unread.length > 0 ? (
+            <motion.span
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 1, opacity: 0 }}
+              transition={TRANSITION_LAYOUT}
+              className="absolute -top-1.5 -right-1.5 grid min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-ink"
+              aria-hidden
+            >
+              {unread.length > 9 ? "9+" : unread.length}
+            </motion.span>
+          ) : null}
+        </AnimatePresence>
       </button>
 
       <AnimatePresence>
@@ -204,13 +213,18 @@ export function NotificationBell() {
                   </p>
                 </div>
               ) : (
-                <ul>
+                /* Dealt out rather than appearing at once: the panel is a list
+                   people read top-down, and the sequence points the eye at the
+                   newest item. Its own initial/animate, because the panel above
+                   animates on explicit props and so propagates no variants. */
+                <motion.ul variants={stagger(0.035)} initial="hidden" animate="visible">
                   {items.slice(0, 30).map((item) => {
                     const style = KIND_STYLES[item.kind];
                     const isUnread = !seen || item.at > seen;
                     return (
-                      <li
+                      <motion.li
                         key={item.id}
+                        variants={staggerItem}
                         className={`border-b border-hairline/60 last:border-0 ${
                           isUnread ? "bg-accent/[0.04]" : ""
                         }`}
@@ -246,10 +260,10 @@ export function NotificationBell() {
                             </div>
                           </div>
                         </div>
-                      </li>
+                      </motion.li>
                     );
                   })}
-                </ul>
+                </motion.ul>
               )}
             </div>
 
