@@ -1,50 +1,47 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 
-import { DirectoryView } from "@/components/dashboard/DirectoryView";
-import { buttonClasses } from "@/components/ui/Button";
-import { IconUserPlus } from "@/components/ui/Icons";
+import { Card } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { listEmployees } from "@/lib/db/repository";
+import { getCurrentUser } from "@/lib/auth/current";
 
-// The roster changes as HC edits it, so never serve a prerendered snapshot.
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const employees = await listEmployees();
+const ROLE_LABEL: Record<string, string> = { ADMIN: "Admin", USER: "Pengguna" };
+
+/**
+ * The landing page: the signed-in person's own account, read from the session.
+ *
+ * Everything shown here comes from Active Directory at login. There is nothing
+ * else to manage — the app is only a way to sign in with an AD account and see
+ * who you are.
+ */
+export default async function HomePage() {
+  const session = await getCurrentUser();
+  if (!session) redirect("/login");
+
+  const rows: Array<[string, string]> = [
+    ["Nama", session.name],
+    ["Email", session.email],
+    ["Peran", ROLE_LABEL[session.role] ?? session.role],
+  ];
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
-        eyebrow="Human Capital Platform"
-        badge={
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-0.5 text-xs font-bold text-shimmer-brand shadow-[0_0_12px_rgba(253,183,19,0.25)]">
-            <span className="size-1.5 rounded-full bg-accent animate-pulse" />
-            User Management
-          </span>
-        }
-        title={
-          <span className="flex flex-wrap items-center gap-3">
-            <span>Direktori Karyawan</span>
-            <span className="text-shimmer-brand text-2xl sm:text-3xl font-extrabold">
-              & User Management
-            </span>
-          </span>
-        }
-        description="Portal terpadu direktori karyawan dan pengelolaan izin akses, dengan login Active Directory."
-        actions={
-          <>
-            <Link
-              href="/users/new"
-              className={buttonClasses()}
-            >
-              <IconUserPlus className="size-4" />
-              Tambah karyawan
-            </Link>
-          </>
-        }
+        eyebrow="Active Directory"
+        title="Akun saya"
+        description="Anda masuk dengan akun Active Directory. Data di bawah diambil dari AD."
       />
-
-      <DirectoryView employees={employees} activeTickets={{}} />
+      <Card className="p-6">
+        <dl className="divide-y divide-hairline">
+          {rows.map(([label, value]) => (
+            <div key={label} className="grid gap-1 py-3 sm:grid-cols-[10rem_1fr] sm:gap-3">
+              <dt className="text-sm text-ink-muted">{label}</dt>
+              <dd className="text-sm font-medium break-words text-ink">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </Card>
     </div>
   );
 }
