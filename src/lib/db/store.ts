@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { getDataFilePath } from "@/lib/config/env";
+import { getDataFilePath } from "@/lib/config/storage";
 import type { Employee, AccessRequest, ActivityEntry } from "@/lib/types";
 
 import { seedEmployees } from "./seed";

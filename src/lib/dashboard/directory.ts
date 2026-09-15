@@ -99,11 +99,13 @@ export function isDefaultFilters(filters: DirectoryFilters): boolean {
 const STATUS_WEIGHT: Record<EmployeeStatus, number> = {
   PENDING_MANAGER_APPROVAL: 0,
   PENDING_TRANSFER_APPROVAL: 1,
-  PENDING_SECURITY_SETUP: 2,
-  PENDING_TRANSFER_SETUP: 3,
-  ACTIVE: 4,
-  DISABLED: 5,
-  REJECTED: 6,
+  PENDING_OFFBOARDING_APPROVAL: 2,
+  PENDING_SECURITY_SETUP: 3,
+  PENDING_TRANSFER_SETUP: 4,
+  PENDING_OFFBOARDING_SETUP: 5,
+  ACTIVE: 6,
+  DISABLED: 7,
+  REJECTED: 8,
 };
 
 /** Statuses that mean somebody, somewhere, still has to act. */
@@ -112,7 +114,9 @@ export function isPending(status: EmployeeStatus): boolean {
     status === "PENDING_MANAGER_APPROVAL" ||
     status === "PENDING_SECURITY_SETUP" ||
     status === "PENDING_TRANSFER_APPROVAL" ||
-    status === "PENDING_TRANSFER_SETUP"
+    status === "PENDING_TRANSFER_SETUP" ||
+    status === "PENDING_OFFBOARDING_APPROVAL" ||
+    status === "PENDING_OFFBOARDING_SETUP"
   );
 }
 

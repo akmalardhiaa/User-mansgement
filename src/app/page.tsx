@@ -1,11 +1,11 @@
 import Link from "next/link";
 
 import { DirectoryView } from "@/components/dashboard/DirectoryView";
-import { SyncButton } from "@/components/dashboard/SyncButton";
+import { buttonClasses } from "@/components/ui/Button";
 import { IconUserPlus } from "@/components/ui/Icons";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { listEmployees, listRequests } from "@/lib/db/repository";
-import type { JiraIssueRef } from "@/lib/types";
+import type { ApprovalReference } from "@/lib/types";
 
 // The roster changes on every approval, so never serve a prerendered snapshot.
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   const [employees, requests] = await Promise.all([listEmployees(), listRequests()]);
 
   // The ticket each still-onboarding employee is currently blocked on.
-  const activeTickets: Record<string, JiraIssueRef | undefined> = {};
+  const activeTickets: Record<string, ApprovalReference | undefined> = {};
   for (const request of requests) {
     if (request.stage === "MANAGER_APPROVAL") {
       activeTickets[request.employeeId] = request.managerIssue;
@@ -26,15 +26,27 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Human Capital"
-        title="Direktori karyawan"
-        description="Kelola akses karyawan dan pantau pengajuan akun melalui persetujuan di Jira."
+        eyebrow="Human Capital Platform"
+        badge={
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-0.5 text-xs font-bold text-shimmer-brand shadow-[0_0_12px_rgba(253,183,19,0.25)]">
+            <span className="size-1.5 rounded-full bg-accent animate-pulse" />
+            User Management
+          </span>
+        }
+        title={
+          <span className="flex flex-wrap items-center gap-3">
+            <span>Direktori Karyawan</span>
+            <span className="text-shimmer-brand text-2xl sm:text-3xl font-extrabold">
+              & User Management
+            </span>
+          </span>
+        }
+        description="Portal terpadu pengawasan direktori karyawan, pengelolaan izin akses, dan persetujuan melalui email."
         actions={
           <>
-            <SyncButton />
             <Link
               href="/users/new"
-              className="inline-flex items-center gap-2 rounded-lg border border-accent/70 bg-accent px-3.5 py-2 text-sm font-semibold text-accent-ink transition-all duration-200 hover:bg-accent-soft hover:shadow-[0_0_20px_-4px_var(--color-accent)] active:scale-[0.97]"
+              className={buttonClasses()}
             >
               <IconUserPlus className="size-4" />
               Tambah akun

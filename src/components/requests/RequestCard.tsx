@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/Icons";
 import { StageBadge, StatusBadge } from "@/components/ui/StatusBadge";
 import { TRANSITION, TRANSITION_FAST, collapse } from "@/lib/motion";
-import type { Employee, JiraIssueRef, AccessRequest } from "@/lib/types";
+import type { Employee, ApprovalReference, AccessRequest } from "@/lib/types";
 
 type StepState = "done" | "current" | "todo" | "failed";
 
@@ -22,7 +22,7 @@ interface Step {
   title: string;
   detail: string;
   state: StepState;
-  issue?: JiraIssueRef;
+  issue?: ApprovalReference;
 }
 
 /** Wording for each step, which differs between adding and removing an account. */
@@ -31,21 +31,31 @@ const STEP_COPY = {
     submitted: "HC mencatat data karyawan baru.",
     securityTitle: "Penyiapan akses IT Security",
     securityDone: "Akun dan akses sudah disiapkan.",
-    securityWaiting: "Menunggu IT Security menutup tiket penyiapan akses.",
+    securityWaiting: "Menunggu IT Security mengonfirmasi penyiapan akses dari tautan email.",
     securityPending: "Dibuat otomatis setelah manager menyetujui.",
     finalTitle: "Akun aktif",
     finalDone: "Karyawan sudah aktif di dashboard HC.",
-    finalPending: "Diubah otomatis saat tiket penyiapan ditutup.",
+    finalPending: "Diubah otomatis saat IT Security mengonfirmasi penyiapan.",
   },
   TRANSFER: {
     submitted: "HC mengajukan pemindahan divisi karyawan ini.",
     securityTitle: "Penyesuaian akses IT Security",
     securityDone: "Akses sudah disesuaikan dengan divisi baru.",
-    securityWaiting: "Menunggu IT Security menutup tiket penyesuaian akses.",
+    securityWaiting: "Menunggu IT Security mengonfirmasi penyesuaian akses dari tautan email.",
     securityPending: "Dibuat otomatis setelah manager menyetujui.",
     finalTitle: "Posisi diperbarui",
     finalDone: "Divisi dan jabatan baru sudah berlaku di dashboard HC.",
-    finalPending: "Diterapkan otomatis saat tiket penyesuaian ditutup.",
+    finalPending: "Diterapkan otomatis saat email penyesuaian ditutup.",
+  },
+  OFFBOARDING: {
+    submitted: "HC mengajukan penonaktifan akun karyawan ini.",
+    securityTitle: "Pencabutan akses IT Security",
+    securityDone: "Akun dan akses sudah dicabut.",
+    securityWaiting: "Menunggu IT Security mengonfirmasi pencabutan akses dari tautan email.",
+    securityPending: "Dibuat otomatis setelah manager menyetujui.",
+    finalTitle: "Akun nonaktif",
+    finalDone: "Karyawan sudah dinonaktifkan di dashboard HC.",
+    finalPending: "Diubah otomatis saat IT Security mengonfirmasi pencabutan.",
   },
 } as const;
 
@@ -70,7 +80,7 @@ function buildSteps(request: AccessRequest): Step[] {
           : "Manager menolak pengajuan ini."
         : pastManager
           ? "Disetujui oleh manager."
-          : "Menunggu manager memindahkan status tiket di Jira.",
+          : "Menunggu keputusan manager dari tautan email.",
       state: rejected ? "failed" : pastManager ? "done" : "current",
       issue: request.managerIssue,
     },
@@ -122,7 +132,7 @@ function StepMarker({ state, index }: { state: StepState; index: number }) {
   );
 }
 
-function IssueLink({ issue }: { issue: JiraIssueRef }) {
+function IssueLink({ issue }: { issue: ApprovalReference }) {
   return (
     <a
       href={issue.url}

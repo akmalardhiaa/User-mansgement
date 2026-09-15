@@ -12,7 +12,7 @@ export default function DemoPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">HC User Management</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          Employee directory and Jira-driven onboarding approvals.
+          Employee directory and email-driven onboarding approvals.
         </p>
       </div>
       <DemoApp />

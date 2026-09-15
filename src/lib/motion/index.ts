@@ -62,11 +62,23 @@ export const TRANSITION_HEIGHT: Transition = {
   bounce: 0.05,
 };
 
-/** Rise-and-fade. The default entrance for a panel or a section. */
+/**
+ * Rise, sharpen and fade in. The default entrance for a panel or a section.
+ *
+ * The blur is what separates this from a slide. A panel that only moves has
+ * always been there and is being repositioned; a panel that resolves out of
+ * softness is being brought into being, which is what actually just happened.
+ * Six pixels is enough to read as depth of field and short of anything anyone
+ * would call an effect.
+ *
+ * It is the one property here the compositor cannot do for free, so it is spent
+ * only on entrances — never on a hover, and never on a table row, where a
+ * hundred of them would land on one frame.
+ */
 export const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0, transition: TRANSITION },
-  exit: { opacity: 0, y: -8, transition: TRANSITION_FAST },
+  hidden: { opacity: 0, y: 12, filter: "blur(6px)" },
+  visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: TRANSITION },
+  exit: { opacity: 0, y: -8, filter: "blur(4px)", transition: TRANSITION_FAST },
 };
 
 /** Plain fade, for content that would look unsettled if it also moved. */
@@ -96,8 +108,8 @@ export function stagger(step = 0.045, delay = 0): Variants {
  * coming toward the reader rather than being pushed up from below.
  */
 export const staggerItem: Variants = {
-  hidden: { opacity: 0, y: 12, scale: 0.985 },
-  visible: { opacity: 1, y: 0, scale: 1, transition: TRANSITION },
+  hidden: { opacity: 0, y: 12, scale: 0.985, filter: "blur(5px)" },
+  visible: { opacity: 1, y: 0, scale: 1, filter: "blur(0px)", transition: TRANSITION },
 };
 
 /**
@@ -108,8 +120,21 @@ export const staggerItem: Variants = {
  * `whileTap` is deliberately smaller than the lift it replaces: a press should
  * look like the surface taking weight, not like it flinching.
  */
-export const hoverLift = { y: -3, transition: TRANSITION_FAST };
-export const pressSettle = { y: -1, scale: 0.99, transition: TRANSITION_FAST };
+export const hoverLift = { y: -4, scale: 1.012, transition: TRANSITION_FAST };
+export const pressSettle = { y: -1, scale: 0.985, transition: TRANSITION_FAST };
+
+/**
+ * A band of light crossing a surface once, left to right.
+ *
+ * Spent on the moment a card becomes the selected one. A border colour says
+ * "this is now the filter" only to someone already looking at that card; a
+ * sweep says it to whoever was looking anywhere on the row. One pass, no loop —
+ * repeated, it would be a loading state.
+ *
+ * A tween rather than a spring, because a spring overshoots and this is a
+ * travelling highlight: it has a direction, not a destination.
+ */
+export const SHEEN: Transition = { duration: 0.85, ease: [...EASE_OUT] };
 
 /**
  * Height animation for a disclosure. `height: auto` is not animatable in CSS,

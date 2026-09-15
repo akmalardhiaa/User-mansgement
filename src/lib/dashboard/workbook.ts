@@ -35,6 +35,8 @@ const STATUS_STYLE: Record<EmployeeStatus, { font: string; fill: string }> = {
   PENDING_TRANSFER_APPROVAL: { font: "FFB23C0A", fill: "FFFDEDE6" },
   PENDING_SECURITY_SETUP: { font: "FF0369A1", fill: "FFE6F0F7" },
   PENDING_TRANSFER_SETUP: { font: "FF0369A1", fill: "FFE6F0F7" },
+  PENDING_OFFBOARDING_APPROVAL: { font: "FFB23C0A", fill: "FFFDEDE6" },
+  PENDING_OFFBOARDING_SETUP: { font: "FF0369A1", fill: "FFE6F0F7" },
   REJECTED: { font: "FFBE123C", fill: "FFFBE9EE" },
   DISABLED: { font: "FF44607F", fill: "FFEEF2F7" },
 };
@@ -50,6 +52,10 @@ const STATUS_MEANING: Record<EmployeeStatus, string> = {
     "Pengajuan pindah divisi, menunggu manager. Posisi lama masih berlaku.",
   PENDING_TRANSFER_SETUP:
     "Pindah divisi sudah disetujui; IT Security sedang menyesuaikan akses. Posisi baru belum berlaku.",
+  PENDING_OFFBOARDING_APPROVAL:
+    "Pengajuan penonaktifan akun, menunggu manager. Akses masih berjalan normal.",
+  PENDING_OFFBOARDING_SETUP:
+    "Penonaktifan sudah disetujui; IT Security sedang mencabut akses. Akun belum sepenuhnya nonaktif.",
 };
 
 const COLUMNS = [
@@ -264,7 +270,7 @@ function buildGlossary(workbook: ExcelJS.Workbook, brandName: string): void {
   const note = sheet.getRow(6 + EMPLOYEE_STATUSES.length);
   sheet.mergeCells(`A${note.number}:B${note.number}`);
   note.getCell(1).value =
-    `Setiap perubahan status pada daftar ini melewati persetujuan di Jira, kecuali penangguhan akses ` +
+    `Setiap perubahan status pada daftar ini melewati persetujuan email, kecuali penangguhan akses ` +
     `sementara yang bisa dilakukan ${brandName} · Human Capital secara langsung.`;
   note.getCell(1).font = { name: "Calibri", size: 9, italic: true, color: { argb: INK_MUTED } };
   note.getCell(1).alignment = { wrapText: true, vertical: "top" };

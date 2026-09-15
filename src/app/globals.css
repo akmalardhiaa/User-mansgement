@@ -88,7 +88,7 @@
  * usable light one. Two tokens deliberately swap roles:
  *
  *   accent-soft  is a lighter gold on dark and a darker one here. It serves
- *                both the primary button's hover and the Jira link's text, and
+ *                both the primary button's hover and the email link's text, and
  *                on white only a darker gold can do the second job.
  *   ok/warn/info/danger  darken sharply. #34d399 on white is 1.9:1; the badges
  *                that tint their own background need ink that survives it.
@@ -96,17 +96,18 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --color-canvas: #f4f7fb;
-  /* Cards are white against the tinted ground, so a surface reads as raised
-     without needing a shadow to say so. */
-  --color-surface: #ffffff;
-  --color-elevated: #eaf0f8;
-  --color-hairline: #d5e0ee;
-  --color-hairline-strong: #b3c6de;
+  /* Soft warm ivory/cream ground instead of stark cold blue-white */
+  --color-canvas: #f6f3eb;
+  /* Soft warm paper surface for cards to eliminate eye strain & harsh glare */
+  --color-surface: #fdfbf7;
+  --color-elevated: #eee8dc;
+  --color-hairline: #e3dccb;
+  --color-hairline-strong: #cabaa3;
 
-  --color-ink: #0a1c33;
-  --color-ink-muted: #44607f;
-  --color-ink-faint: #506b8a;
+  /* Warm slate inks with eye-friendly contrast */
+  --color-ink: #142030;
+  --color-ink-muted: #4a5c73;
+  --color-ink-faint: #60738c;
 
   --color-accent: #fdb713;
   --color-accent-soft: #8a5c00;
@@ -117,24 +118,59 @@
   --color-info: #0369a1;
   --color-danger: #be123c;
 
-  --shadow-header: 0 8px 24px -14px rgb(10 28 51 / 0.28);
-  --shadow-panel: 0 20px 50px -20px rgb(10 28 51 / 0.3);
+  --shadow-header: 0 8px 24px -14px rgb(20 32 48 / 0.12);
+  --shadow-panel: 0 20px 50px -20px rgb(20 32 48 / 0.15);
 
-  --wash-cool: color-mix(in oklab, #2e6ab8 7%, transparent);
-  --wash-warm: color-mix(in oklab, #fdb713 8%, transparent);
+  /* Warm ambient atmospheric washes */
+  --wash-cool: color-mix(in oklab, #173d6e 5%, transparent);
+  --wash-warm: color-mix(in oklab, #fdb713 16%, transparent);
 }
 
 body {
   background-color: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  /* A cool wash on one side, a warm gold one on the other, so the flat ground
-     has depth without either colour competing with the content. */
+}
+
+/*
+ * The two washes that give the flat ground depth — a cool one on one side, a
+ * warm gold one on the other, neither strong enough to compete with content.
+ *
+ * They sit on a pseudo-element rather than on `body` so they can drift. A
+ * background-image cannot be animated cheaply, but a fixed layer carrying the
+ * same gradients can be moved with `transform`, which the compositor handles
+ * without repainting the page underneath it. Oversized by 20% on every side, so
+ * the drift never pulls a gradient's own edge into view.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
   background-image:
-    radial-gradient(60rem 32rem at 10% -8%, var(--wash-cool), transparent),
-    radial-gradient(46rem 26rem at 94% 0%, var(--wash-warm), transparent);
+    radial-gradient(60rem 32rem at 21% 9%, var(--wash-cool), transparent),
+    radial-gradient(46rem 26rem at 81% 14%, var(--wash-warm), transparent);
   background-repeat: no-repeat;
-  background-attachment: fixed;
+  animation: aurora 48s ease-in-out infinite;
+}
+
+/*
+ * A minute-long breath, deliberately below the speed anyone can point at.
+ * Watched directly it is barely a drift; what it does is stop the page reading
+ * as a printed sheet while someone spends an afternoon on a table sitting on it.
+ */
+@keyframes aurora {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(2.5%, 1.5%, 0) scale(1.08);
+  }
+  66% {
+    transform: translate3d(-2%, 3%, 0) scale(1.04);
+  }
 }
 
 /*
@@ -204,8 +240,39 @@ body {
 }
 
 /*
- * The loading placeholder. A sweep rather than a pulse, because a pulse at card
- * size reads as something failing rather than something arriving.
+ * A highlight that follows the pointer across a surface.
+ *
+ * Its position arrives as two custom properties written by `usePointerGlow`,
+ * which sets them straight on the node — so the gradient tracks the cursor at
+ * the browser's own frame rate and React re-renders nothing. The centre defaults
+ * to the middle of the element, which is what a keyboard or touch user gets: a
+ * plain wash rather than a highlight stuck in a corner.
+ *
+ * Needs a positioned ancestor; every surface that uses it is already relative.
+ */
+@utility pointer-glow {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.35s var(--ease-out-quint);
+    background: radial-gradient(
+      16rem 16rem at var(--glow-x, 50%) var(--glow-y, 50%),
+      color-mix(in oklab, var(--color-accent) 16%, transparent),
+      transparent 72%
+    );
+  }
+
+  &:hover::before {
+    opacity: 1;
+  }
+}
+
+/*
+ * Loading placeholder skeleton shimmer
  */
 @keyframes shimmer {
   100% {
@@ -231,6 +298,51 @@ body {
     );
     animation: shimmer 1.6s infinite;
   }
+}
+
+/*
+ * Eye-candy text shimmer animation for brand & title highlights
+ */
+@keyframes text-glow-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@utility text-shimmer-brand {
+  background: linear-gradient(
+    110deg,
+    var(--color-accent) 0%,
+    var(--color-accent-soft) 25%,
+    #fff5cc 50%,
+    var(--color-accent-soft) 75%,
+    var(--color-accent) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: text-glow-shimmer 6s linear infinite;
+}
+
+:root[data-theme="light"] .text-shimmer-brand {
+  background: linear-gradient(
+    110deg,
+    #d99b00 0%,
+    #8a5c00 25%,
+    #fdb713 50%,
+    #8a5c00 75%,
+    #d99b00 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@utility brand-glow-box {
+  box-shadow: 0 0 20px -3px color-mix(in oklab, var(--color-accent) 30%, transparent);
 }
 
 /*
@@ -260,3 +372,4 @@ body {
     scroll-behavior: auto !important;
   }
 }
+

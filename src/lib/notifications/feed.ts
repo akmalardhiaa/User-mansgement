@@ -42,7 +42,7 @@ export interface Feed {
  * Audit events worth surfacing, and how to headline each.
  *
  * The trail also records `request.created` and the `notify.*` pair. Those are
- * HC's own actions and Jira plumbing respectively — an officer who just filed a
+ * HC's own actions and email delivery respectively — an officer who just filed a
  * request does not need telling that they filed it, so neither is a
  * notification.
  */
@@ -64,7 +64,7 @@ function pendingHeadline(request: AccessRequest): string | undefined {
   return undefined;
 }
 
-/** The ticket an event belongs to, so the item can deep-link into Jira. */
+/** The email handoff an event belongs to, so the item can link to its reference. */
 function issueFor(request: AccessRequest, event: WorkflowEvent) {
   if (!event.issueKey) return undefined;
   for (const issue of [request.managerIssue, request.securityIssue]) {
@@ -95,8 +95,8 @@ export function buildFeed(requests: AccessRequest[], employees: Employee[]): Fee
         kind: "pending",
         title: `${who} — ${waiting}`,
         detail: issue
-          ? `Tiket ${issue.key}${issue.assignee ? ` di-assign ke ${issue.assignee}` : " belum di-assign"}.`
-          : "Belum ada tiket Jira untuk tahap ini.",
+          ? `Email ${issue.key}${issue.assignee ? ` dikirim ke ${issue.assignee}` : " belum terkirim"}.`
+          : "Belum ada email persetujuan untuk tahap ini.",
         // The stage's own age, not the request's: an item that has sat in one
         // stage for a week should not look fresh because something else about
         // the request changed.

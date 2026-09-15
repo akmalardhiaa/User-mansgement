@@ -49,8 +49,7 @@ export function parseNewUserInput(payload: unknown): ValidationResult {
     errors.email = "Masukkan alamat email yang valid.";
   }
 
-  // The manager's email is how the approval ticket gets assigned, which is what
-  // makes Jira notify them — so it is required, not optional.
+  // The manager's email is how the approval email is sent, so it is required, not optional.
   if (!errors.managerEmail && !EMAIL_PATTERN.test(draft.managerEmail)) {
     errors.managerEmail = "Masukkan alamat email manager yang valid.";
   }

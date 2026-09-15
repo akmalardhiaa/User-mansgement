@@ -5,8 +5,8 @@
 # checkout (the repository is untouched) and exports the browser-only demo
 # at src/app/demo instead.
 #
-# The full application — including POST /api/webhooks/jira, which Jira must be
-# able to reach — needs a Node host. See the README.
+# The full application — the account system, and the emailed approval links
+# together with the decision pages they open — needs a Node host. See the README.
 
 name: Deploy demo to GitHub Pages
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Field, SelectField } from "@/components/ui/Field";
 import { IconCheck, IconAlert, IconMail, IconUserCheck } from "@/components/ui/Icons";
@@ -11,16 +11,15 @@ import type { Employee } from "@/lib/types";
 /**
  * Who approves this request.
  *
- * Was two free-text boxes, and the email one decided whether a manager ever
- * heard about the request at all: it is resolved to a Jira account, and an
- * address Jira does not recognise leaves the ticket unassigned, un-emailed, and
- * waiting on somebody who was never told. The failure was recorded in the audit
- * trail and nowhere else.
+ * Whatever address ends up here is where the approval email goes, so this is
+ * the one field on the form that decides whether anybody hears about the
+ * request at all. It is checked with the same rule the server applies, and the
+ * verdict names the actual address — "will be sent to x@y" is something HC can
+ * read back and catch a typo in; a generic "ready" is not.
  *
- * So the roster answers it now. Typing is still allowed — a manager hired
- * before this portal existed is not in the directory, and blocking HC on that
- * would be trading one silent failure for a dead end — but whichever way the
- * address arrives, it is checked against Jira before the form is submitted.
+ * Only the format can be checked here. Whether the mailbox exists is known only
+ * once the mail is sent, and a failed send rolls the request back rather than
+ * leaving it waiting on someone who was never told.
  */
 
 export interface ManagerValue {
@@ -28,15 +27,18 @@ export interface ManagerValue {
   managerEmail: string;
 }
 
-type Check =
-  | { state: "idle" }
-  | { state: "checking" }
-  | { state: "found"; displayName: string }
-  | { state: "missing" }
-  /** Jira could not be reached. Not the same as "wrong", and not shown as one. */
-  | { state: "unknown" };
+/** Same rule as src/lib/validation/userInput.ts, so the two never disagree. */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type Check = { state: "idle" } | { state: "valid"; email: string } | { state: "invalid" };
 
 const MANUAL = "__manual__";
+
+function checkAddress(email: string): Check {
+  const trimmed = email.trim();
+  if (!trimmed) return { state: "idle" };
+  return EMAIL_PATTERN.test(trimmed) ? { state: "valid", email: trimmed } : { state: "invalid" };
+}
 
 export function ManagerPicker({
   employees,
@@ -62,47 +64,12 @@ export function ManagerPicker({
   const [manual, setManual] = useState(() => Boolean(value.managerEmail) && !matched);
   const [check, setCheck] = useState<Check>({ state: "idle" });
 
-  // The in-flight lookup, so a slow answer for an old address cannot overwrite
-  // the verdict for the one now in the box.
-  const latest = useRef(0);
-
-  const verify = useCallback(async (email: string) => {
-    const trimmed = email.trim();
-    if (!trimmed || !trimmed.includes("@")) {
-      setCheck({ state: "idle" });
-      return;
-    }
-    const ticket = ++latest.current;
-    setCheck({ state: "checking" });
-    try {
-      const response = await fetch(`/api/jira/lookup?email=${encodeURIComponent(trimmed)}`);
-      const payload = await response.json();
-      if (ticket !== latest.current) return;
-      // The route answers with `status`; this component's own idle/checking
-      // states share the field, so it is read across rather than spread in.
-      // Spreading the payload straight in silently produced a `state` of
-      // undefined, and every lookup — including the successful ones — fell
-      // through to "could not check".
-      const status = payload?.ok ? payload.data?.status : undefined;
-      if (status === "found") {
-        setCheck({ state: "found", displayName: payload.data.displayName });
-      } else if (status === "missing") {
-        setCheck({ state: "missing" });
-      } else {
-        setCheck({ state: "unknown" });
-      }
-    } catch {
-      if (ticket === latest.current) setCheck({ state: "unknown" });
-    }
-  }, []);
-
-  // Re-check whenever the address settles, whichever way it was set — picking
-  // from the roster is no guarantee that Jira knows the person either.
+  // Judged once the address settles rather than per keystroke, so a half-typed
+  // address does not flash as invalid while HC is still typing it.
   useEffect(() => {
-    const email = value.managerEmail;
-    const timer = setTimeout(() => verify(email), 400);
+    const timer = setTimeout(() => setCheck(checkAddress(value.managerEmail)), 400);
     return () => clearTimeout(timer);
-  }, [value.managerEmail, verify]);
+  }, [value.managerEmail]);
 
   function selectEmployee(email: string) {
     if (email === MANUAL) {
@@ -127,9 +94,7 @@ export function ManagerPicker({
         value={manual ? MANUAL : (matched?.email ?? "")}
         onChange={(event) => selectEmployee(event.target.value)}
         error={manual ? undefined : nameError}
-        hint={
-          manual ? undefined : "Manager yang akan menerima tiket persetujuan di Jira."
-        }
+        hint={manual ? undefined : "Manager yang akan menerima email persetujuan."}
       >
         <option value="">Pilih manager…</option>
         {employees.map((employee) => (
@@ -186,26 +151,20 @@ export function ManagerPicker({
             aria-live="polite"
             className="overflow-hidden text-xs"
           >
-            <span className="flex items-center gap-1.5 pt-0.5">
-              {check.state === "checking" ? (
-                <span className="text-ink-faint">Memeriksa akun Jira…</span>
-              ) : check.state === "found" ? (
-                <span className="flex items-center gap-1.5 text-ok">
-                  <IconCheck className="size-3.5" />
-                  Ditemukan di Jira: {check.displayName}
+            {check.state === "valid" ? (
+              <span className="flex items-center gap-1.5 pt-0.5 text-ok">
+                <IconCheck className="size-3.5 shrink-0" />
+                <span>
+                  Email persetujuan akan dikirim ke{" "}
+                  <span className="font-mono break-all">{check.email}</span>
                 </span>
-              ) : check.state === "missing" ? (
-                <span className="flex items-center gap-1.5 text-warn">
-                  <IconAlert className="size-3.5" />
-                  Jira tidak mengenali email ini — tiket akan dibuat tanpa assignee, dan
-                  manager tidak menerima email.
-                </span>
-              ) : (
-                <span className="text-ink-faint">
-                  Tidak bisa memeriksa ke Jira sekarang. Pengajuan tetap bisa dikirim.
-                </span>
-              )}
-            </span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 pt-0.5 text-warn">
+                <IconAlert className="size-3.5 shrink-0" />
+                Format email belum valid — email persetujuan tidak bisa dikirim ke alamat ini.
+              </span>
+            )}
           </motion.p>
         ) : null}
       </AnimatePresence>

@@ -4,7 +4,15 @@ import { motion } from "framer-motion";
 
 import { AnimatedNumber } from "@/components/motion/AnimatedNumber";
 import { IconApprovals, IconCheck, IconDirectory, IconPower } from "@/components/ui/Icons";
-import { TRANSITION_LAYOUT, hoverLift, pressSettle, stagger, staggerItem } from "@/lib/motion";
+import {
+  SHEEN,
+  TRANSITION_LAYOUT,
+  hoverLift,
+  pressSettle,
+  stagger,
+  staggerItem,
+} from "@/lib/motion";
+import { usePointerGlow } from "@/lib/motion/usePointerGlow";
 import { isPending, type StatusFilter } from "@/lib/dashboard/directory";
 import type { Employee } from "@/lib/types";
 
@@ -37,6 +45,10 @@ export function StatsRow({
   active?: StatusFilter;
   onSelect?: (status: StatusFilter) => void;
 }) {
+  // One set of handlers shared by all four tiles: each writes onto whichever
+  // node the pointer is actually over, so there is nothing per-card to hold.
+  const glow = usePointerGlow<HTMLButtonElement>();
+
   const count = (predicate: (employee: Employee) => boolean) => employees.filter(predicate).length;
 
   const pending = count((employee) => isPending(employee.status));
@@ -106,28 +118,60 @@ export function StatsRow({
             // move under the cursor and invite a click that does nothing.
             whileHover={onSelect ? hoverLift : undefined}
             whileTap={onSelect ? pressSettle : undefined}
+            // Only a live tile tracks the pointer. A glow chasing the cursor
+            // across something that cannot be clicked is an invitation.
+            {...(onSelect ? glow : null)}
             onClick={() => onSelect?.(selected && stat.key !== "ALL" ? "ALL" : stat.key)}
             // A toggle, not a link: it turns a filter on and off in place.
             aria-pressed={selected}
             disabled={!onSelect}
-            className={`group relative overflow-hidden rounded-2xl border bg-surface/80 p-4 text-left backdrop-blur-sm transition-colors duration-200 disabled:cursor-default ${
-              selected ? "border-accent/50 bg-surface" : `border-hairline ${stat.ring}`
+            className={`group relative overflow-hidden rounded-2xl border bg-surface/80 p-4 text-left backdrop-blur-sm transition-[border-color,background-color,box-shadow] duration-300 ease-(--ease-out-quint) disabled:cursor-default ${
+              onSelect ? "pointer-glow" : ""
+            } ${
+              selected
+                ? // The shadow is gold rather than black: the selected tile
+                  // should look lit from within, not stacked on top of its
+                  // neighbours. Spread far and faint enough that it reads as
+                  // warmth around the card and never as an edge.
+                  "border-accent/50 bg-surface shadow-[0_18px_44px_-30px_var(--color-accent)]"
+                : `border-hairline ${stat.ring}`
             }`}
           >
             {/* Marks the pressed card without moving anything: a bar Framer
-                slides between cards as the filter changes. */}
+                slides between cards as the filter changes. Its own initial and
+                animate stop it inheriting the parent's entrance variants, which
+                would otherwise blur and drop a two-pixel rule into place. */}
             {selected ? (
               <motion.span
                 layoutId="stat-active"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={TRANSITION_LAYOUT}
-                className="absolute inset-x-0 top-0 h-0.5 bg-accent"
+                className="absolute inset-x-0 top-0 h-0.5 bg-accent shadow-[0_0_12px_1px_var(--color-accent)]"
+              />
+            ) : null}
+
+            {/*
+              * A single band of light crossing the card the moment it becomes
+              * the filter. Mounted with the selection, so it plays exactly once
+              * per press and cannot be seen at rest — and the whole row is
+              * covered, so the confirmation is legible to someone whose eyes
+              * were on a different card when they clicked.
+              */}
+            {selected ? (
+              <motion.span
+                aria-hidden
+                initial={{ x: "-170%" }}
+                animate={{ x: "430%" }}
+                transition={SHEEN}
+                className="pointer-events-none absolute inset-y-0 left-0 w-1/4 -skew-x-12 bg-gradient-to-r from-transparent via-accent/25 to-transparent"
               />
             ) : null}
 
             <div className="flex items-start justify-between gap-2">
               <p className="text-xs tracking-wide text-ink-faint uppercase">{stat.label}</p>
               <stat.icon
-                className={`size-4 shrink-0 transition-colors duration-200 ${
+                className={`size-4 shrink-0 transition-[color,scale] duration-300 ease-(--ease-out-quint) group-hover:scale-115 ${
                   selected ? "text-accent" : "text-ink-faint/60 group-hover:text-ink-faint"
                 }`}
               />

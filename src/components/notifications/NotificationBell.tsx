@@ -12,8 +12,9 @@ import { unreadSince, type Feed, type FeedItem } from "@/lib/notifications/feed"
 /**
  * The bell, its unread count, and the panel behind it.
  *
- * Jira moves these requests, not this app, so the feed is polled rather than
- * pushed — a webhook lands on the server and the browser has no way to know.
+ * Decisions made from an email move these requests, not this page, so the
+ * feed is polled rather than pushed — the decision lands on the server and
+ * the browser has no way to know.
  * Sixty seconds is slow enough to be invisible on the network tab and fast
  * enough that an approval is never stale by the time anyone looks.
  */

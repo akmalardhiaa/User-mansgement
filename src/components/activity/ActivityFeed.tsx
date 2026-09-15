@@ -13,6 +13,7 @@ import {
   IconPower,
   IconSearch,
   IconSwap,
+  IconUser,
   IconUserPlus,
 } from "@/components/ui/Icons";
 import { stagger, staggerItem } from "@/lib/motion";
@@ -69,6 +70,11 @@ const ACTION_PRESENTATION: Record<
     label: "Direktori diekspor",
     tone: "border-hairline-strong bg-elevated text-ink-muted",
     icon: IconDownload,
+  },
+  "employee.profile_updated": {
+    label: "Profil diperbarui",
+    tone: "border-hairline-strong bg-elevated text-ink-muted",
+    icon: IconUser,
   },
 };
 

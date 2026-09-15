@@ -12,20 +12,39 @@ import {
   IconApprovals,
   IconClock,
   IconDirectory,
+  IconIdCard,
+  IconInbox,
+  IconMail,
+  IconPower,
   IconSignOut,
+  IconSwap,
+  IconUser,
+  IconUserCheck,
   IconUserPlus,
 } from "@/components/ui/Icons";
+import type { Role } from "@/lib/auth/types";
 import { TRANSITION, TRANSITION_LAYOUT } from "@/lib/motion";
 
 const NAV: ReadonlyArray<{
   href: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
+  /** Hidden from anyone who is not an ADMIN. */
+  adminOnly?: boolean;
 }> = [
   { href: "/", label: "Dashboard", icon: IconDirectory },
   { href: "/requests", label: "Persetujuan", icon: IconApprovals },
   { href: "/users/new", label: "Tambah akun", icon: IconUserPlus },
+  { href: "/users/edit", label: "Edit User", icon: IconUser },
+  { href: "/users/movement", label: "Movement", icon: IconSwap },
+  { href: "/users/offboarding", label: "Off-boarding", icon: IconPower },
   { href: "/aktivitas", label: "Aktivitas", icon: IconClock },
+  { href: "/register", label: "Buat user", icon: IconUserPlus, adminOnly: true },
+  { href: "/approval-requests", label: "Approval user", icon: IconApprovals, adminOnly: true },
+  { href: "/email-settings", label: "Pengaturan email", icon: IconMail, adminOnly: true },
+  { href: "/dashboard", label: "Kelola akun", icon: IconUserCheck, adminOnly: true },
+  { href: "/my-approvals", label: "Persetujuan saya", icon: IconInbox },
+  { href: "/profile", label: "Profil", icon: IconIdCard },
 ];
 
 function isActive(pathname: string, href: string): boolean {
@@ -39,6 +58,8 @@ function isActive(pathname: string, href: string): boolean {
 const IS_STATIC_DEMO = process.env.NEXT_PUBLIC_DEMO === "true";
 
 export interface SessionUser {
+  /** Absent in the static demo build, which has no session at all. */
+  role?: Role;
   name: string;
   email: string;
 }
@@ -76,7 +97,13 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
 
   // The demo build has no routes to link to, so it gets the container without
   // navigation — as does the login screen, where every item would be a dead end.
-  const items = IS_STATIC_DEMO ? [] : user ? NAV : [];
+  // Admin-only entries are filtered out rather than shown disabled: the page
+  // itself refuses non-admins, so a visible link would only be a dead end.
+  const items = IS_STATIC_DEMO
+    ? []
+    : user
+      ? NAV.filter((item) => !item.adminOnly || user.role === "ADMIN")
+      : [];
 
   async function signOut() {
     setSigningOut(true);
@@ -113,7 +140,7 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
                   <span className="absolute inline-flex size-full animate-ping rounded-full bg-warn opacity-75" />
                   <span className="relative inline-flex size-1.5 rounded-full bg-warn" />
                 </span>
-                Preview statis · Jira tidak terhubung
+                Preview statis · email tidak terhubung
               </span>
             ) : user ? (
               <>
@@ -212,7 +239,7 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
       </div>
 
       <footer className="border-t border-hairline px-5 py-5 text-center text-xs text-ink-faint">
-        Human Capital · pengajuan akun diproses melalui persetujuan di Jira
+        Human Capital · pengajuan akun diproses melalui persetujuan di email
       </footer>
     </div>
   );

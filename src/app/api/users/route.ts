@@ -1,7 +1,6 @@
 import { getActorName } from "@/lib/auth/current";
 import { DuplicateEmailError, listEmployees } from "@/lib/db/repository";
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
-import { JiraApiError } from "@/lib/jira/jiraClient";
 import { parseNewUserInput } from "@/lib/validation/userInput";
 import { submitOnboardingRequest } from "@/lib/workflow/accessWorkflow";
 
@@ -16,7 +15,7 @@ export async function GET() {
  * POST /api/users — Step 1 of the approval workflow.
  *
  * This deliberately does NOT activate an account. It records the joiner as
- * PENDING_MANAGER_APPROVAL and raises the manager's approval ticket in Jira.
+ * PENDING_MANAGER_APPROVAL and emails the manager an approval link.
  */
 export async function POST(request: Request) {
   const parsed = parseNewUserInput(await readJson(request));
@@ -40,12 +39,6 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof DuplicateEmailError) {
       return fail(error.message, 409, { fieldErrors: { email: error.message } });
-    }
-    if (error instanceof JiraApiError) {
-      return fail(
-        `Pengajuan gagal dikirim ke Jira, jadi tidak ada data yang tersimpan. ${error.message}`,
-        502,
-      );
     }
     console.error("[api/users] submit failed:", error);
     return fail("Pengajuan gagal dikirim.", 500);

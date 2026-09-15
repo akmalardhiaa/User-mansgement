@@ -1,19 +1,14 @@
-import type {
-  CreateUserResult,
-  DashboardDataSource,
-  SyncResult,
-} from "@/lib/client/dataSource";
+import type { CreateUserResult, DashboardDataSource } from "@/lib/client/dataSource";
 import { SubmissionError } from "@/lib/client/dataSource";
 import { seedEmployees } from "@/lib/db/seed";
 import type {
   AccessRequest,
   Employee,
-  JiraIssueRef,
+  ApprovalReference,
   NewUserInput,
   TransferInput,
 } from "@/lib/types";
 import { parseNewUserInput } from "@/lib/validation/userInput";
-import { classifyManagerStatus, isSecurityComplete } from "@/lib/workflow/statusRules";
 
 /**
  * Browser-only re-implementation of the onboarding workflow, used by the static
@@ -24,12 +19,39 @@ import { classifyManagerStatus, isSecurityComplete } from "@/lib/workflow/status
  * keys. The authoritative implementation is `src/lib/workflow/accessWorkflow.ts`.
  */
 
-/** Mirrors the defaults documented in `.env.example`. */
+/**
+ * Status names the demo's simulator panel offers.
+ *
+ * The real app no longer interprets status names at all: an approval is a
+ * button pressed on an emailed page. The static demo has neither email nor a
+ * server, so it still simulates each decision as a named status change and
+ * reads it here. Kept local on purpose, because this vocabulary now exists
+ * only for the simulator.
+ */
 export const DEMO_STATUS_RULES = {
   approvedStatuses: ["Approved", "Done"],
   rejectedStatuses: ["Rejected", "Declined"],
   securityDoneStatuses: ["Done", "Closed", "Resolved"],
 };
+
+function matches(statusName: string, candidates: string[]): boolean {
+  const normalised = statusName.trim().toLowerCase();
+  return candidates.some((candidate) => candidate.trim().toLowerCase() === normalised);
+}
+
+function classifyManagerStatus(
+  statusName: string,
+  rules: typeof DEMO_STATUS_RULES,
+): "APPROVED" | "REJECTED" | "PENDING" {
+  // Rejection is checked first: a name listed in both should block, not pass.
+  if (matches(statusName, rules.rejectedStatuses)) return "REJECTED";
+  if (matches(statusName, rules.approvedStatuses)) return "APPROVED";
+  return "PENDING";
+}
+
+function isSecurityComplete(statusName: string, rules: typeof DEMO_STATUS_RULES): boolean {
+  return matches(statusName, rules.securityDoneStatuses);
+}
 
 const DEMO_PROJECT_KEY = "HC";
 
@@ -78,7 +100,7 @@ export class DemoStore implements DashboardDataSource {
     this.emit();
   }
 
-  private nextTicket(): JiraIssueRef {
+  private nextTicket(): ApprovalReference {
     this.ticketCounter += 1;
     const key = `${DEMO_PROJECT_KEY}-${this.ticketCounter}`;
     // A demo ticket has no real Jira behind it, so the link stays inert.
@@ -215,15 +237,6 @@ export class DemoStore implements DashboardDataSource {
     return employee;
   }
 
-  /** There is no Jira to poll in the demo, so this is a no-op reconcile. */
-  async sync(): Promise<SyncResult> {
-    const open = this.requests.filter(
-      (request) =>
-        request.stage === "MANAGER_APPROVAL" || request.stage === "SECURITY_PROVISIONING",
-    );
-    return { checked: open.length, advanced: 0 };
-  }
-
   /* ---------------------------------------------------------------- */
   /* Jira simulator — stands in for the webhook                        */
   /* ---------------------------------------------------------------- */
@@ -337,7 +350,7 @@ export class DemoStore implements DashboardDataSource {
   }
 
   /** Tickets a demo visitor can currently act on. */
-  openTickets(): Array<{ issue: JiraIssueRef; employeeName: string; stage: string }> {
+  openTickets(): Array<{ issue: ApprovalReference; employeeName: string; stage: string }> {
     return this.requests.flatMap((request) => {
       const employee = this.employees.find((candidate) => candidate.id === request.employeeId);
       if (request.stage === "MANAGER_APPROVAL" && request.managerIssue) {

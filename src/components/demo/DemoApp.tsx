@@ -11,7 +11,7 @@ import { IconAlert } from "@/components/ui/Icons";
 import { CreateUserForm } from "@/components/users/CreateUserForm";
 import { DemoStore } from "@/lib/demo/demoStore";
 import { TRANSITION_LAYOUT } from "@/lib/motion";
-import type { JiraIssueRef } from "@/lib/types";
+import type { ApprovalReference } from "@/lib/types";
 
 /**
  * The whole dashboard, running entirely in the browser for the static
@@ -35,7 +35,7 @@ export function DemoApp() {
   const [log, setLog] = useState<string[]>([]);
 
   const activeTickets = useMemo(() => {
-    const map: Record<string, JiraIssueRef | undefined> = {};
+    const map: Record<string, ApprovalReference | undefined> = {};
     for (const request of state.requests) {
       if (request.stage === "MANAGER_APPROVAL") map[request.employeeId] = request.managerIssue;
       else if (request.stage === "SECURITY_PROVISIONING")
@@ -143,18 +143,17 @@ function DemoBanner() {
         Static demo — no backend
       </p>
       <p className="mt-1 text-xs text-ink-muted">
-        This page is a GitHub Pages export, so the API routes and the real Jira integration are not
-        running. Tickets are generated locally and the panel below stands in for the Jira webhook.
-        Everything resets on refresh. The full application, including{" "}
-        <code className="font-mono text-ink">POST /api/webhooks/jira</code>, needs a Node host — see
-        the README.
+        This page is a GitHub Pages export, so the API routes are not running. Requests are
+        simulated locally, and the panel below stands in for the manager and the security team
+        acting on their emails. Everything resets on refresh. The full application, including the
+        emailed approval links, needs a Node host — see the README.
       </p>
     </div>
   );
 }
 
 interface JiraSimulatorProps {
-  openTickets: Array<{ issue: JiraIssueRef; employeeName: string; stage: string }>;
+  openTickets: Array<{ issue: ApprovalReference; employeeName: string; stage: string }>;
   log: string[];
   onTransition: (issueKey: string, status: string, actor: string) => void;
 }

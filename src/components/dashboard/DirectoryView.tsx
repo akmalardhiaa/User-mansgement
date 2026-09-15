@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { DirectoryToolbar } from "@/components/dashboard/DirectoryToolbar";
 import { EmployeeTable } from "@/components/dashboard/EmployeeTable";
+import { RoleSimulatorBanner, type SimulatedRole } from "@/components/dashboard/RoleSimulatorBanner";
 import { StatsRow } from "@/components/dashboard/StatsRow";
 import { Reveal } from "@/components/motion/Reveal";
 import { Card } from "@/components/ui/Field";
@@ -14,21 +15,12 @@ import {
   departmentsOf,
   filterEmployees,
   isDefaultFilters,
-  sortEmployees,
+  sortEmployees,
   type DirectoryFilters,
   type SortKey,
 } from "@/lib/dashboard/directory";
-import type { Employee, JiraIssueRef } from "@/lib/types";
+import type { Employee, ApprovalReference } from "@/lib/types";
 
-/**
- * The directory: headline counts, the filter bar, and the table, sharing one
- * piece of filter state.
- *
- * They live together because they are three views of the same question. The
- * stat cards set the status filter, the toolbar narrows it further, and the
- * table's own column headers drive the sort — none of which is possible while
- * each component keeps its own private copy of what the user asked for.
- */
 export function DirectoryView({
   employees,
   activeTickets,
@@ -36,32 +28,39 @@ export function DirectoryView({
   onChanged,
 }: {
   employees: Employee[];
-  activeTickets: Record<string, JiraIssueRef | undefined>;
+  activeTickets: Record<string, ApprovalReference | undefined>;
   dataSource?: DashboardDataSource;
   onChanged?: () => void;
 }) {
   const { toast } = useToast();
   const [filters, setFilters] = useState<DirectoryFilters>(DEFAULT_FILTERS);
   const [exporting, setExporting] = useState(false);
+  const [simulatedRole, setSimulatedRole] = useState<SimulatedRole>("HC_ADMIN");
 
   const departments = useMemo(() => departmentsOf(employees), [employees]);
 
-  const visible = useMemo(
-    () => sortEmployees(filterEmployees(employees, filters), filters.sort, filters.direction),
-    [employees, filters],
-  );
+  const visible = useMemo(() => {
+    let filteredList = filterEmployees(employees, filters);
+    if (simulatedRole === "MANAGER") {
+      filteredList = filteredList.filter(
+        (e) => e.department === "Technology" || e.status === "PENDING_MANAGER_APPROVAL",
+      );
+    } else if (simulatedRole === "SECURITY") {
+      filteredList = filteredList.filter(
+        (e) => e.status === "PENDING_SECURITY_SETUP" || e.status === "ACTIVE",
+      );
+    }
+    return sortEmployees(filteredList, filters.sort, filters.direction);
+  }, [employees, filters, simulatedRole]);
 
   const change = useCallback((next: Partial<DirectoryFilters>) => {
     setFilters((current) => ({ ...current, ...next }));
   }, []);
 
   const reset = useCallback(() => {
-    // Keeps the sort. Resetting is about clearing what is hidden, not about
-    // throwing away the order the user chose to read it in.
     setFilters((current) => ({ ...DEFAULT_FILTERS, sort: current.sort, direction: current.direction }));
   }, []);
 
-  /** A column header: same column flips direction, a new one starts ascending. */
   const sortBy = useCallback((key: SortKey) => {
     setFilters((current) =>
       current.sort === key
@@ -70,12 +69,6 @@ export function DirectoryView({
     );
   }, []);
 
-  /**
-   * The workbook is built on the server: ExcelJS is about a megabyte, and
-   * shipping it to every visitor to save one request would cost every page load
-   * in the app. Only the filter state crosses the wire — the server re-runs the
-   * same filter and sort, so the file matches the screen.
-   */
   async function exportWorkbook() {
     if (exporting) return;
     setExporting(true);
@@ -91,8 +84,6 @@ export function DirectoryView({
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      // Taken from the response, so the server names the file and the client
-      // never has to guess at the extension it is about to save.
       link.download =
         response.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] ??
         `direktori-karyawan-${new Date().toISOString().slice(0, 10)}.xlsx`;
@@ -108,6 +99,8 @@ export function DirectoryView({
 
   return (
     <div className="space-y-6">
+      <RoleSimulatorBanner onRoleChange={(role) => setSimulatedRole(role)} />
+
       <StatsRow
         employees={employees}
         active={filters.status}
