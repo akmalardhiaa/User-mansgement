@@ -4,24 +4,13 @@ import { DirectoryView } from "@/components/dashboard/DirectoryView";
 import { buttonClasses } from "@/components/ui/Button";
 import { IconUserPlus } from "@/components/ui/Icons";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { listEmployees, listRequests } from "@/lib/db/repository";
-import type { ApprovalReference } from "@/lib/types";
+import { listEmployees } from "@/lib/db/repository";
 
-// The roster changes on every approval, so never serve a prerendered snapshot.
+// The roster changes as HC edits it, so never serve a prerendered snapshot.
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [employees, requests] = await Promise.all([listEmployees(), listRequests()]);
-
-  // The ticket each still-onboarding employee is currently blocked on.
-  const activeTickets: Record<string, ApprovalReference | undefined> = {};
-  for (const request of requests) {
-    if (request.stage === "MANAGER_APPROVAL") {
-      activeTickets[request.employeeId] = request.managerIssue;
-    } else if (request.stage === "SECURITY_PROVISIONING") {
-      activeTickets[request.employeeId] = request.securityIssue;
-    }
-  }
+  const employees = await listEmployees();
 
   return (
     <div className="space-y-6">
@@ -41,7 +30,7 @@ export default async function DashboardPage() {
             </span>
           </span>
         }
-        description="Portal terpadu pengawasan direktori karyawan, pengelolaan izin akses, dan persetujuan melalui email."
+        description="Portal terpadu direktori karyawan dan pengelolaan izin akses, dengan login Active Directory."
         actions={
           <>
             <Link
@@ -49,13 +38,13 @@ export default async function DashboardPage() {
               className={buttonClasses()}
             >
               <IconUserPlus className="size-4" />
-              Tambah akun
+              Tambah karyawan
             </Link>
           </>
         }
       />
 
-      <DirectoryView employees={employees} activeTickets={activeTickets} />
+      <DirectoryView employees={employees} activeTickets={{}} />
     </div>
   );
 }

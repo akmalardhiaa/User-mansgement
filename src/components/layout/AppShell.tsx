@@ -6,20 +6,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, type ComponentType, type ReactNode } from "react";
 
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { BrandMark } from "@/components/ui/BrandMark";
 import {
-  IconApprovals,
   IconClock,
   IconDirectory,
   IconIdCard,
-  IconInbox,
-  IconMail,
-  IconPower,
   IconSignOut,
-  IconSwap,
   IconUser,
-  IconUserCheck,
   IconUserPlus,
 } from "@/components/ui/Icons";
 import type { Role } from "@/lib/auth/types";
@@ -33,17 +26,9 @@ const NAV: ReadonlyArray<{
   adminOnly?: boolean;
 }> = [
   { href: "/", label: "Dashboard", icon: IconDirectory },
-  { href: "/requests", label: "Persetujuan", icon: IconApprovals },
-  { href: "/users/new", label: "Tambah akun", icon: IconUserPlus },
+  { href: "/users/new", label: "Tambah karyawan", icon: IconUserPlus },
   { href: "/users/edit", label: "Edit User", icon: IconUser },
-  { href: "/users/movement", label: "Movement", icon: IconSwap },
-  { href: "/users/offboarding", label: "Off-boarding", icon: IconPower },
   { href: "/aktivitas", label: "Aktivitas", icon: IconClock },
-  { href: "/register", label: "Buat user", icon: IconUserPlus, adminOnly: true },
-  { href: "/approval-requests", label: "Approval user", icon: IconApprovals, adminOnly: true },
-  { href: "/email-settings", label: "Pengaturan email", icon: IconMail, adminOnly: true },
-  { href: "/dashboard", label: "Kelola akun", icon: IconUserCheck, adminOnly: true },
-  { href: "/my-approvals", label: "Persetujuan saya", icon: IconInbox },
   { href: "/profile", label: "Profil", icon: IconIdCard },
 ];
 
@@ -144,8 +129,6 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
               </span>
             ) : user ? (
               <>
-                {/* The static demo has no API routes for the bell to poll. */}
-                {IS_STATIC_DEMO ? null : <NotificationBell />}
                 <span className="hidden items-center gap-2.5 sm:flex">
                   <span
                     className="grid size-8 place-items-center rounded-full border border-accent/30 bg-accent/10 text-[11px] font-semibold text-accent-soft"
@@ -239,7 +222,7 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
       </div>
 
       <footer className="border-t border-hairline px-5 py-5 text-center text-xs text-ink-faint">
-        Human Capital · pengajuan akun diproses melalui persetujuan di email
+        Human Capital · direktori karyawan dengan login Active Directory
       </footer>
     </div>
   );

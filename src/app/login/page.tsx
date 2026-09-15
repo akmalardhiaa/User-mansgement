@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { LoginAside } from "@/components/auth/LoginAside";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Reveal } from "@/components/motion/Reveal";
@@ -55,16 +53,10 @@ export default async function LoginPage({
           {configured ? (
             <>
               <LoginForm next={destination} />
-              {/* No sign-up link: accounts are created by HC and activated only
-                  after the manager and the CISO approve them. */}
+              {/* Accounts live in Active Directory: no sign-up, and passwords are
+                  reset through AD, not here. */}
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-4 text-sm">
-                <Link
-                  href="/forgot-password"
-                  className="text-ink-muted transition-colors hover:text-accent"
-                >
-                  Lupa kata sandi?
-                </Link>
-                <span className="text-ink-faint">Akun baru dibuat oleh HC</span>
+                <span className="text-ink-muted">Masuk dengan akun Active Directory Anda.</span>
               </div>
             </>
           ) : (
@@ -74,8 +66,7 @@ export default async function LoginPage({
                 Login belum dikonfigurasi
               </p>
               <p className="mt-2 text-ink-muted">
-                Setel <code className="font-mono text-ink">DATABASE_URL</code> dan{" "}
-                <code className="font-mono text-ink">JWT_SECRET</code> di environment, lalu
+                Setel <code className="font-mono text-ink">JWT_SECRET</code> di environment, lalu
                 jalankan ulang aplikasinya. Contohnya ada di{" "}
                 <code className="font-mono text-ink">.env.example</code>.
               </p>

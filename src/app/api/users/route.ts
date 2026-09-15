@@ -1,21 +1,19 @@
 import { getActorName } from "@/lib/auth/current";
-import { DuplicateEmailError, listEmployees } from "@/lib/db/repository";
+import { DuplicateEmailError, addEmployee, listEmployees } from "@/lib/db/repository";
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
 import { parseNewUserInput } from "@/lib/validation/userInput";
-import { submitOnboardingRequest } from "@/lib/workflow/accessWorkflow";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/users — the roster rendered by the HC dashboard. */
+/** GET /api/users — the roster rendered by the directory. */
 export async function GET() {
   return ok({ employees: await listEmployees() });
 }
 
 /**
- * POST /api/users — Step 1 of the approval workflow.
+ * POST /api/users — add a new employee to the directory.
  *
- * This deliberately does NOT activate an account. It records the joiner as
- * PENDING_MANAGER_APPROVAL and emails the manager an approval link.
+ * The account is active immediately: there is no approval workflow any more.
  */
 export async function POST(request: Request) {
   const parsed = parseNewUserInput(await readJson(request));
@@ -24,23 +22,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { employee, request: onboarding } = await submitOnboardingRequest(
-      parsed.value,
-      await getActorName(),
-    );
-    return ok(
-      {
-        employee,
-        request: onboarding,
-        managerIssue: onboarding.managerIssue,
-      },
-      201,
-    );
+    const employee = await addEmployee(parsed.value, await getActorName());
+    return ok({ employee }, 201);
   } catch (error) {
     if (error instanceof DuplicateEmailError) {
       return fail(error.message, 409, { fieldErrors: { email: error.message } });
     }
-    console.error("[api/users] submit failed:", error);
-    return fail("Pengajuan gagal dikirim.", 500);
+    console.error("[api/users] create failed:", error);
+    return fail("Gagal menambahkan karyawan.", 500);
   }
 }

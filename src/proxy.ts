@@ -32,30 +32,12 @@ import {
  */
 const PUBLIC_PATHS = [
   "/login",
-  "/verify-email",
-  "/forgot-password",
-  "/reset-password",
   "/api/auth/login",
   "/api/auth/logout",
-  "/api/auth/verify-email",
-  "/api/auth/forgot-password",
-  "/api/auth/reset-password",
-  "/api/auth/resend-verification",
-  // The manager approving an access request has no account here — a login
-  // for every approver in the company is exactly what this channel avoids.
-  // The emailed token is the credential; see src/app/api/hc-approvals/[token].
-  "/approvals/",
-  "/api/hc-approvals/",
-  // Account approval links (manager and CISO). /api/approvals — the admin
-  // list — is deliberately NOT here: only the token routes are public.
-  "/approval",
-  "/api/approval/",
-  // Development-only email preview; the route 404s in production regardless.
-  "/api/dev/",
 ];
 
 /** Pages a signed-in person has no reason to see. */
-const SIGNED_IN_REDIRECTS = new Set(["/login", "/forgot-password"]);
+const SIGNED_IN_REDIRECTS = new Set(["/login"]);
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((entry) => {

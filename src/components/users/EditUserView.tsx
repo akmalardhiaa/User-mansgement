@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { FormAlert } from "@/components/accounts/FormAlert";
+import { FormAlert } from "@/components/ui/FormAlert";
 import { Button } from "@/components/ui/Button";
 import { Card, Field, SelectField, TextareaField } from "@/components/ui/Field";
 import { IconBriefcase, IconBuilding, IconNote, IconSearch, IconUser } from "@/components/ui/Icons";

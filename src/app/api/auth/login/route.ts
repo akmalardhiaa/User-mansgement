@@ -1,23 +1,21 @@
 import { cookies } from "next/headers";
 
-import { authenticate, toPublicUser } from "@/lib/accounts/service";
+import { authenticateAD } from "@/lib/auth/ad";
 import { TOKEN_COOKIE, createAccessToken, secondsUntilExpiry, tokenCookieOptions, verifyAccessToken } from "@/lib/auth/jwt";
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
 import { preflight, withCors } from "@/lib/http/cors";
 import { clientKey, rateLimit, resetRateLimit } from "@/lib/http/rateLimit";
-import { parseLoginInput } from "@/lib/validation/accountInput";
 
 export const dynamic = "force-dynamic";
 
 export const OPTIONS = preflight;
 
 /**
- * POST /api/auth/login
+ * POST /api/auth/login — { username | email, password }.
  *
- * Exchanges credentials for a short-lived JWT, delivered as an httpOnly
- * cookie. The token is not in the response body: httpOnly is what stops an
- * injected script from reading it, and handing the same value back in JSON
- * would put it right back within reach of `document`-level code.
+ * Verifies the credentials against Active Directory (or the local dev fallback),
+ * then issues a short-lived JWT as an httpOnly cookie. The password is never
+ * stored here: AD checks it, and only a signed session token comes back.
  */
 export async function POST(request: Request) {
   // Ten attempts per five minutes per address. A person who has mistyped their
@@ -26,56 +24,40 @@ export async function POST(request: Request) {
   const limit = rateLimit(key, 10, 5 * 60 * 1000);
   if (!limit.allowed) {
     return withCors(
-      fail("Terlalu banyak percobaan masuk. Coba lagi sebentar lagi.", 429, {
-        retryAfter: limit.retryAfter,
+      fail("Terlalu banyak percobaan masuk. Coba lagi sebentar lagi.", 429, { retryAfter: limit.retryAfter }),
+      request,
+    );
+  }
+
+  const body = (await readJson(request)) as { username?: unknown; email?: unknown; password?: unknown } | undefined;
+  const username =
+    typeof body?.username === "string" ? body.username.trim() : typeof body?.email === "string" ? body.email.trim() : "";
+  const password = typeof body?.password === "string" ? body.password : "";
+
+  if (!username || !password) {
+    return withCors(
+      fail("Username dan kata sandi wajib diisi.", 422, {
+        fieldErrors: {
+          ...(username ? {} : { username: "Username wajib diisi." }),
+          ...(password ? {} : { password: "Kata sandi wajib diisi." }),
+        },
       }),
       request,
     );
   }
 
-  const parsed = parseLoginInput(await readJson(request));
-  if (!parsed.ok) {
-    return withCors(fail("Email dan kata sandi wajib diisi.", 422, { fieldErrors: parsed.errors }), request);
-  }
-
   try {
-    const outcome = await authenticate(parsed.value.email, parsed.value.password);
+    const user = await authenticateAD(username, password);
 
-    if (outcome.status === "bad-credentials") {
-      // One message for both an unknown address and a wrong password, so the
-      // response never reveals which accounts exist.
-      return withCors(fail("Email atau kata sandi salah.", 401), request);
-    }
-
-    if (outcome.status === "unverified") {
-      return withCors(
-        fail("Email belum dikonfirmasi. Cek kotak masuk Anda untuk tautan konfirmasi.", 403, {
-          code: "EMAIL_NOT_VERIFIED",
-          email: outcome.email,
-        }),
-        request,
-      );
-    }
-
-    if (outcome.status === "pending-approval") {
-      const rejected = outcome.approvalStatus.endsWith("_REJECTED");
-      return withCors(
-        fail(
-          rejected
-            ? "Permohonan akun Anda ditolak. Hubungi Human Capital untuk informasi lebih lanjut."
-            : "Akun Anda belum aktif. Masih menunggu persetujuan manager dan CISO / IT Security.",
-          403,
-          { code: rejected ? "APPROVAL_REJECTED" : "APPROVAL_PENDING" },
-        ),
-        request,
-      );
-    }
+    // One message for both an unknown account and a wrong password, so the
+    // response never reveals which usernames exist.
+    if (!user) return withCors(fail("Username atau kata sandi salah.", 401), request);
 
     const token = createAccessToken({
-      id: outcome.user.id,
-      email: outcome.user.email,
-      fullName: outcome.user.fullName,
-      role: outcome.user.role,
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
     });
 
     // A correct password clears the counter, so someone who fumbled their
@@ -86,7 +68,10 @@ export async function POST(request: Request) {
     const store = await cookies();
     store.set(TOKEN_COOKIE, token, tokenCookieOptions(payload ? secondsUntilExpiry(payload) : 900));
 
-    return withCors(ok({ user: toPublicUser(outcome.user) }), request);
+    return withCors(
+      ok({ user: { id: user.id, email: user.email, fullName: user.fullName, role: user.role, department: user.department } }),
+      request,
+    );
   } catch (error) {
     console.error("[auth/login]", error);
     return withCors(fail("Tidak bisa masuk saat ini. Coba lagi.", 500), request);

@@ -94,7 +94,7 @@ export function ManagerPicker({
         value={manual ? MANUAL : (matched?.email ?? "")}
         onChange={(event) => selectEmployee(event.target.value)}
         error={manual ? undefined : nameError}
-        hint={manual ? undefined : "Manager yang akan menerima email persetujuan."}
+        hint={manual ? undefined : "Atasan langsung karyawan ini."}
       >
         <option value="">Pilih manager…</option>
         {employees.map((employee) => (
@@ -155,14 +155,13 @@ export function ManagerPicker({
               <span className="flex items-center gap-1.5 pt-0.5 text-ok">
                 <IconCheck className="size-3.5 shrink-0" />
                 <span>
-                  Email persetujuan akan dikirim ke{" "}
-                  <span className="font-mono break-all">{check.email}</span>
+                  Email manager: <span className="font-mono break-all">{check.email}</span>
                 </span>
               </span>
             ) : (
               <span className="flex items-center gap-1.5 pt-0.5 text-warn">
                 <IconAlert className="size-3.5 shrink-0" />
-                Format email belum valid — email persetujuan tidak bisa dikirim ke alamat ini.
+                Format email belum valid.
               </span>
             )}
           </motion.p>

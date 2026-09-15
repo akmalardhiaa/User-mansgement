@@ -4,18 +4,14 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { MotionProvider } from "@/components/motion/MotionProvider";
 import { ToastProvider } from "@/components/ui/Toast";
-import { EmailDeliveryNotice } from "@/components/approval/EmailDeliveryNotice";
-import { PendingApprovalsNotice } from "@/components/approval/PendingApprovalsNotice";
 import { getCurrentUser } from "@/lib/auth/current";
-import { isEmailDeliveryConfigured } from "@/lib/config/authEnv";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "HC User Management",
-  description:
-    "Portal Human Capital untuk pengelolaan akun karyawan dengan alur persetujuan melalui email.",
+  description: "Portal Human Capital: direktori karyawan dengan login Active Directory.",
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
@@ -44,8 +40,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                   : undefined
               }
             >
-              {session?.role === "ADMIN" && !isEmailDeliveryConfigured() ? <EmailDeliveryNotice /> : null}
-              {session ? <PendingApprovalsNotice userId={session.id} /> : null}
               {children}
             </AppShell>
           </ToastProvider>

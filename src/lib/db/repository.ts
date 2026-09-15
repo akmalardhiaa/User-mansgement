@@ -83,6 +83,51 @@ export async function listEmployees(): Promise<Employee[]> {
   return [...employees].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/**
+ * Adds an employee to the directory, active immediately.
+ *
+ * There is no approval step any more: HC records the person and they appear in
+ * the directory straight away. Access can still be suspended later through
+ * setEmployeeAccess.
+ */
+export async function addEmployee(input: NewUserInput, actor: string): Promise<Employee> {
+  return transaction((draft) => {
+    const email = input.email.toLowerCase();
+    if (draft.employees.some((employee) => employee.email.toLowerCase() === email)) {
+      throw new DuplicateEmailError(input.email);
+    }
+
+    const now = timestamp();
+    const employee: Employee = {
+      id: `emp_${randomUUID()}`,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      displayName: input.displayName,
+      email: input.email,
+      jobTitle: input.jobTitle,
+      department: input.department,
+      managerName: input.managerName,
+      managerEmail: input.managerEmail,
+      managerAccountId: input.managerAccountId,
+      description: input.description,
+      status: "ACTIVE",
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    draft.employees.push(employee);
+    recordActivityInDraft(draft, {
+      actor,
+      action: "user.created",
+      employeeId: employee.id,
+      employeeName: employee.displayName,
+      detail: `Menambahkan karyawan ${employee.displayName} — ${employee.jobTitle}, ${employee.department}.`,
+    });
+
+    return employee;
+  });
+}
+
 export async function listRequests(): Promise<AccessRequest[]> {
   const { requests } = await readStore();
   return [...requests].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
