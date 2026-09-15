@@ -14,7 +14,6 @@ import {
   IconBriefcase,
   IconBuilding,
   IconCheck,
-  IconExternal,
   IconIdCard,
   IconMail,
   IconNote,
@@ -72,17 +71,14 @@ export function CreateUserForm({
   dataSource = apiDataSource,
   employees = [],
   onCreated,
-  onTrack,
 }: {
   dataSource?: DashboardDataSource;
   /**
    * The roster the manager picker offers. Empty is a valid state — it just
-   * leaves HC typing the approver, which is what the form did before.
+   * leaves HC typing the manager by hand.
    */
   employees?: Employee[];
   onCreated?: () => void;
-  /** Demo mode switches tab instead of navigating to /requests. */
-  onTrack?: () => void;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -125,7 +121,7 @@ export function CreateUserForm({
       setSuccess(result);
       setValues(EMPTY);
       nameEdited.current = false;
-      toast(`Email persetujuan untuk ${result.employee.displayName} sudah dikirim.`);
+      toast(`Karyawan ${result.employee.displayName} ditambahkan.`);
       if (onCreated) {
         onCreated();
       } else {
@@ -155,63 +151,20 @@ export function CreateUserForm({
               <IconCheck className="size-4" />
             </motion.span>
             <div>
-              <h2 className="text-lg font-semibold">Pengajuan terkirim</h2>
+              <h2 className="text-lg font-semibold">Karyawan ditambahkan</h2>
               <p className="mt-1 text-sm text-ink-muted">
-                {success.employee.displayName} tercatat sebagai{" "}
-                <strong className="text-ink">Menunggu manager</strong> dan belum aktif. Email persetujuan sudah dibuat untuk {success.employee.managerName}.
+                {success.employee.displayName} sudah tercatat di direktori sebagai{" "}
+                <strong className="text-ink">Aktif</strong>.
               </p>
-              {/* The request is only usable after its email was delivered. */}
-              {success.managerIssue?.assignee ? (
-                <p className="mt-2 flex items-start gap-1.5 text-sm text-ok">
-                  <IconCheck className="mt-0.5 size-3.5" />
-                  Email persetujuan sudah dikirim ke {success.managerIssue.assignee} — persetujuan bisa
-                  langsung dilakukan dari tautan email.
-                </p>
-              ) : (
-                <p className="mt-2 flex items-start gap-1.5 text-sm text-warn">
-                  <IconAlert className="mt-0.5 size-3.5" />
-                  <span>
-                    Email persetujuan tidak dapat dikirim ke {success.employee.managerEmail}, jadi
-                    email tidak dapat dikirim.
-                  </span>
-                </p>
-              )}
             </div>
           </div>
 
-          {success.managerIssue ? (
-            <a
-              href={success.managerIssue.url}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-5 flex items-center justify-between rounded-xl border border-hairline-strong bg-elevated px-4 py-3 transition-colors hover:border-accent/50"
-            >
-              <span>
-                <span className="block text-xs text-ink-faint">Email persetujuan manager</span>
-                <span className="font-mono text-sm text-accent-soft">
-                  {success.managerIssue.key}
-                </span>
-              </span>
-              <span className="flex items-center gap-1.5 text-sm text-ink-muted">
-                Buka halaman persetujuan
-                <IconExternal className="size-3.5" />
-              </span>
-            </a>
-          ) : null}
-
           <div className="mt-6 flex flex-wrap gap-3">
-            {onTrack ? (
-              <Button onClick={onTrack}>Lihat progres</Button>
-            ) : (
-              <Link
-                href="/requests"
-                className={buttonClasses()}
-              >
-                Lihat progres
-              </Link>
-            )}
+            <Link href="/" className={buttonClasses()}>
+              Lihat direktori
+            </Link>
             <Button variant="secondary" icon={<IconUserPlus />} onClick={() => setSuccess(null)}>
-              Tambah akun lain
+              Tambah karyawan lain
             </Button>
           </div>
         </Card>
@@ -445,7 +398,7 @@ export function CreateUserForm({
 
           <motion.p variants={staggerItem} className={`mt-8 ${SECTION_CLASSES}`}>
             <IconApprovals className="size-3.5" />
-            Atasan yang menyetujui
+            Atasan langsung
           </motion.p>
 
           <motion.div variants={staggerItem}>
@@ -472,21 +425,21 @@ export function CreateUserForm({
               icon={<IconNote className="size-4" />}
               value={values.description ?? ""}
               onChange={(event) => update("description", event.target.value)}
-              placeholder="Catatan tambahan untuk manager dan IT Security — opsional"
-              hint="Ikut tercantum di kedua email persetujuan."
+              placeholder="Catatan internal untuk direktori — opsional"
+              hint="Catatan internal; tidak dikirim ke mana pun."
             />
           </motion.div>
         </motion.div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
           <Button type="submit" loading={submitting} icon={<IconUserPlus />}>
-            {submitting ? "Mengirim email…" : "Ajukan persetujuan"}
+            {submitting ? "Menyimpan…" : "Tambah karyawan"}
           </Button>
           <Link href="/" className="text-sm text-ink-muted transition-colors hover:text-ink">
             Batal
           </Link>
           <p className="w-full text-xs text-ink-faint sm:ml-auto sm:w-auto">
-            Mengirim form ini mengirim email persetujuan ke manager — bukan langsung membuat akun aktif.
+            Karyawan langsung aktif di direktori setelah ditambahkan.
           </p>
         </div>
       </form>

@@ -6,13 +6,12 @@ import { IconClock } from "@/components/ui/Icons";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { listEmployees } from "@/lib/db/repository";
 
-export const metadata = { title: "Tambah akun · HC User Management" };
+export const metadata = { title: "Tambah karyawan · HC User Management" };
 
 const WORKFLOW = [
-  ["1", "HC mengajukan", "Karyawan tercatat sebagai Menunggu manager — akun belum dibuat."],
-  ["2", "Manager menyetujui", "Email persetujuan dikirim ke manager yang bersangkutan."],
-  ["3", "IT Security menyiapkan", "Persetujuan otomatis mengirim email penyiapan akses."],
-  ["4", "Akun aktif", "Konfirmasi penyiapan dari IT Security mengubah status menjadi Aktif."],
+  ["1", "Isi data karyawan", "Nama, email, jabatan, departemen, dan atasan langsung."],
+  ["2", "Simpan", "Karyawan langsung tercatat sebagai Aktif di direktori."],
+  ["3", "Login lewat AD", "Karyawan masuk portal memakai akun Active Directory mereka."],
 ] as const;
 
 export const dynamic = "force-dynamic";
@@ -34,9 +33,9 @@ export default async function NewUserPage() {
         </Link>
         <div className="mt-2">
           <PageHeader
-            eyebrow="Pengajuan baru"
-            title="Tambah akun baru"
-            description="Pengajuan melewati persetujuan manager dan penyiapan akses IT Security sebelum akun menjadi aktif."
+            eyebrow="Direktori"
+            title="Tambah karyawan"
+            description="Tambahkan karyawan ke direktori. Karyawan langsung aktif dan bisa login memakai akun Active Directory."
           />
         </div>
       </div>
