@@ -1,8 +1,8 @@
 /**
  * Core domain model for the HC User Management dashboard.
  *
- * Both kinds of access request run through the same two-step chain — HC raises
- * it, the manager approves in Jira, IT Security carries it out in Jira:
+ * All three kinds of access request run through the same two-step chain — HC
+ * raises it, the manager approves by email, and IT Security confirms the work by email:
  *
  *   Adding an account (ONBOARDING)
  *     PENDING_MANAGER_APPROVAL -> PENDING_SECURITY_SETUP -> ACTIVE
@@ -11,12 +11,19 @@
  *     PENDING_TRANSFER_APPROVAL -> PENDING_TRANSFER_SETUP -> back to ACTIVE,
  *     with the new department, position and manager applied.
  *
+ *   Removing an account (OFFBOARDING)
+ *     PENDING_OFFBOARDING_APPROVAL -> PENDING_OFFBOARDING_SETUP -> DISABLED,
+ *     once IT Security has revoked the access.
+ *
  * A manager rejection ends the request: a rejected joiner becomes REJECTED,
  * while a rejected transfer simply restores the employee's previous status and
- * leaves their position untouched.
+ * leaves their position untouched. A rejected offboarding leaves the employee
+ * exactly as they were — still active, still with their access.
  *
- * DISABLED is separate and deliberately unmediated: a reversible suspension HC
- * can apply immediately without waiting on an approval.
+ * DISABLED is where an approved offboarding ends up, and it is also what HC
+ * applies directly as a reversible suspension that needs no approval. Keeping
+ * one status for both is deliberate: in either case the person keeps their
+ * record and their history, and can be switched back on.
  */
 
 export const EMPLOYEE_STATUSES = [
@@ -27,6 +34,8 @@ export const EMPLOYEE_STATUSES = [
   "REJECTED",
   "PENDING_TRANSFER_APPROVAL",
   "PENDING_TRANSFER_SETUP",
+  "PENDING_OFFBOARDING_APPROVAL",
+  "PENDING_OFFBOARDING_SETUP",
 ] as const;
 
 export type EmployeeStatus = (typeof EMPLOYEE_STATUSES)[number];
@@ -41,11 +50,21 @@ export interface Employee {
   displayName: string;
   email: string;
   jobTitle: string;
+  /** Description or details of the job position. */
+  jobDescription?: string;
   department: string;
+  /** Employment contract type: Permanent (Karyawan Tetap) or Contract. */
+  employmentType?: "PERMANENT" | "CONTRACT";
+  /** Expiration date for contract employees (ISO string). */
+  expiredDate?: string;
+  /** Work location: Pusat (Head Office) or Cabang (Branch Office). */
+  locationType?: "PUSAT" | "CABANG";
+  /** Branch office name if locationType is Cabang. */
+  branchName?: string;
   managerName: string;
-  /** Work email of the manager. Resolved to a Jira account so ticket #1 is assigned. */
+  /** Work email of the manager. This is where the approval email is sent. */
   managerEmail: string;
-  /** Jira accountId, once resolved. Assignment is what makes Jira email them. */
+  /** Legacy Jira account identifier. It is no longer used for approvals. */
   managerAccountId?: string;
   /** Free-text note HC captured when the account was requested. */
   description?: string;
@@ -57,7 +76,7 @@ export interface Employee {
 }
 
 /** What the request asks for. Both types share the same approval chain. */
-export const REQUEST_TYPES = ["ONBOARDING", "TRANSFER"] as const;
+export const REQUEST_TYPES = ["ONBOARDING", "TRANSFER", "OFFBOARDING"] as const;
 
 export type RequestType = (typeof REQUEST_TYPES)[number];
 
@@ -75,6 +94,7 @@ export type RequestStage = (typeof REQUEST_STAGES)[number];
 export interface TransferTarget {
   department: string;
   jobTitle: string;
+  jobDescription?: string;
   /** Optional: a move between divisions usually means a new manager too. */
   managerName?: string;
   managerEmail?: string;
@@ -86,21 +106,45 @@ export interface WorkflowEvent {
   type: string;
   /** Human-readable line rendered in the audit trail. */
   message: string;
-  /** Who caused it — a Jira display name, or "HC Portal" for local actions. */
+  /** Who caused it — the person who decided from an email, an HC officer, or "HC Portal". */
   actor?: string;
   issueKey?: string;
 }
 
-export interface JiraIssueRef {
+/**
+ * The handle a workflow step is tracked by: `MAIL-…` for the manager's
+ * decision, `SEC-…` for the security team's work order.
+ */
+export interface ApprovalReference {
   key: string;
+  /** The decision page the step's email links to. */
   url: string;
-  /** Last status name we observed for this issue. */
+  /** Last status recorded for this step, as shown on the request card. */
   status?: string;
-  /**
-   * Who the issue is assigned to. Assignment is what makes Jira email them, so
-   * an absent value means nobody was notified.
-   */
+  /** Address the step was emailed to. Absent means nobody was asked. */
   assignee?: string;
+}
+
+/**
+ * A step handed to someone by email.
+ *
+ * The token is what authenticates the decision: the recipient has no account
+ * here, so possession of the emailed link is the only proof of identity
+ * available. It is therefore random, single-use, and expires — and the link
+ * opens a page rather than deciding on its own, because mail scanners and
+ * link previewers follow every URL in a message and would otherwise approve
+ * the request before a human had read it.
+ */
+export interface EmailHandoff {
+  token: string;
+  /** ISO timestamp; past this the link is dead and HC must resend. */
+  expiresAt: string;
+  /** Address the request was sent to, for the audit trail. */
+  sentTo: string;
+  sentAt: string;
+  /** Set once the manager has answered, so the token cannot be replayed. */
+  decidedAt?: string;
+  decidedBy?: string;
 }
 
 export interface AccessRequest {
@@ -108,7 +152,7 @@ export interface AccessRequest {
   employeeId: string;
   type: RequestType;
   stage: RequestStage;
-  /** Why HC raised the request. Transfers only. */
+  /** Why HC raised the request. Transfers and Offboardings. */
   reason?: string;
   /** Where the employee is moving to. Transfers only. */
   transfer?: TransferTarget;
@@ -117,12 +161,17 @@ export interface AccessRequest {
    * manager turns down keeps working where they are, not becoming REJECTED.
    */
   previousStatus?: EmployeeStatus;
-  managerIssue?: JiraIssueRef;
-  securityIssue?: JiraIssueRef;
+  managerIssue?: ApprovalReference;
+  /** The manager email handoff. */
+  managerApproval?: EmailHandoff;
+  /** The IT Security email handoff. */
+  securityApproval?: EmailHandoff;
+  securityIssue?: ApprovalReference;
   events: WorkflowEvent[];
   /**
-   * Transitions already applied, as `${issueKey}:${status}`. Jira delivers
-   * webhooks at-least-once, so we claim a signal before acting on it.
+   * Transitions already applied, as `${issueKey}:${status}`. A decision page can
+   * be submitted twice — a double-click, a second tab — so a signal is claimed
+   * before it is acted on.
    */
   processedSignals: string[];
   createdAt: string;
@@ -136,10 +185,15 @@ export interface NewUserInput {
   displayName: string;
   email: string;
   jobTitle: string;
+  jobDescription?: string;
   department: string;
+  employmentType?: "PERMANENT" | "CONTRACT";
+  expiredDate?: string;
+  locationType?: "PUSAT" | "CABANG";
+  branchName?: string;
   managerName: string;
   managerEmail: string;
-  /** Free-text note carried onto both Jira tickets. */
+  /** Free-text note included in the approval emails. */
   description?: string;
   /** Optional override; normally resolved from `managerEmail`. */
   managerAccountId?: string;
@@ -172,6 +226,7 @@ export const ACTIVITY_ACTIONS = [
   "request.rejected",
   "request.completed",
   "directory.exported",
+  "employee.profile_updated",
 ] as const;
 
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];
@@ -181,7 +236,7 @@ export interface ActivityEntry {
   /** ISO timestamp. The log is read newest-first. */
   at: string;
   /**
-   * The HC officer's name for anything done in this app, the Jira display name
+   * The HC officer's name for anything done in this app, or the email recipient
    * for anything a webhook brought in. Never blank: an entry nobody can be
    * attributed to is not worth recording.
    */

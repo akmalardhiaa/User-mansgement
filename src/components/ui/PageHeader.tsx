@@ -3,37 +3,52 @@ import type { ReactNode } from "react";
 import { Reveal } from "@/components/motion/Reveal";
 
 /**
- * The heading block every page opens with: an eyebrow, a title, a line of
- * explanation, and the page's actions pushed to the far end.
- *
- * Shared so the three pages cannot drift apart in type size or spacing, which
- * they had already started to do.
+ * The heading block every page opens with, featuring eye-candy motion,
+ * glowing brand pills, and flexible header layout.
  */
 export function PageHeader({
   eyebrow,
   title,
   description,
   actions,
+  badge,
 }: {
-  eyebrow?: string;
-  title: string;
+  eyebrow?: ReactNode;
+  title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
+  badge?: ReactNode;
 }) {
   return (
-    <Reveal className="flex flex-wrap items-end gap-x-4 gap-y-3">
-      <div className="min-w-0">
-        {eyebrow ? (
-          <p className="mb-1.5 text-xs font-medium tracking-[0.14em] text-accent uppercase">
-            {eyebrow}
-          </p>
+    <Reveal className="relative flex flex-wrap items-end justify-between gap-x-6 gap-y-4 rounded-2xl border border-hairline/60 bg-surface/40 p-6 backdrop-blur-md shadow-[0_8px_30px_rgb(0_0_0_/_0.12)]">
+      {/* Top ambient highlight glow line */}
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
+
+      <div className="min-w-0 flex-1 space-y-1.5">
+        {eyebrow || badge ? (
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {eyebrow ? (
+              <p className="text-xs font-bold tracking-[0.16em] text-accent uppercase">
+                {eyebrow}
+              </p>
+            ) : null}
+            {badge ? <div>{badge}</div> : null}
+          </div>
         ) : null}
-        <h1 className="text-2xl font-semibold tracking-tight text-balance">{title}</h1>
+
+        <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-balance text-ink">
+          {title}
+        </div>
+
         {description ? (
-          <p className="mt-1.5 max-w-prose text-sm text-ink-muted">{description}</p>
+          <p className="max-w-2xl text-sm leading-relaxed text-ink-muted">{description}</p>
         ) : null}
       </div>
-      {actions ? <div className="ml-auto flex flex-wrap items-center gap-3">{actions}</div> : null}
+
+      {actions ? (
+        <div className="flex flex-wrap items-center gap-3 shrink-0">{actions}</div>
+      ) : null}
     </Reveal>
   );
 }
+

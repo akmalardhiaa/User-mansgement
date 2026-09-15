@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { DEPARTMENTS } from "@/lib/db/seed";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card, Field, TextareaField } from "@/components/ui/Field";
 import {
   IconAlert,
@@ -66,7 +66,7 @@ const REQUIRED: ReadonlyArray<keyof NewUserInput> = [
  * Step 1 of the workflow from the HC side.
  *
  * Submitting never activates an account — it hands the request to the manager
- * via Jira, which the confirmation panel makes explicit.
+ * via email, which the confirmation panel makes explicit.
  */
 export function CreateUserForm({
   dataSource = apiDataSource,
@@ -125,7 +125,7 @@ export function CreateUserForm({
       setSuccess(result);
       setValues(EMPTY);
       nameEdited.current = false;
-      toast(`Pengajuan untuk ${result.employee.displayName} dikirim ke Jira.`);
+      toast(`Email persetujuan untuk ${result.employee.displayName} sudah dikirim.`);
       if (onCreated) {
         onCreated();
       } else {
@@ -158,23 +158,21 @@ export function CreateUserForm({
               <h2 className="text-lg font-semibold">Pengajuan terkirim</h2>
               <p className="mt-1 text-sm text-ink-muted">
                 {success.employee.displayName} tercatat sebagai{" "}
-                <strong className="text-ink">Menunggu manager</strong> dan belum aktif. Tiket
-                persetujuan sudah dibuat untuk {success.employee.managerName}.
+                <strong className="text-ink">Menunggu manager</strong> dan belum aktif. Email persetujuan sudah dibuat untuk {success.employee.managerName}.
               </p>
-              {/* Assignment is what triggers Jira's email, so say plainly whether
-                  the approver was actually reached. */}
+              {/* The request is only usable after its email was delivered. */}
               {success.managerIssue?.assignee ? (
                 <p className="mt-2 flex items-start gap-1.5 text-sm text-ok">
                   <IconCheck className="mt-0.5 size-3.5" />
-                  Jira sudah mengirim email ke {success.managerIssue.assignee} — persetujuan bisa
-                  langsung dilakukan dari tiketnya.
+                  Email persetujuan sudah dikirim ke {success.managerIssue.assignee} — persetujuan bisa
+                  langsung dilakukan dari tautan email.
                 </p>
               ) : (
                 <p className="mt-2 flex items-start gap-1.5 text-sm text-warn">
                   <IconAlert className="mt-0.5 size-3.5" />
                   <span>
-                    Tidak ada akun Jira yang cocok dengan {success.employee.managerEmail}, jadi
-                    tiket belum ter-assign dan email tidak terkirim. Assign manual di Jira.
+                    Email persetujuan tidak dapat dikirim ke {success.employee.managerEmail}, jadi
+                    email tidak dapat dikirim.
                   </span>
                 </p>
               )}
@@ -189,13 +187,13 @@ export function CreateUserForm({
               className="mt-5 flex items-center justify-between rounded-xl border border-hairline-strong bg-elevated px-4 py-3 transition-colors hover:border-accent/50"
             >
               <span>
-                <span className="block text-xs text-ink-faint">Tiket persetujuan manager</span>
+                <span className="block text-xs text-ink-faint">Email persetujuan manager</span>
                 <span className="font-mono text-sm text-accent-soft">
                   {success.managerIssue.key}
                 </span>
               </span>
               <span className="flex items-center gap-1.5 text-sm text-ink-muted">
-                Buka di Jira
+                Buka halaman persetujuan
                 <IconExternal className="size-3.5" />
               </span>
             </a>
@@ -207,7 +205,7 @@ export function CreateUserForm({
             ) : (
               <Link
                 href="/requests"
-                className="inline-flex items-center rounded-lg border border-accent/70 bg-accent px-3.5 py-2 text-sm font-semibold text-accent-ink transition-all duration-200 hover:bg-accent-soft active:scale-[0.97]"
+                className={buttonClasses()}
               >
                 Lihat progres
               </Link>
@@ -322,6 +320,19 @@ export function CreateUserForm({
                 autoComplete="off"
               />
             </motion.div>
+
+            <motion.div variants={staggerItem}>
+              <Field
+                label="Keterangan / Deskripsi Jabatan"
+                name="jobDescription"
+                icon={<IconNote className="size-4" />}
+                value={values.jobDescription ?? ""}
+                onChange={(event) => update("jobDescription", event.target.value)}
+                placeholder="Contoh: Penanggung jawab modul transaksi backend"
+                autoComplete="off"
+              />
+            </motion.div>
+
             <motion.div variants={staggerItem}>
               <Field
                 label="Departemen"
@@ -341,6 +352,95 @@ export function CreateUserForm({
                 ))}
               </datalist>
             </motion.div>
+
+            {/* Status Karyawan & Tanggal Expired */}
+            <motion.div variants={staggerItem} className="space-y-1.5">
+              <label className="block text-xs font-medium text-ink-muted">
+                Status Hubungan Kerja (Tipe Karyawan)
+              </label>
+              <div className="flex gap-3">
+                <label className="flex items-center gap-2 rounded-xl border border-hairline bg-surface px-3.5 py-2.5 text-xs text-ink cursor-pointer hover:border-accent/50">
+                  <input
+                    type="radio"
+                    name="employmentType"
+                    value="PERMANENT"
+                    checked={(values.employmentType ?? "PERMANENT") === "PERMANENT"}
+                    onChange={() => update("employmentType", "PERMANENT")}
+                    className="accent-accent"
+                  />
+                  <span>Permanent (Karyawan Tetap)</span>
+                </label>
+                <label className="flex items-center gap-2 rounded-xl border border-hairline bg-surface px-3.5 py-2.5 text-xs text-ink cursor-pointer hover:border-accent/50">
+                  <input
+                    type="radio"
+                    name="employmentType"
+                    value="CONTRACT"
+                    checked={values.employmentType === "CONTRACT"}
+                    onChange={() => update("employmentType", "CONTRACT")}
+                    className="accent-accent"
+                  />
+                  <span>Kontrak (Contract)</span>
+                </label>
+              </div>
+            </motion.div>
+
+            {values.employmentType === "CONTRACT" ? (
+              <motion.div variants={staggerItem}>
+                <Field
+                  label="Tanggal Masa Expired Kontrak (Expired Date)"
+                  name="expiredDate"
+                  type="date"
+                  icon={<IconNote className="size-4" />}
+                  value={values.expiredDate ?? ""}
+                  onChange={(event) => update("expiredDate", event.target.value)}
+                  hint="Tanggal berakhirnya masa berlaku akun kontrak"
+                />
+              </motion.div>
+            ) : null}
+
+            {/* Lokasi Kerja (Pusat vs Cabang) */}
+            <motion.div variants={staggerItem} className="space-y-1.5 sm:col-span-2">
+              <label className="block text-xs font-medium text-ink-muted">
+                Lokasi Penempatan Kerja
+              </label>
+              <div className="flex flex-wrap gap-3">
+                <label className="flex items-center gap-2 rounded-xl border border-hairline bg-surface px-4 py-2.5 text-xs text-ink cursor-pointer hover:border-accent/50">
+                  <input
+                    type="radio"
+                    name="locationType"
+                    value="PUSAT"
+                    checked={(values.locationType ?? "PUSAT") === "PUSAT"}
+                    onChange={() => update("locationType", "PUSAT")}
+                    className="accent-accent"
+                  />
+                  <span>Kantor Pusat (Head Office)</span>
+                </label>
+                <label className="flex items-center gap-2 rounded-xl border border-hairline bg-surface px-4 py-2.5 text-xs text-ink cursor-pointer hover:border-accent/50">
+                  <input
+                    type="radio"
+                    name="locationType"
+                    value="CABANG"
+                    checked={values.locationType === "CABANG"}
+                    onChange={() => update("locationType", "CABANG")}
+                    className="accent-accent"
+                  />
+                  <span>Kantor Cabang (Branch Office)</span>
+                </label>
+              </div>
+            </motion.div>
+
+            {values.locationType === "CABANG" ? (
+              <motion.div variants={staggerItem} className="sm:col-span-2">
+                <Field
+                  label="Nama Kantor Cabang"
+                  name="branchName"
+                  icon={<IconBuilding className="size-4" />}
+                  value={values.branchName ?? ""}
+                  onChange={(event) => update("branchName", event.target.value)}
+                  placeholder="Contoh: Cabang Bandung, Cabang Surabaya, Cabang Medan"
+                />
+              </motion.div>
+            ) : null}
           </div>
 
           <motion.p variants={staggerItem} className={`mt-8 ${SECTION_CLASSES}`}>
@@ -373,20 +473,20 @@ export function CreateUserForm({
               value={values.description ?? ""}
               onChange={(event) => update("description", event.target.value)}
               placeholder="Catatan tambahan untuk manager dan IT Security — opsional"
-              hint="Ikut tercantum di kedua tiket Jira."
+              hint="Ikut tercantum di kedua email persetujuan."
             />
           </motion.div>
         </motion.div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
           <Button type="submit" loading={submitting} icon={<IconUserPlus />}>
-            {submitting ? "Mengirim ke Jira…" : "Ajukan persetujuan"}
+            {submitting ? "Mengirim email…" : "Ajukan persetujuan"}
           </Button>
           <Link href="/" className="text-sm text-ink-muted transition-colors hover:text-ink">
             Batal
           </Link>
           <p className="w-full text-xs text-ink-faint sm:ml-auto sm:w-auto">
-            Mengirim form ini membuat tiket persetujuan di Jira — bukan langsung membuat akun aktif.
+            Mengirim form ini mengirim email persetujuan ke manager — bukan langsung membuat akun aktif.
           </p>
         </div>
       </form>

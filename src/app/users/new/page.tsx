@@ -10,9 +10,9 @@ export const metadata = { title: "Tambah akun · HC User Management" };
 
 const WORKFLOW = [
   ["1", "HC mengajukan", "Karyawan tercatat sebagai Menunggu manager — akun belum dibuat."],
-  ["2", "Manager menyetujui", "Tiket Jira di-assign ke manager yang bersangkutan."],
-  ["3", "IT Security menyiapkan", "Persetujuan otomatis membuat tiket penyiapan akses."],
-  ["4", "Akun aktif", "Menutup tiket penyiapan mengubah status menjadi Aktif."],
+  ["2", "Manager menyetujui", "Email persetujuan dikirim ke manager yang bersangkutan."],
+  ["3", "IT Security menyiapkan", "Persetujuan otomatis mengirim email penyiapan akses."],
+  ["4", "Akun aktif", "Konfirmasi penyiapan dari IT Security mengubah status menjadi Aktif."],
 ] as const;
 
 export const dynamic = "force-dynamic";

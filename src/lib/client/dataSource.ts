@@ -1,7 +1,7 @@
 import type {
   AccessRequest,
   Employee,
-  JiraIssueRef,
+  ApprovalReference,
   NewUserInput,
   TransferInput,
 } from "@/lib/types";
@@ -17,12 +17,7 @@ import type {
 export interface CreateUserResult {
   employee: Employee;
   request: AccessRequest;
-  managerIssue?: JiraIssueRef;
-}
-
-export interface SyncResult {
-  checked: number;
-  advanced: number;
+  managerIssue?: ApprovalReference;
 }
 
 export interface DashboardDataSource {
@@ -30,7 +25,6 @@ export interface DashboardDataSource {
   /** Opens a transfer request; the position is not changed until IT Security acts. */
   requestTransfer(employeeId: string, target: TransferInput): Promise<CreateUserResult>;
   createUser(input: NewUserInput): Promise<CreateUserResult>;
-  sync(): Promise<SyncResult>;
 }
 
 /** Error carrying per-field messages returned by the API. */
@@ -80,10 +74,5 @@ export const apiDataSource: DashboardDataSource = {
       body: JSON.stringify(input),
     });
     return unwrap<CreateUserResult>(response);
-  },
-
-  async sync() {
-    const response = await fetch("/api/workflow/sync", { method: "POST" });
-    return unwrap<SyncResult>(response);
   },
 };

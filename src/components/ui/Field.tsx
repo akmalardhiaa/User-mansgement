@@ -207,7 +207,12 @@ export function Card({
        */
       className={`rounded-2xl border border-hairline bg-surface/80 backdrop-blur-sm ${
         interactive
-          ? "transition-[transform,border-color,background-color,box-shadow] duration-200 ease-(--ease-out-quint) hover:-translate-y-0.5 hover:border-hairline-strong hover:bg-surface hover:shadow-[var(--shadow-header)]"
+          ? // `pointer-glow` without the hook that steers it, which leaves the
+            // highlight resting in the middle of the card: a warm bloom under
+            // the pointer rather than one that follows it. That is the price of
+            // this file staying a server component, and for a card the size of
+            // a request it is a difference nobody can see.
+            "relative pointer-glow transition-[transform,border-color,background-color,box-shadow] duration-200 ease-(--ease-out-quint) hover:-translate-y-0.5 hover:border-hairline-strong hover:bg-surface hover:shadow-[var(--shadow-header)]"
           : ""
       } ${className}`}
     >

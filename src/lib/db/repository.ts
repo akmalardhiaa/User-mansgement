@@ -98,7 +98,7 @@ export async function getRequestById(id: string): Promise<AccessRequest | undefi
   return requests.find((request) => request.id === id);
 }
 
-/** Requests still waiting on Jira — the working set for the polling fallback. */
+/** Requests still waiting for an emailed decision. */
 export async function listOpenRequests(): Promise<AccessRequest[]> {
   const { requests } = await readStore();
   return requests.filter(
@@ -106,7 +106,7 @@ export async function listOpenRequests(): Promise<AccessRequest[]> {
   );
 }
 
-/** Locate the request that owns a Jira issue, whichever step created it. */
+/** Locate the request that owns an emailed approval reference. */
 export function findRequestByIssueKeyInDraft(
   draft: StoreShape,
   issueKey: string,
@@ -255,7 +255,7 @@ export async function createTransfer(
   });
 }
 
-/** Reverses a transfer request whose Jira ticket could not be created. */
+/** Reverses a transfer request whose approval email could not be sent. */
 export async function cancelTransfer(requestId: string): Promise<void> {
   await transaction((draft) => {
     const request = draft.requests.find((candidate) => candidate.id === requestId);
@@ -317,6 +317,93 @@ export async function setEmployeeAccess(
       detail: enabled
         ? `Akses ${employee.displayName} diaktifkan kembali tanpa melalui persetujuan.`
         : `Akses ${employee.displayName} ditangguhkan seketika tanpa melalui persetujuan.`,
+    });
+
+    return employee;
+  });
+}
+
+/** The profile fields HC may edit directly, without an approval. */
+export interface EmployeeProfilePatch {
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  jobTitle: string;
+  jobDescription?: string;
+  department: string;
+  employmentType?: "PERMANENT" | "CONTRACT";
+  expiredDate?: string;
+  locationType?: "PUSAT" | "CABANG";
+  branchName?: string;
+  description?: string;
+}
+
+/**
+ * Edits an employee's profile in place.
+ *
+ * Deliberately narrow. Email is not editable here — it is the key that ties a
+ * record to its login account and to any outstanding approval requests for
+ * it, so changing it silently would orphan both. Neither is the manager, nor
+ * the department-of-record used by an in-flight request: moving someone
+ * between divisions is what the TRANSFER flow exists for, and letting this
+ * form do it would route the change around the manager approval.
+ */
+export async function updateEmployeeProfile(
+  id: string,
+  patch: EmployeeProfilePatch,
+  actor: string,
+): Promise<Employee> {
+  return transaction((draft) => {
+    const employee = draft.employees.find((candidate) => candidate.id === id);
+    if (!employee) {
+      throw new Error(`Karyawan ${id} tidak ditemukan.`);
+    }
+
+    // A pending request owns the employee's department and job title until it
+    // resolves, so editing them mid-flight would make the approval request disagree with
+    // the record it was raised from.
+    if (employee.activeRequestId) {
+      throw new Error(
+        `${employee.displayName} sedang dalam proses persetujuan. Selesaikan atau batalkan permintaan itu dulu.`,
+      );
+    }
+
+    const changed: string[] = [];
+    const note = (label: string, from: unknown, to: unknown) => {
+      if (from !== to) changed.push(label);
+    };
+
+    note("nama", employee.displayName, patch.displayName);
+    note("jabatan", employee.jobTitle, patch.jobTitle);
+    note("departemen", employee.department, patch.department);
+    note("status kepegawaian", employee.employmentType, patch.employmentType);
+    note("lokasi", employee.locationType, patch.locationType);
+
+    employee.firstName = patch.firstName;
+    employee.lastName = patch.lastName;
+    employee.displayName = patch.displayName;
+    employee.jobTitle = patch.jobTitle;
+    employee.jobDescription = patch.jobDescription || undefined;
+    employee.department = patch.department;
+    employee.employmentType = patch.employmentType;
+    // Only a contract has an end date. Clearing it when the type flips back to
+    // permanent stops a stale date sitting on the record and later reading as
+    // an expiry that was never meant to apply.
+    employee.expiredDate = patch.employmentType === "CONTRACT" ? patch.expiredDate : undefined;
+    employee.locationType = patch.locationType;
+    employee.branchName = patch.locationType === "CABANG" ? patch.branchName : undefined;
+    employee.description = patch.description || undefined;
+    employee.updatedAt = timestamp();
+
+    recordActivityInDraft(draft, {
+      actor,
+      action: "employee.profile_updated",
+      employeeId: employee.id,
+      employeeName: employee.displayName,
+      detail:
+        changed.length > 0
+          ? `Profil ${employee.displayName} diperbarui — ${changed.join(", ")}.`
+          : `Profil ${employee.displayName} diperbarui.`,
     });
 
     return employee;

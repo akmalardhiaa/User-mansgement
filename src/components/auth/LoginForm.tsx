@@ -3,12 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { AnimatePresence, motion } from "framer-motion";
-
+import { FormAlert } from "@/components/accounts/FormAlert";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
-import { IconAlert, IconLock, IconMail } from "@/components/ui/Icons";
-import { TRANSITION_FAST } from "@/lib/motion";
+import { IconLock, IconMail } from "@/components/ui/Icons";
+import { postJson } from "@/lib/client/accountsApi";
 
 /** Credential form for the HC dashboard. */
 export function LoginForm({ next }: { next: string }) {
@@ -16,49 +15,62 @@ export function LoginForm({ next }: { next: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [unverified, setUnverified] = useState(false);
+  const [resendNote, setResendNote] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
+    setUnverified(false);
+    setResendNote(null);
 
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? "Login gagal.");
-      }
+    const result = await postJson<{ user: { email: string } }>("/api/auth/login", {
+      email,
+      password,
+    });
+
+    if (result.ok) {
       // A full navigation, so the server components re-render with the session.
       router.replace(next);
       router.refresh();
-    } catch (cause) {
-      setError((cause as Error).message);
-      setSubmitting(false);
+      return;
     }
+
+    setError(result.failure.message);
+    // The one login failure the person can act on from here, so it gets its
+    // own affordance rather than just a sentence telling them to go and look.
+    setUnverified(result.failure.code === "EMAIL_NOT_VERIFIED");
+    setSubmitting(false);
+  }
+
+  async function resend() {
+    setResendNote(null);
+    const result = await postJson<{ message: string }>("/api/auth/resend-verification", { email });
+    setResendNote(result.ok ? result.data.message : result.failure.message);
   }
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
-      <AnimatePresence initial={false}>
+      <FormAlert tone="error">
         {error ? (
-          <motion.p
-            role="alert"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={TRANSITION_FAST}
-            className="flex items-start gap-2 overflow-hidden rounded-lg border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm text-danger"
-          >
-            <IconAlert className="mt-0.5 size-4 shrink-0" />
-            {error}
-          </motion.p>
+          <>
+            <p>{error}</p>
+            {unverified ? (
+              <button
+                type="button"
+                onClick={() => void resend()}
+                className="font-medium underline underline-offset-2"
+              >
+                Kirim ulang tautan konfirmasi
+              </button>
+            ) : null}
+          </>
         ) : null}
-      </AnimatePresence>
+      </FormAlert>
+
+      <FormAlert tone="info">{resendNote}</FormAlert>
 
       <Field
         label="Email"

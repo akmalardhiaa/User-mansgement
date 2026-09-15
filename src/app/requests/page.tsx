@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import { SyncButton } from "@/components/dashboard/SyncButton";
 import { RequestsBoard } from "@/components/requests/RequestsBoard";
+import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Field";
 import { IconApprovals, IconUserPlus } from "@/components/ui/Icons";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -19,8 +19,7 @@ export default async function RequestsPage() {
       <PageHeader
         eyebrow="Alur persetujuan"
         title="Persetujuan pengajuan"
-        description="Semua pengajuan beserta tiket Jira dan jejak audit setiap perubahannya."
-        actions={<SyncButton />}
+        description="Semua pengajuan beserta status persetujuannya dan jejak audit setiap perubahan."
       />
 
       {requests.length === 0 ? (
@@ -33,7 +32,7 @@ export default async function RequestsPage() {
           <p className="mt-3 text-sm text-ink-muted">Belum ada pengajuan.</p>
           <Link
             href="/users/new"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-accent/70 bg-accent px-3.5 py-2 text-sm font-semibold text-accent-ink transition-all duration-200 hover:bg-accent-soft active:scale-[0.97]"
+            className={`mt-4 ${buttonClasses()}`}
           >
             <IconUserPlus className="size-4" />
             Tambah akun

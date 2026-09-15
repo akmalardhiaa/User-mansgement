@@ -1,7 +1,6 @@
-import { cookies } from "next/headers";
 
-import { SESSION_COOKIE, readSessionToken } from "@/lib/auth/session";
-import { getActorName } from "@/lib/auth/current";
+
+import { getActorName, getCurrentUser } from "@/lib/auth/current";
 import { getBrand } from "@/lib/config/brand";
 import { filterEmployees, sanitiseFilters, sortEmployees } from "@/lib/dashboard/directory";
 import { listEmployees, recordActivity } from "@/lib/db/repository";
@@ -20,8 +19,8 @@ export const dynamic = "force-dynamic";
  * exported as it stands now rather than as a stale copy.
  */
 export async function POST(request: Request) {
-  const session = await readSessionToken((await cookies()).get(SESSION_COOKIE)?.value);
-  // The middleware already refused anonymous callers; this is for the name on
+  const session = await getCurrentUser();
+  // The proxy already refused anonymous callers; this is for the name on
   // the file, and a belt-and-braces check because that name is the only thing
   // making the export attributable.
   if (!session) return fail("Sesi tidak ditemukan.", 401);

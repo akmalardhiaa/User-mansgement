@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { MotionProvider } from "@/components/motion/MotionProvider";
 import { ToastProvider } from "@/components/ui/Toast";
-import { SESSION_COOKIE, readSessionToken } from "@/lib/auth/session";
+import { EmailDeliveryNotice } from "@/components/approval/EmailDeliveryNotice";
+import { PendingApprovalsNotice } from "@/components/approval/PendingApprovalsNotice";
+import { getCurrentUser } from "@/lib/auth/current";
+import { isEmailDeliveryConfigured } from "@/lib/config/authEnv";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
 import "./globals.css";
@@ -13,14 +15,13 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "HC User Management",
   description:
-    "Portal Human Capital untuk pengelolaan akun karyawan dengan alur persetujuan melalui Jira.",
+    "Portal Human Capital untuk pengelolaan akun karyawan dengan alur persetujuan melalui email.",
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  // Read once here so the chrome knows who is signed in; middleware is what
+  // Read once here so the chrome knows who is signed in; the proxy is what
   // actually enforces access.
-  const store = await cookies();
-  const session = await readSessionToken(store.get(SESSION_COOKIE)?.value);
+  const session = await getCurrentUser();
 
   return (
     <html lang="id" className="h-full antialiased" suppressHydrationWarning>
@@ -36,7 +37,15 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             toasts, which sit outside the shell — honours "reduce motion". */}
         <MotionProvider>
           <ToastProvider>
-            <AppShell user={session ? { name: session.name, email: session.email } : undefined}>
+            <AppShell
+              user={
+                session
+                  ? { name: session.name, email: session.email, role: session.role }
+                  : undefined
+              }
+            >
+              {session?.role === "ADMIN" && !isEmailDeliveryConfigured() ? <EmailDeliveryNotice /> : null}
+              {session ? <PendingApprovalsNotice userId={session.id} /> : null}
               {children}
             </AppShell>
           </ToastProvider>

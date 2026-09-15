@@ -40,6 +40,16 @@ const EMPLOYEE_STATUS_PRESENTATION: Record<
     className: "border-info/30 bg-info/10 text-info",
     dot: "bg-info",
   },
+  PENDING_OFFBOARDING_APPROVAL: {
+    label: "Penonaktifan · menunggu manager",
+    className: "border-warn/30 bg-warn/10 text-warn",
+    dot: "bg-warn",
+  },
+  PENDING_OFFBOARDING_SETUP: {
+    label: "Penonaktifan · IT Security",
+    className: "border-info/30 bg-info/10 text-info",
+    dot: "bg-info",
+  },
 };
 
 export function employeeStatusLabel(status: EmployeeStatus): string {
@@ -60,12 +70,13 @@ export function StatusBadge({ status }: { status: EmployeeStatus }) {
 
 const STAGE_PRESENTATION: Record<
   RequestStage,
-  { label: string; transferLabel?: string; className: string }
+  { label: string; transferLabel?: string; offboardingLabel?: string; className: string }
 > = {
   MANAGER_APPROVAL: { label: "Persetujuan manager", className: "border-warn/30 bg-warn/10 text-warn" },
   SECURITY_PROVISIONING: {
     label: "Penyiapan akses IT Security",
     transferLabel: "Penyesuaian akses IT Security",
+    offboardingLabel: "Pencabutan akses IT Security",
     className: "border-info/30 bg-info/10 text-info",
   },
   COMPLETED: { label: "Selesai", className: "border-ok/30 bg-ok/10 text-ok" },
@@ -75,8 +86,15 @@ const STAGE_PRESENTATION: Record<
 export function StageBadge({ stage, type }: { stage: RequestStage; type?: RequestType }) {
   const presentation = STAGE_PRESENTATION[stage];
   const className = presentation.className;
+  // Each flow gets its own wording for a stage where it has one, and falls
+  // back to the neutral label where it does not — so adding a flow cannot
+  // silently render a stage name belonging to a different process.
   const label =
-    type === "TRANSFER" ? (presentation.transferLabel ?? presentation.label) : presentation.label;
+    (type === "TRANSFER"
+      ? presentation.transferLabel
+      : type === "OFFBOARDING"
+        ? presentation.offboardingLabel
+        : undefined) ?? presentation.label;
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap ${className}`}
