@@ -4,6 +4,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { BrandMark } from "@/components/ui/BrandMark";
 import { Card } from "@/components/ui/Field";
 import { IconAlert } from "@/components/ui/Icons";
+import { isLdapConfigured } from "@/lib/auth/ad";
 import { isAccountSystemConfigured } from "@/lib/config/authEnv";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,8 @@ export default async function LoginPage({
   // Only same-site paths, so `?next=` can never bounce someone to another host.
   const destination = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
   const configured = isAccountSystemConfigured();
+  // No LDAP server wired up yet: the app is running on its local demo accounts.
+  const demoMode = !isLdapConfigured() && process.env.NODE_ENV !== "production";
 
   return (
     // `content-center` rather than `flex-1`: the shell's <main> is not a flex
@@ -55,9 +58,24 @@ export default async function LoginPage({
               <LoginForm next={destination} />
               {/* Accounts live in Active Directory: no sign-up, and passwords are
                   reset through AD, not here. */}
-              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-4 text-sm">
-                <span className="text-ink-muted">Masuk dengan akun Active Directory Anda.</span>
-              </div>
+              {demoMode ? (
+                <div className="mt-5 space-y-1 rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-sm">
+                  <p className="flex items-center gap-2 font-medium text-warn">
+                    <IconAlert className="size-4" />
+                    Mode demo — Active Directory belum tersambung
+                  </p>
+                  <p className="text-ink-muted">
+                    Coba masuk dengan <code className="font-mono text-ink">admin</code> /{" "}
+                    <code className="font-mono text-ink">admin12345</code>. Isi{" "}
+                    <code className="font-mono text-ink">LDAP_URL</code> di{" "}
+                    <code className="font-mono text-ink">.env.local</code> untuk mengaktifkan login AD.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-4 text-sm">
+                  <span className="text-ink-muted">Masuk dengan akun Active Directory Anda.</span>
+                </div>
+              )}
             </>
           ) : (
             <div className="text-sm">
