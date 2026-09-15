@@ -6,16 +6,12 @@ import type { Role } from "./types";
 /**
  * The signed-in account, for server components and route handlers.
  *
- * Reads the JWT that /api/auth/login issued. The Prisma `User` table is now
- * the only source of accounts — the old HC_AUTH_USERS list is gone — so this
- * is one identity across the dashboard and the account system rather than two
- * that have to be kept in step.
+ * Reads the JWT that /api/auth/login issued. The claims were set from Active
+ * Directory at sign-in, so this is the app's single record of who is signed in.
  *
- * Resolved from the token alone, with no database round trip: it is called on
- * essentially every render, and the claims are signed, so a query would buy
- * nothing but latency. Routes that must see changes made in the last few
- * minutes (a role change, a renamed profile) read the row themselves — see
- * GET /api/auth/me.
+ * Resolved from the token alone, with no round trip: it is called on
+ * essentially every render, and the claims are signed, so a lookup would buy
+ * nothing but latency.
  */
 
 export interface SessionUser {

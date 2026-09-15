@@ -1,11 +1,9 @@
 /**
- * Account-system types.
+ * Session types.
  *
- * `Role` is declared here as a plain union rather than imported from
- * `@prisma/client` so that proxy.ts — which only ever verifies a token — can
- * use it without pulling the Prisma engine into the request path. Prisma
- * generates its enum as the same union, so the two stay assignment-compatible
- * and a mismatch is a type error rather than a runtime surprise.
+ * `Role` is a plain union. The app has no database: roles come from Active
+ * Directory group membership (see src/lib/auth/ad.ts) and are carried inside
+ * the signed session token, so nothing here reaches for a data layer.
  */
 
 export const ROLES = ["USER", "ADMIN"] as const;

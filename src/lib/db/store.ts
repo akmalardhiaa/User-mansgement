@@ -18,7 +18,7 @@ export interface StoreShape {
  * A deliberately small JSON-file persistence layer.
  *
  * Everything above this module talks to `repository.ts`, so swapping this for
- * Postgres/Prisma later means rewriting one file rather than the whole app.
+ * a real database later means rewriting one file rather than the whole app.
  */
 
 function emptyStore(): StoreShape {
