@@ -7,7 +7,14 @@ import { useState, type ComponentType, type ReactNode } from "react";
 
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { BrandMark } from "@/components/ui/BrandMark";
-import { IconIdCard, IconSignOut } from "@/components/ui/Icons";
+import {
+  IconClock,
+  IconDirectory,
+  IconIdCard,
+  IconSignOut,
+  IconUser,
+  IconUserPlus,
+} from "@/components/ui/Icons";
 import type { Role } from "@/lib/auth/types";
 import { TRANSITION, TRANSITION_LAYOUT } from "@/lib/motion";
 
@@ -18,7 +25,11 @@ const NAV: ReadonlyArray<{
   /** Hidden from anyone who is not an ADMIN. */
   adminOnly?: boolean;
 }> = [
-  { href: "/", label: "Akun saya", icon: IconIdCard },
+  { href: "/", label: "Dashboard", icon: IconDirectory },
+  { href: "/users/new", label: "Tambah karyawan", icon: IconUserPlus },
+  { href: "/users/edit", label: "Edit User", icon: IconUser },
+  { href: "/aktivitas", label: "Aktivitas", icon: IconClock },
+  { href: "/profile", label: "Profil", icon: IconIdCard },
 ];
 
 function isActive(pathname: string, href: string): boolean {
