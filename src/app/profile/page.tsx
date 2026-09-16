@@ -1,29 +1,45 @@
-import { redirect } from "next/navigation";
-
 import { Card } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { getCurrentUser } from "@/lib/auth/current";
+import { requirePageSession } from "@/lib/auth/current";
+import type { PortalRole } from "@/lib/auth/roles";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Profil · HC User Management" };
 
-const ROLE_LABEL: Record<string, string> = { ADMIN: "Admin", USER: "Pengguna" };
+const ROLE_LABEL: Record<PortalRole, string> = {
+  HC_REQUESTER: "Human Capital",
+  MANAGER: "Manager",
+  CISO_APPROVER: "CISO / IT Security",
+  SYSTEM_ADMIN: "Administrator sistem",
+  OPS_OPERATOR: "Operator",
+  AUDITOR: "Auditor",
+};
 
 /**
  * The signed-in person's own account, read from the session.
  *
- * Name, email and role come from Active Directory at login. Changing them is
- * done in AD, not here, so this page shows them rather than editing them.
+ * Name, email and department come from Active Directory at login; roles come
+ * from their AD group membership. Changing any of it is done in AD, not here,
+ * so this page shows them rather than editing them.
+ *
+ * The one page every signed-in person can reach, whatever their roles — which
+ * is why it also has to be the page that explains having none.
  */
 export default async function ProfilePage() {
-  const session = await getCurrentUser();
-  if (!session) redirect("/login?next=/profile");
+  const session = await requirePageSession("/profile");
 
   const rows: Array<[string, string]> = [
-    ["Nama", session.name],
+    ["Nama", session.fullName],
+    ["Username", session.username],
     ["Email", session.email],
-    ["Peran", ROLE_LABEL[session.role] ?? session.role],
+    ["Departemen", session.department ?? "—"],
+    [
+      "Peran portal",
+      session.roles.length > 0
+        ? session.roles.map((role) => ROLE_LABEL[role] ?? role).join(", ")
+        : "Belum ada peran portal",
+    ],
   ];
 
   return (
@@ -43,6 +59,17 @@ export default async function ProfilePage() {
           ))}
         </dl>
       </Card>
+
+      {session.roles.length === 0 ? (
+        <Card className="p-6">
+          <h2 className="text-sm font-semibold text-ink">Belum ada peran portal</h2>
+          <p className="mt-2 max-w-prose text-sm text-ink-muted">
+            Akun Active Directory Anda dikenali, tetapi belum termasuk group mana pun yang
+            dipetakan ke peran portal. Karena itu halaman selain profil ini belum dapat dibuka.
+            Hubungi administrator sistem bila Anda seharusnya memiliki akses.
+          </p>
+        </Card>
+      ) : null}
     </div>
   );
 }

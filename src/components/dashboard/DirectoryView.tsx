@@ -4,12 +4,10 @@ import { useCallback, useMemo, useState } from "react";
 
 import { DirectoryToolbar } from "@/components/dashboard/DirectoryToolbar";
 import { EmployeeTable } from "@/components/dashboard/EmployeeTable";
-import { RoleSimulatorBanner, type SimulatedRole } from "@/components/dashboard/RoleSimulatorBanner";
 import { StatsRow } from "@/components/dashboard/StatsRow";
 import { Reveal } from "@/components/motion/Reveal";
 import { Card } from "@/components/ui/Field";
 import { useToast } from "@/components/ui/Toast";
-import type { DashboardDataSource } from "@/lib/client/dataSource";
 import {
   DEFAULT_FILTERS,
   departmentsOf,
@@ -19,46 +17,55 @@ import {
   type DirectoryFilters,
   type SortKey,
 } from "@/lib/dashboard/directory";
-import type { Employee, ApprovalReference } from "@/lib/types";
+import type { PendingByEmployee } from "@/lib/lifecycle/pending";
+import type { Employee } from "@/lib/types";
 
+/**
+ * The directory.
+ *
+ * The role simulator that used to sit at the top of this view is gone. It was a
+ * switcher offering "HC Admin / Manager / IT Security", and picking one filtered
+ * the rows client-side — so it looked like an access control and was nothing of
+ * the kind: every row was already in the browser, and the backend was never told
+ * which role had supposedly been chosen. Authority now comes from the signed-in
+ * session's roles, checked on the server for every page and every handler.
+ */
 export function DirectoryView({
   employees,
-  activeTickets,
-  dataSource,
-  onChanged,
+  pending,
+  canRequest = false,
 }: {
   employees: Employee[];
-  activeTickets: Record<string, ApprovalReference | undefined>;
-  dataSource?: DashboardDataSource;
-  onChanged?: () => void;
+  /** Open lifecycle requests, keyed by the employee they concern. */
+  pending: PendingByEmployee;
+  /** Whether this viewer may raise a lifecycle request. */
+  canRequest?: boolean;
 }) {
   const { toast } = useToast();
   const [filters, setFilters] = useState<DirectoryFilters>(DEFAULT_FILTERS);
   const [exporting, setExporting] = useState(false);
-  const [simulatedRole, setSimulatedRole] = useState<SimulatedRole>("HC_ADMIN");
 
   const departments = useMemo(() => departmentsOf(employees), [employees]);
 
-  const visible = useMemo(() => {
-    let filteredList = filterEmployees(employees, filters);
-    if (simulatedRole === "MANAGER") {
-      filteredList = filteredList.filter(
-        (e) => e.department === "Technology" || e.status === "PENDING_MANAGER_APPROVAL",
-      );
-    } else if (simulatedRole === "SECURITY") {
-      filteredList = filteredList.filter(
-        (e) => e.status === "PENDING_SECURITY_SETUP" || e.status === "ACTIVE",
-      );
-    }
-    return sortEmployees(filteredList, filters.sort, filters.direction);
-  }, [employees, filters, simulatedRole]);
+  // Which people have something in flight. Derived from the requests, never
+  // from the roster: the directory describes accounts, not intentions.
+  const pendingIds = useMemo(() => new Set(Object.keys(pending)), [pending]);
+
+  const visible = useMemo(
+    () => sortEmployees(filterEmployees(employees, filters, pendingIds), filters.sort, filters.direction),
+    [employees, filters, pendingIds],
+  );
 
   const change = useCallback((next: Partial<DirectoryFilters>) => {
     setFilters((current) => ({ ...current, ...next }));
   }, []);
 
   const reset = useCallback(() => {
-    setFilters((current) => ({ ...DEFAULT_FILTERS, sort: current.sort, direction: current.direction }));
+    setFilters((current) => ({
+      ...DEFAULT_FILTERS,
+      sort: current.sort,
+      direction: current.direction,
+    }));
   }, []);
 
   const sortBy = useCallback((key: SortKey) => {
@@ -99,10 +106,9 @@ export function DirectoryView({
 
   return (
     <div className="space-y-6">
-      <RoleSimulatorBanner onRoleChange={(role) => setSimulatedRole(role)} />
-
       <StatsRow
         employees={employees}
+        pendingCount={pendingIds.size}
         active={filters.status}
         onSelect={(status) => change({ status })}
       />
@@ -121,14 +127,13 @@ export function DirectoryView({
           />
           <EmployeeTable
             employees={visible}
-            activeTickets={activeTickets}
+            pending={pending}
+            canRequest={canRequest}
             sort={filters.sort}
             direction={filters.direction}
             onSort={sortBy}
             onReset={reset}
             filtered={!isDefaultFilters(filters)}
-            dataSource={dataSource}
-            onChanged={onChanged}
           />
         </Card>
       </Reveal>

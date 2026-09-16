@@ -24,10 +24,11 @@ export const SORT_LABELS: Record<SortKey, string> = {
 };
 
 /**
- * `PENDING` is not an employee status — it is every status that means somebody
- * still has to act. It exists because "show me what is stuck" is the question
- * the directory gets asked most, and answering it otherwise means ticking four
- * separate boxes.
+ * `PENDING` is not an account status — it means "has a lifecycle request still
+ * in flight". It stays in the filter because "show me what is waiting on
+ * somebody" is the question the directory gets asked most, but it is now
+ * answered from the requests rather than from the roster, which is where that
+ * fact actually lives.
  */
 export type StatusFilter = EmployeeStatus | "ALL" | "PENDING";
 
@@ -88,37 +89,11 @@ export function isDefaultFilters(filters: DirectoryFilters): boolean {
   );
 }
 
-/**
- * Sort order for the status column.
- *
- * Alphabetical would be useless here — it would file "Aktif" above "Menunggu
- * manager" purely on the letter A. Sorting ascending puts what needs a human
- * first: things waiting on someone, then things that are fine, then things that
- * are over.
- */
+/** Active first: a working account is the ordinary case and reads first. */
 const STATUS_WEIGHT: Record<EmployeeStatus, number> = {
-  PENDING_MANAGER_APPROVAL: 0,
-  PENDING_TRANSFER_APPROVAL: 1,
-  PENDING_OFFBOARDING_APPROVAL: 2,
-  PENDING_SECURITY_SETUP: 3,
-  PENDING_TRANSFER_SETUP: 4,
-  PENDING_OFFBOARDING_SETUP: 5,
-  ACTIVE: 6,
-  DISABLED: 7,
-  REJECTED: 8,
+  ACTIVE: 0,
+  DISABLED: 1,
 };
-
-/** Statuses that mean somebody, somewhere, still has to act. */
-export function isPending(status: EmployeeStatus): boolean {
-  return (
-    status === "PENDING_MANAGER_APPROVAL" ||
-    status === "PENDING_SECURITY_SETUP" ||
-    status === "PENDING_TRANSFER_APPROVAL" ||
-    status === "PENDING_TRANSFER_SETUP" ||
-    status === "PENDING_OFFBOARDING_APPROVAL" ||
-    status === "PENDING_OFFBOARDING_SETUP"
-  );
-}
 
 /** Every department present in the roster, for the filter's options. */
 export function departmentsOf(employees: Employee[]): string[] {
@@ -140,15 +115,22 @@ function matchesQuery(employee: Employee, needle: string): boolean {
     .includes(needle);
 }
 
+/**
+ * @param pendingIds employees with a lifecycle request still in flight. Only
+ *   consulted by the `PENDING` filter; omitted, that filter simply matches
+ *   nobody rather than throwing, which is the right answer for a caller that
+ *   has no request data to hand.
+ */
 export function filterEmployees(
   employees: Employee[],
   filters: Pick<DirectoryFilters, "query" | "status" | "department">,
+  pendingIds: ReadonlySet<string> = new Set(),
 ): Employee[] {
   const needle = filters.query.trim().toLowerCase();
 
   return employees.filter((employee) => {
     if (filters.status === "PENDING") {
-      if (!isPending(employee.status)) return false;
+      if (!pendingIds.has(employee.id)) return false;
     } else if (filters.status !== "ALL" && employee.status !== filters.status) {
       return false;
     }

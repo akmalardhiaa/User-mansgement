@@ -1,14 +1,18 @@
-import type { Role } from "./types";
-
 import { DEV_USERS } from "./devUsers";
+import { rolesFromGroups } from "./roleMapping";
+import type { PortalRole } from "./roles";
 
 /**
  * Authentication against Active Directory (LDAP).
  *
  * The user's own username and password are used to bind to AD: if the bind
  * succeeds, they are who they say they are, and this app never stores their
- * password. Their name, email, department and role are read from their AD
- * record — role from group membership (LDAP_ADMIN_GROUP).
+ * password. Their name, email and department are read from their AD record.
+ *
+ * Portal authority is a separate question, answered by group membership — see
+ * roles.ts. A successful bind proves identity and nothing more: somebody who is
+ * in AD but in none of the mapped groups signs in and gets their own profile,
+ * not the directory.
  *
  * When no `LDAP_URL` is set, a small local list (devUsers.ts) stands in so the
  * portal runs before a real AD server is available. That fallback is refused in
@@ -25,7 +29,8 @@ export interface AdUser {
   username: string;
   email: string;
   fullName: string;
-  role: Role;
+  /** Portal roles this person's AD groups map to. Often empty, and that is fine. */
+  roles: PortalRole[];
   department?: string;
 }
 
@@ -67,7 +72,7 @@ function authViaDev(username: string, password: string): AdUser | null {
     username: match.username,
     email: match.email,
     fullName: match.fullName,
-    role: match.role,
+    roles: [...match.roles],
     department: match.department,
   };
 }
@@ -95,7 +100,6 @@ async function authViaLdap(username: string, password: string): Promise<AdUser |
   const url = process.env.LDAP_URL!.trim();
   const domain = process.env.LDAP_DOMAIN?.trim();
   const baseDN = process.env.LDAP_BASE_DN?.trim() ?? "";
-  const adminGroup = process.env.LDAP_ADMIN_GROUP?.trim().toLowerCase();
 
   // AD accepts either a UPN (user@domain) or DOMAIN\user for the bind. If the
   // caller typed a bare username and a domain is configured, build the UPN.
@@ -123,15 +127,13 @@ async function authViaLdap(username: string, password: string): Promise<AdUser |
     });
 
     const entry = searchEntries[0];
-    const groups = asArray(entry?.memberOf).map((group) => group.toLowerCase());
-    const role: Role = adminGroup && groups.some((group) => group.includes(adminGroup)) ? "ADMIN" : "USER";
 
     return {
       id: firstString(entry?.sAMAccountName) || account,
       username: account,
       email: firstString(entry?.mail) || firstString(entry?.userPrincipalName) || bindName,
       fullName: firstString(entry?.displayName) || account,
-      role,
+      roles: rolesFromGroups(asArray(entry?.memberOf)),
       department: firstString(entry?.department) || undefined,
     };
   } finally {

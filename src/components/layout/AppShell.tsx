@@ -8,6 +8,7 @@ import { useState, type ComponentType, type ReactNode } from "react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { BrandMark } from "@/components/ui/BrandMark";
 import {
+  IconApprovals,
   IconClock,
   IconDirectory,
   IconIdCard,
@@ -15,20 +16,24 @@ import {
   IconUser,
   IconUserPlus,
 } from "@/components/ui/Icons";
-import type { Role } from "@/lib/auth/types";
+import { hasPermission, type Permission, type PortalRole } from "@/lib/auth/roles";
 import { TRANSITION, TRANSITION_LAYOUT } from "@/lib/motion";
 
 const NAV: ReadonlyArray<{
   href: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  /** Hidden from anyone who is not an ADMIN. */
-  adminOnly?: boolean;
+  /**
+   * Hidden from anyone whose roles do not carry it. Omitted means everyone with
+   * a session — the profile is the one page authority is irrelevant to.
+   */
+  permission?: Permission;
 }> = [
-  { href: "/", label: "Dashboard", icon: IconDirectory },
-  { href: "/users/new", label: "Tambah karyawan", icon: IconUserPlus },
-  { href: "/users/edit", label: "Edit User", icon: IconUser },
-  { href: "/aktivitas", label: "Aktivitas", icon: IconClock },
+  { href: "/", label: "Direktori", icon: IconDirectory, permission: "directory.read" },
+  { href: "/pengajuan", label: "Pengajuan", icon: IconApprovals, permission: "request.read" },
+  { href: "/pengajuan/baru", label: "Pengajuan baru", icon: IconUserPlus, permission: "request.create" },
+  { href: "/users/edit", label: "Edit profil", icon: IconUser, permission: "employee.update" },
+  { href: "/aktivitas", label: "Aktivitas", icon: IconClock, permission: "activity.read" },
   { href: "/profile", label: "Profil", icon: IconIdCard },
 ];
 
@@ -43,8 +48,11 @@ function isActive(pathname: string, href: string): boolean {
 const IS_STATIC_DEMO = process.env.NEXT_PUBLIC_DEMO === "true";
 
 export interface SessionUser {
-  /** Absent in the static demo build, which has no session at all. */
-  role?: Role;
+  /**
+   * Empty for somebody who is in Active Directory but in none of the mapped
+   * groups; absent entirely in the static demo build, which has no session.
+   */
+  roles?: PortalRole[];
   name: string;
   email: string;
 }
@@ -82,12 +90,13 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
 
   // The demo build has no routes to link to, so it gets the container without
   // navigation — as does the login screen, where every item would be a dead end.
-  // Admin-only entries are filtered out rather than shown disabled: the page
-  // itself refuses non-admins, so a visible link would only be a dead end.
+  // Entries the person's roles do not cover are filtered out rather than shown
+  // disabled: the page itself refuses them, so a visible link would only be a
+  // dead end. This is presentation, never enforcement.
   const items = IS_STATIC_DEMO
     ? []
     : user
-      ? NAV.filter((item) => !item.adminOnly || user.role === "ADMIN")
+      ? NAV.filter((item) => !item.permission || hasPermission(user.roles ?? [], item.permission))
       : [];
 
   async function signOut() {

@@ -1,16 +1,30 @@
 import Link from "next/link";
 
+import { AccessDenied } from "@/components/auth/AccessDenied";
 import { DirectoryView } from "@/components/dashboard/DirectoryView";
 import { buttonClasses } from "@/components/ui/Button";
 import { IconUserPlus } from "@/components/ui/Icons";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { requirePageSession } from "@/lib/auth/current";
+import { hasPermission } from "@/lib/auth/roles";
 import { listEmployees } from "@/lib/db/repository";
+import { loadPendingByEmployee } from "@/lib/lifecycle/pendingStore";
 
 // The roster changes as HC edits it, so never serve a prerendered snapshot.
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const employees = await listEmployees();
+  // The proxy only checks that a cookie exists. This is where a stale or
+  // revoked session is actually turned away, and where authority is checked.
+  const session = await requirePageSession("/");
+  if (!hasPermission(session.roles, "directory.read")) {
+    return <AccessDenied roles={session.roles} need="Akses baca direktori karyawan" />;
+  }
+
+  // The roster and what is in flight against it, read together so the page
+  // cannot render an account state and a request state from different moments.
+  const [employees, pending] = await Promise.all([listEmployees(), loadPendingByEmployee()]);
+  const canRequest = hasPermission(session.roles, "request.create");
 
   return (
     <div className="space-y-6">
@@ -44,7 +58,7 @@ export default async function DashboardPage() {
         }
       />
 
-      <DirectoryView employees={employees} activeTickets={{}} />
+      <DirectoryView employees={employees} pending={pending} canRequest={canRequest} />
     </div>
   );
 }

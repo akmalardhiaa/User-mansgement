@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { MotionProvider } from "@/components/motion/MotionProvider";
 import { ToastProvider } from "@/components/ui/Toast";
-import { getCurrentUser } from "@/lib/auth/current";
+import { getSession } from "@/lib/auth/current";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
 import "./globals.css";
@@ -15,9 +16,19 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  // Read once here so the chrome knows who is signed in; the proxy is what
-  // actually enforces access.
-  const session = await getCurrentUser();
+  // Read once here so the chrome knows who is signed in and which nav items to
+  // offer. Each page still guards itself: this only decides what to draw.
+  const session = await getSession();
+
+  /*
+   * The per-request nonce, set by the proxy.
+   *
+   * Next attaches this to its own script tags automatically, but the boot
+   * script below is a plain <script> rather than a <Script> component, so it
+   * needs the nonce spelled out — otherwise the policy blocks the one script
+   * whose whole job is to run before the first paint.
+   */
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
     <html lang="id" className="h-full antialiased" suppressHydrationWarning>
@@ -26,7 +37,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             provider — means every load flashes the wrong palette first. The
             attribute it writes is why <html> suppresses hydration warnings:
             the server cannot know which theme this browser chose. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body className="min-h-full">
         {/* Motion config outermost, so every animation below it — including the
@@ -36,7 +47,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <AppShell
               user={
                 session
-                  ? { name: session.name, email: session.email, role: session.role }
+                  ? { name: session.fullName, email: session.email, roles: session.roles }
                   : undefined
               }
             >

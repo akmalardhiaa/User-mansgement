@@ -1,4 +1,5 @@
-import { verifyToken } from "@/lib/auth/guard";
+import { requireSession } from "@/lib/auth/guard";
+import { permissionsOf } from "@/lib/auth/roles";
 import { ok } from "@/lib/http/apiResponse";
 import { preflight, withCors } from "@/lib/http/cors";
 
@@ -9,14 +10,21 @@ export const OPTIONS = preflight;
 /**
  * GET /api/auth/me — the signed-in account.
  *
- * Taken straight from the verified session token. There is no local user table
- * to read back from any more: the token's claims were set from Active Directory
- * at login and are the app's record of who is signed in.
+ * Resolved from the stored session, so it reflects a revocation immediately.
+ * The effective permission list is included because the UI needs to know what
+ * to render; it is a convenience for the client and never the basis of a
+ * decision, which is always taken server-side from the roles.
  */
 export async function GET(request: Request) {
-  const guarded = await verifyToken(request);
+  const guarded = await requireSession();
   if (!guarded.ok) return withCors(guarded.response, request);
 
-  const { sub, email, fullName, role } = guarded.user;
-  return withCors(ok({ user: { id: sub, email, fullName, role } }), request);
+  const { userId, username, email, fullName, roles, department } = guarded.session;
+  return withCors(
+    ok({
+      user: { id: userId, username, email, fullName, roles, department },
+      permissions: permissionsOf(roles),
+    }),
+    request,
+  );
 }

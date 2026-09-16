@@ -31,31 +31,13 @@ const HAIRLINE = "FFD5E0EE";
  */
 const STATUS_STYLE: Record<EmployeeStatus, { font: string; fill: string }> = {
   ACTIVE: { font: "FF047857", fill: "FFE6F4EF" },
-  PENDING_MANAGER_APPROVAL: { font: "FFB23C0A", fill: "FFFDEDE6" },
-  PENDING_TRANSFER_APPROVAL: { font: "FFB23C0A", fill: "FFFDEDE6" },
-  PENDING_SECURITY_SETUP: { font: "FF0369A1", fill: "FFE6F0F7" },
-  PENDING_TRANSFER_SETUP: { font: "FF0369A1", fill: "FFE6F0F7" },
-  PENDING_OFFBOARDING_APPROVAL: { font: "FFB23C0A", fill: "FFFDEDE6" },
-  PENDING_OFFBOARDING_SETUP: { font: "FF0369A1", fill: "FFE6F0F7" },
-  REJECTED: { font: "FFBE123C", fill: "FFFBE9EE" },
   DISABLED: { font: "FF44607F", fill: "FFEEF2F7" },
 };
 
 /** What each status means, for readers who have never seen this dashboard. */
 const STATUS_MEANING: Record<EmployeeStatus, string> = {
-  PENDING_MANAGER_APPROVAL: "Pengajuan akun baru, menunggu persetujuan manager. Akun belum dibuat.",
-  PENDING_SECURITY_SETUP: "Sudah disetujui manager; IT Security sedang menyiapkan aksesnya.",
   ACTIVE: "Akun aktif dan akses berjalan normal.",
-  DISABLED: "Akses ditangguhkan sementara oleh HC. Bisa diaktifkan kembali tanpa persetujuan.",
-  REJECTED: "Pengajuan ditolak manager. Akun tidak dibuat.",
-  PENDING_TRANSFER_APPROVAL:
-    "Pengajuan pindah divisi, menunggu manager. Posisi lama masih berlaku.",
-  PENDING_TRANSFER_SETUP:
-    "Pindah divisi sudah disetujui; IT Security sedang menyesuaikan akses. Posisi baru belum berlaku.",
-  PENDING_OFFBOARDING_APPROVAL:
-    "Pengajuan penonaktifan akun, menunggu manager. Akses masih berjalan normal.",
-  PENDING_OFFBOARDING_SETUP:
-    "Penonaktifan sudah disetujui; IT Security sedang mencabut akses. Akun belum sepenuhnya nonaktif.",
+  DISABLED: "Akun dinonaktifkan. Akses tidak berjalan.",
 };
 
 const COLUMNS = [
@@ -270,8 +252,9 @@ function buildGlossary(workbook: ExcelJS.Workbook, brandName: string): void {
   const note = sheet.getRow(6 + EMPLOYEE_STATUSES.length);
   sheet.mergeCells(`A${note.number}:B${note.number}`);
   note.getCell(1).value =
-    `Setiap perubahan status pada daftar ini melewati persetujuan email, kecuali penangguhan akses ` +
-    `sementara yang bisa dilakukan ${brandName} · Human Capital secara langsung.`;
+    `Kolom Status menyatakan keadaan akun saat ini di ${brandName} · Human Capital. ` +
+    `Pengajuan perubahan yang masih berjalan tidak tercermin di sini — status baru berubah ` +
+    `setelah perubahan benar-benar dijalankan dan diverifikasi.`;
   note.getCell(1).font = { name: "Calibri", size: 9, italic: true, color: { argb: INK_MUTED } };
   note.getCell(1).alignment = { wrapText: true, vertical: "top" };
   note.height = 28;

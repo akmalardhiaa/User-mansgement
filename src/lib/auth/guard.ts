@@ -3,44 +3,47 @@ import type { NextResponse } from "next/server";
 
 import { fail } from "@/lib/http/apiResponse";
 
-import { TOKEN_COOKIE, verifyAccessToken } from "./jwt";
-import type { AccessTokenPayload } from "./types";
+import { hasPermission, type Permission } from "./roles";
+import { SESSION_COOKIE, resolveSession, type PortalSession } from "./session";
 
 /**
- * Route-handler protection.
+ * Route-handler authorisation.
  *
- * proxy.ts already turns away unauthenticated traffic, but it is a network
- * layer: it can be bypassed by anything that reaches the app directly, and it
- * cannot know whether *this particular* route needs an admin. So every
- * protected handler re-checks here. Two independent checks is the point — the
- * proxy gives a good redirect, this one is the control.
+ * This is the control. `proxy.ts` turns away requests with no session cookie at
+ * all, but that is a network-layer convenience: it cannot see whether the
+ * session behind the cookie is still valid, it does not know which permission a
+ * given route needs, and Next's own documentation is explicit that a proxy may
+ * be skipped or relocated and must never be the only check. So every guarded
+ * handler resolves the session from the store and checks a permission here.
+ *
+ * Handlers ask for a permission, never a role. Which roles satisfy it lives in
+ * roles.ts, so the authorisation matrix can be read — and later tested — in one
+ * place instead of being scattered across route files.
  */
 
 export type Guarded =
-  | { ok: true; user: AccessTokenPayload }
+  | { ok: true; session: PortalSession }
   | { ok: false; response: NextResponse };
 
 /**
- * Pulls the token from the httpOnly cookie the browser flow uses, falling back
- * to an `Authorization: Bearer` header so the API is usable from curl and from
- * non-browser clients that have no cookie jar.
+ * The session id comes from the httpOnly cookie only.
+ *
+ * The previous version also accepted `Authorization: Bearer` for curl. That is
+ * gone on purpose: it made every credential usable from a header, which is
+ * exactly the shape that lets a copied value be replayed from anywhere. Machine
+ * callers get their own identity when the worker API arrives; until then there
+ * is one way in.
  */
-async function readToken(request: Request): Promise<string | undefined> {
-  const header = request.headers.get("authorization");
-  if (header?.toLowerCase().startsWith("bearer ")) {
-    const token = header.slice(7).trim();
-    if (token) return token;
-  }
-
+async function currentSession(): Promise<PortalSession | undefined> {
   const store = await cookies();
-  return store.get(TOKEN_COOKIE)?.value;
+  return resolveSession(store.get(SESSION_COOKIE)?.value);
 }
 
-/** Verifies the caller holds a valid token. The spec's `VerifyToken`. */
-export async function verifyToken(request: Request): Promise<Guarded> {
-  const user = verifyAccessToken(await readToken(request));
+/** Verifies the caller holds a live session. Identity only, no authority. */
+export async function requireSession(): Promise<Guarded> {
+  const session = await currentSession();
 
-  if (!user) {
+  if (!session) {
     return {
       ok: false,
       // 401, not 403: the caller has not proven who they are, and retrying
@@ -51,45 +54,24 @@ export async function verifyToken(request: Request): Promise<Guarded> {
     };
   }
 
-  return { ok: true, user };
+  return { ok: true, session };
 }
 
-/** Verifies the caller is a signed-in ADMIN. */
-export async function requireAdmin(request: Request): Promise<Guarded> {
-  const guarded = await verifyToken(request);
+/** Verifies the caller holds a live session that carries `permission`. */
+export async function requirePermission(permission: Permission): Promise<Guarded> {
+  const guarded = await requireSession();
   if (!guarded.ok) return guarded;
 
-  if (guarded.user.role !== "ADMIN") {
+  if (!hasPermission(guarded.session.roles, permission)) {
     return {
       ok: false,
       // 403, not 401: we know exactly who this is, and signing in again will
-      // not help. Retrying is pointless, so say so.
-      response: fail("Akses ditolak. Tindakan ini hanya untuk admin.", 403, {
+      // not help. The permission is named so an operator can map the refusal
+      // to a group that needs assigning — it reveals nothing the caller could
+      // not already infer from being refused.
+      response: fail("Akses ditolak. Peran Anda tidak mencakup tindakan ini.", 403, {
         code: "FORBIDDEN",
-      }),
-    };
-  }
-
-  return guarded;
-}
-
-/**
- * Verifies the caller is either an ADMIN or the owner of `userId`.
- *
- * This is what keeps GET/PUT /api/accounts/[id] from becoming a way to read or
- * rewrite anyone's account by guessing an id — the id in the URL is caller
- * input, so it is compared against the id in the verified token, never trusted
- * on its own.
- */
-export async function requireSelfOrAdmin(request: Request, userId: string): Promise<Guarded> {
-  const guarded = await verifyToken(request);
-  if (!guarded.ok) return guarded;
-
-  if (guarded.user.role !== "ADMIN" && guarded.user.sub !== userId) {
-    return {
-      ok: false,
-      response: fail("Akses ditolak. Anda hanya dapat mengakses akun sendiri.", 403, {
-        code: "FORBIDDEN",
+        requiredPermission: permission,
       }),
     };
   }

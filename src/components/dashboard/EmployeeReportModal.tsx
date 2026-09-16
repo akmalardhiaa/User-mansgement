@@ -3,13 +3,12 @@
 import { AnimatePresence, motion } from "framer-motion";
 
 import { Button } from "@/components/ui/Button";
-import { IconClose, IconDownload, IconPrinter } from "@/components/ui/Icons";
+import { IconClose, IconPrinter } from "@/components/ui/Icons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import type { Employee, ApprovalReference } from "@/lib/types";
+import type { Employee } from "@/lib/types";
 
 interface EmployeeReportModalProps {
   employee: Employee | null;
-  activeTicket?: ApprovalReference;
   onClose: () => void;
 }
 
@@ -33,11 +32,7 @@ function checksum(input: string): string {
   return hash.toString(36).toUpperCase().padStart(7, "0");
 }
 
-export function EmployeeReportModal({
-  employee,
-  activeTicket,
-  onClose,
-}: EmployeeReportModalProps) {
+export function EmployeeReportModal({ employee, onClose }: EmployeeReportModalProps) {
   if (!employee) return null;
 
   function handlePrint() {
@@ -166,41 +161,26 @@ export function EmployeeReportModal({
               ) : null}
             </div>
 
-            {/* Approval Workflow & Audit Trail Table */}
+            {/*
+             * There was a three-row "audit trail" table here. Every row was
+             * hard-coded — the same manager approval, the same IT Security
+             * reference SEC-2041, the same PROVISIONED verdict — printed onto
+             * every employee's report regardless of whether any of it had
+             * happened. On a document headed "Dokumen Resmi" that is not a
+             * placeholder, it is a fabricated record.
+             *
+             * The real trail belongs to the request that changed the account,
+             * and is printed from there once the request detail page exists.
+             */}
             <div className="space-y-2">
               <h3 className="text-xs font-bold tracking-wider uppercase text-ink-faint print:text-gray-700">
-                Rekam Jejak Persetujuan Akses (Audit Trail)
+                Rekam Jejak Persetujuan Akses
               </h3>
-              <table className="w-full text-left text-xs border border-hairline rounded-lg overflow-hidden print:border-gray-300">
-                <thead>
-                  <tr className="bg-canvas text-ink-faint uppercase tracking-wider border-b border-hairline print:bg-gray-200 print:text-black print:border-gray-300">
-                    <th className="px-3 py-2">Tahap Workflow</th>
-                    <th className="px-3 py-2">Otoritas / Pelaksana</th>
-                    <th className="px-3 py-2">Referensi persetujuan</th>
-                    <th className="px-3 py-2 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-hairline print:divide-gray-300">
-                  <tr>
-                    <td className="px-3 py-2 font-medium text-ink print:text-black">1. Pengajuan Akun Baru</td>
-                    <td className="px-3 py-2 text-ink-muted print:text-gray-700">HC Officer Portal</td>
-                    <td className="px-3 py-2 font-mono text-ink-faint print:text-gray-600">HC-REQ-{employee.id.slice(-4)}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-ok print:text-black">SELESAI</td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-2 font-medium text-ink print:text-black">2. Persetujuan Manager</td>
-                    <td className="px-3 py-2 text-ink-muted print:text-gray-700">{employee.managerName}</td>
-                    <td className="px-3 py-2 font-mono text-accent print:text-black">{activeTicket?.key || "MND-8941"}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-ok print:text-black">APPROVED</td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-2 font-medium text-ink print:text-black">3. Provisioning IT Security</td>
-                    <td className="px-3 py-2 text-ink-muted print:text-gray-700">IT Security Team</td>
-                    <td className="px-3 py-2 font-mono text-accent print:text-black">SEC-2041</td>
-                    <td className="px-3 py-2 text-right font-semibold text-ok print:text-black">PROVISIONED</td>
-                  </tr>
-                </tbody>
-              </table>
+              <p className="rounded-lg border border-hairline px-3 py-2.5 text-xs leading-relaxed text-ink-muted print:border-gray-300 print:text-gray-700">
+                Dokumen ini memuat keadaan akun saat dicetak. Riwayat persetujuan untuk setiap
+                perubahan akses tercatat pada pengajuan yang bersangkutan, lengkap dengan
+                identitas kedua approver dan waktu keputusannya.
+              </p>
             </div>
 
             {/* Official Signatures & Verification Block */}

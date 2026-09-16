@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 
 import { authenticateAD } from "@/lib/auth/ad";
-import { TOKEN_COOKIE, createAccessToken, secondsUntilExpiry, tokenCookieOptions, verifyAccessToken } from "@/lib/auth/jwt";
+import { SESSION_COOKIE, createSession, sessionCookieOptions } from "@/lib/auth/session";
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
 import { preflight, withCors } from "@/lib/http/cors";
 import { clientKey, rateLimit, resetRateLimit } from "@/lib/http/rateLimit";
@@ -13,9 +13,14 @@ export const OPTIONS = preflight;
 /**
  * POST /api/auth/login — { username | email, password }.
  *
- * Verifies the credentials against Active Directory (or the local dev fallback),
- * then issues a short-lived JWT as an httpOnly cookie. The password is never
- * stored here: AD checks it, and only a signed session token comes back.
+ * Verifies the credentials against Active Directory (or the local dev
+ * fallback), then opens a server-side session and hands back its opaque id in
+ * an httpOnly cookie. The password is never stored here, and neither is
+ * anything the browser could replay elsewhere.
+ *
+ * A successful bind is not authority. Somebody in no mapped AD group signs in
+ * with an empty role list and reaches their own profile only — the response
+ * says so, so the UI can explain it rather than showing an empty dashboard.
  */
 export async function POST(request: Request) {
   // Ten attempts per five minutes per address. A person who has mistyped their
@@ -53,23 +58,33 @@ export async function POST(request: Request) {
     // response never reveals which usernames exist.
     if (!user) return withCors(fail("Username atau kata sandi salah.", 401), request);
 
-    const token = createAccessToken({
-      id: user.id,
+    const { id, maxAgeSeconds } = await createSession({
+      userId: user.id,
+      username: user.username,
       email: user.email,
       fullName: user.fullName,
-      role: user.role,
+      roles: user.roles,
+      department: user.department,
     });
 
     // A correct password clears the counter, so someone who fumbled their
     // password a few times is not then locked out by their own success.
     resetRateLimit(key);
 
-    const payload = verifyAccessToken(token);
     const store = await cookies();
-    store.set(TOKEN_COOKIE, token, tokenCookieOptions(payload ? secondsUntilExpiry(payload) : 900));
+    store.set(SESSION_COOKIE, id, sessionCookieOptions(maxAgeSeconds));
 
     return withCors(
-      ok({ user: { id: user.id, email: user.email, fullName: user.fullName, role: user.role, department: user.department } }),
+      ok({
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          fullName: user.fullName,
+          roles: user.roles,
+          department: user.department,
+        },
+      }),
       request,
     );
   } catch (error) {
