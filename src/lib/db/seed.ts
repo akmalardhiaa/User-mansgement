@@ -3,6 +3,10 @@ import type { Employee } from "@/lib/types";
 /**
  * Demo roster written on first boot so the dashboard is never empty.
  * Delete `data/hc-store.json` to reseed.
+ *
+ * Every row is ACTIVE or DISABLED, because those are the only things an account
+ * can be. A seeded roster used to include people parked in approval statuses,
+ * which put the directory in a state the workflow could never resolve.
  */
 export function seedEmployees(): Employee[] {
   const now = new Date("2026-01-06T09:00:00.000Z").toISOString();
@@ -47,7 +51,7 @@ export function seedEmployees(): Employee[] {
   );
 }
 
-/** Divisions HC can pick from. IT is split into several, which is why transfers exist. */
+/** Divisions HC can pick from. IT is split into several, which is why movements exist. */
 export const DEPARTMENTS = [
   "IT — Engineering",
   "IT — Security",

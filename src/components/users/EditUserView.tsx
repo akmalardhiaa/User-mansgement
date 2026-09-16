@@ -22,7 +22,19 @@ import type { Employee } from "@/lib/types";
  * a corrected spelling, a filled-in job description, a contract that became
  * permanent.
  */
-export function EditUserView({ employees }: { employees: Employee[] }) {
+export function EditUserView({
+  employees,
+  pendingIds = [],
+}: {
+  employees: Employee[];
+  /**
+   * Employees with a lifecycle request in flight. Their profile is locked: a
+   * request in progress owns the fields it proposes to change, and editing them
+   * underneath it would make the approved payload disagree with the record it
+   * was raised from.
+   */
+  pendingIds?: string[];
+}) {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(employees[0]?.id ?? null);
   const [roster, setRoster] = useState(employees);
@@ -85,6 +97,7 @@ export function EditUserView({ employees }: { employees: Employee[] }) {
         <ProfileForm
           key={selected.id}
           employee={selected}
+          locked={pendingIds.includes(selected.id)}
           onSaved={(updated) =>
             setRoster((current) =>
               current.map((employee) => (employee.id === updated.id ? updated : employee)),
@@ -102,9 +115,11 @@ export function EditUserView({ employees }: { employees: Employee[] }) {
 
 function ProfileForm({
   employee,
+  locked,
   onSaved,
 }: {
   employee: Employee;
+  locked: boolean;
   onSaved: (employee: Employee) => void;
 }) {
   const { toast } = useToast();
@@ -140,7 +155,6 @@ function ProfileForm({
 
   const isContract = values.employmentType === "CONTRACT";
   const isBranch = values.locationType === "CABANG";
-  const locked = Boolean(employee.activeRequestId);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

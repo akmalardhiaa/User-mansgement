@@ -1,47 +1,47 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-import { TOKEN_COOKIE, verifyAccessToken } from "./jwt";
-import type { Role } from "./types";
+import { hasPermission, type Permission } from "./roles";
+import { SESSION_COOKIE, resolveSession, type PortalSession } from "./session";
 
 /**
- * The signed-in account, for server components and route handlers.
+ * The signed-in session, for server components.
  *
- * Reads the JWT that /api/auth/login issued. The claims were set from Active
- * Directory at sign-in, so this is the app's single record of who is signed in.
- *
- * Resolved from the token alone, with no round trip: it is called on
- * essentially every render, and the claims are signed, so a lookup would buy
- * nothing but latency.
+ * Reads the stored session record rather than a token's claims, so a session
+ * that was revoked — by logout, by a role change, by an operator — stops
+ * working on the very next render rather than at the end of a token lifetime.
  */
 
-export interface SessionUser {
-  id: string;
-  email: string;
-  /** The person's full name, as shown in the chrome and in the audit trail. */
-  name: string;
-  role: Role;
+export async function getSession(): Promise<PortalSession | undefined> {
+  const store = await cookies();
+  return resolveSession(store.get(SESSION_COOKIE)?.value);
 }
 
-export async function getCurrentUser(): Promise<SessionUser | undefined> {
-  const store = await cookies();
-  const payload = verifyAccessToken(store.get(TOKEN_COOKIE)?.value);
-  if (!payload) return undefined;
+/**
+ * The session, or a redirect to the login page.
+ *
+ * For pages. `proxy.ts` only checks that a cookie is present, so a stale or
+ * revoked cookie still reaches the page — this is what actually turns it away.
+ */
+export async function requirePageSession(returnTo: string): Promise<PortalSession> {
+  const session = await getSession();
+  if (!session) redirect(`/login?next=${encodeURIComponent(returnTo)}`);
+  return session;
+}
 
-  return {
-    id: payload.sub,
-    email: payload.email,
-    name: payload.fullName,
-    role: payload.role,
-  };
+/** True when the signed-in person's roles cover `permission`. */
+export async function can(permission: Permission): Promise<boolean> {
+  const session = await getSession();
+  return session ? hasPermission(session.roles, permission) : false;
 }
 
 /** How the signed-in person is credited in the audit trail. */
 export async function getActorName(): Promise<string> {
-  const user = await getCurrentUser();
-  return user ? `${user.name} (HC)` : "HC Portal";
+  const session = await getSession();
+  return session ? `${session.fullName} (${session.username})` : "HC Portal";
 }
 
-/** True when the signed-in account may administer other accounts. */
-export async function isAdmin(): Promise<boolean> {
-  return (await getCurrentUser())?.role === "ADMIN";
+/** The same credit, from a session already in hand. */
+export function actorNameOf(session: PortalSession): string {
+  return `${session.fullName} (${session.username})`;
 }

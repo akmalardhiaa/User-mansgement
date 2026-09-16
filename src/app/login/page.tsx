@@ -4,8 +4,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { BrandMark } from "@/components/ui/BrandMark";
 import { Card } from "@/components/ui/Field";
 import { IconAlert } from "@/components/ui/Icons";
-import { isLdapConfigured } from "@/lib/auth/ad";
-import { isAccountSystemConfigured } from "@/lib/config/authEnv";
+import { isAuthConfigured, isLdapConfigured } from "@/lib/auth/ad";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +18,7 @@ export default async function LoginPage({
   const { next } = await searchParams;
   // Only same-site paths, so `?next=` can never bounce someone to another host.
   const destination = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
-  const configured = isAccountSystemConfigured();
+  const configured = isAuthConfigured();
   // No LDAP server wired up yet: the app is running on its local demo accounts.
   const demoMode = !isLdapConfigured() && process.env.NODE_ENV !== "production";
 
@@ -65,9 +64,13 @@ export default async function LoginPage({
                     Mode demo — Active Directory belum tersambung
                   </p>
                   <p className="text-ink-muted">
-                    Coba masuk dengan <code className="font-mono text-ink">admin</code> /{" "}
-                    <code className="font-mono text-ink">admin12345</code>. Isi{" "}
-                    <code className="font-mono text-ink">LDAP_URL</code> di{" "}
+                    Alur lengkap butuh tiga identitas berbeda:{" "}
+                    <code className="font-mono text-ink">admin</code> mengajukan,{" "}
+                    <code className="font-mono text-ink">dimas</code> menyetujui sebagai manager,
+                    lalu <code className="font-mono text-ink">bagus</code> sebagai CISO. Kata
+                    sandinya masing-masing username diikuti{" "}
+                    <code className="font-mono text-ink">12345</code>. Daftar lengkap akun demo ada
+                    di README. Isi <code className="font-mono text-ink">LDAP_URL</code> di{" "}
                     <code className="font-mono text-ink">.env.local</code> untuk mengaktifkan login AD.
                   </p>
                 </div>
@@ -84,7 +87,7 @@ export default async function LoginPage({
                 Login belum dikonfigurasi
               </p>
               <p className="mt-2 text-ink-muted">
-                Setel <code className="font-mono text-ink">JWT_SECRET</code> di environment, lalu
+                Setel <code className="font-mono text-ink">LDAP_URL</code> di environment, lalu
                 jalankan ulang aplikasinya. Contohnya ada di{" "}
                 <code className="font-mono text-ink">.env.example</code>.
               </p>

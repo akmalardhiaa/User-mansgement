@@ -3,15 +3,60 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { getDataFilePath } from "@/lib/config/storage";
+import type { ApprovalTokenRecord } from "@/lib/lifecycle/approvalToken";
+import type { ExecutionJob } from "@/lib/lifecycle/executionTypes";
+import type { EmailDelivery, OutboxEvent } from "@/lib/lifecycle/outboxTypes";
+import type { AuditEvent, LifecycleRequest } from "@/lib/lifecycle/types";
 import type { Employee, AccessRequest, ActivityEntry } from "@/lib/types";
 
 import { seedEmployees } from "./seed";
 
 export interface StoreShape {
   employees: Employee[];
+  /**
+   * The old Jira-era access requests. Read-only legacy: nothing writes here any
+   * more, and the flow that once advanced them no longer exists in the code.
+   * They are kept until the archival step rather than deleted silently, because
+   * they are the only record that those requests were ever raised.
+   */
   requests: AccessRequest[];
   /** Newest first. See ActivityEntry for why this exists alongside events. */
   activity: ActivityEntry[];
+  /** The lifecycle requests — the model everything new is written against. */
+  lifecycleRequests: LifecycleRequest[];
+  /**
+   * Attempts to make approved changes real, with their per-step checkpoints.
+   * Kept apart from the requests: a request is decided once, while execution
+   * may be attempted several times and has to remember how far it got.
+   */
+  executionJobs: ExecutionJob[];
+  /**
+   * Emails owed, committed alongside the state change that owes them. A crash
+   * between deciding and sending costs a delay, not a lost approval.
+   */
+  outboxEvents: OutboxEvent[];
+  /**
+   * What the provider said, per attempt. Kept apart from the event so a message
+   * that took four tries still shows all four.
+   */
+  emailDeliveries: EmailDelivery[];
+  /**
+   * Hashes of the links in approval emails. The raw token is never here — it
+   * lives only in the sealed outbox payload, until the message is sent.
+   */
+  approvalTokens: ApprovalTokenRecord[];
+  /**
+   * When the legacy workflow was archived, if it has been. Its only job is to
+   * make the migration idempotent: running it twice must not re-reconcile
+   * accounts an operator has since corrected by hand.
+   */
+  legacyArchivedAt?: string;
+  /**
+   * Append-only evidence, oldest first. Deliberately separate from `activity`,
+   * which is a capped recent-changes feed: a log that trims itself is fine for
+   * a dashboard and useless as an audit trail.
+   */
+  auditEvents: AuditEvent[];
 }
 
 /**
@@ -22,7 +67,17 @@ export interface StoreShape {
  */
 
 function emptyStore(): StoreShape {
-  return { employees: seedEmployees(), requests: [], activity: [] };
+  return {
+    employees: seedEmployees(),
+    requests: [],
+    activity: [],
+    lifecycleRequests: [],
+    executionJobs: [],
+    outboxEvents: [],
+    emailDeliveries: [],
+    approvalTokens: [],
+    auditEvents: [],
+  };
 }
 
 function resolvePath(): string {
@@ -44,8 +99,16 @@ async function load(): Promise<StoreShape> {
       employees: parsed.employees ?? [],
       requests: parsed.requests ?? [],
       // Defaulted rather than required, so a store written before the log
-      // existed loads instead of throwing.
+      // existed loads instead of throwing. The same applies to the two
+      // lifecycle collections: an existing store predates both.
       activity: parsed.activity ?? [],
+      lifecycleRequests: parsed.lifecycleRequests ?? [],
+      executionJobs: parsed.executionJobs ?? [],
+      outboxEvents: parsed.outboxEvents ?? [],
+      emailDeliveries: parsed.emailDeliveries ?? [],
+      approvalTokens: parsed.approvalTokens ?? [],
+      auditEvents: parsed.auditEvents ?? [],
+      legacyArchivedAt: parsed.legacyArchivedAt,
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {

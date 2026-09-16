@@ -1,42 +1,22 @@
 /**
- * Core domain model for the HC User Management dashboard.
+ * The employee directory.
  *
- * All three kinds of access request run through the same two-step chain — HC
- * raises it, the manager approves by email, and IT Security confirms the work by email:
+ * An employee's status describes their ACCOUNT, and only their account: it is
+ * on or it is off. Nothing here records that somebody has asked for a change.
  *
- *   Adding an account (ONBOARDING)
- *     PENDING_MANAGER_APPROVAL -> PENDING_SECURITY_SETUP -> ACTIVE
+ * That separation is the correction this model needed. The directory used to
+ * carry statuses like PENDING_TRANSFER_SETUP, which meant the roster was
+ * reporting the state of a request rather than the state of an account — so
+ * somebody whose move was still waiting on an approval already looked halfway
+ * moved, and a request that died left the person stranded in a status no longer
+ * attached to anything.
  *
- *   Moving between divisions (TRANSFER)
- *     PENDING_TRANSFER_APPROVAL -> PENDING_TRANSFER_SETUP -> back to ACTIVE,
- *     with the new department, position and manager applied.
- *
- *   Removing an account (OFFBOARDING)
- *     PENDING_OFFBOARDING_APPROVAL -> PENDING_OFFBOARDING_SETUP -> DISABLED,
- *     once IT Security has revoked the access.
- *
- * A manager rejection ends the request: a rejected joiner becomes REJECTED,
- * while a rejected transfer simply restores the employee's previous status and
- * leaves their position untouched. A rejected offboarding leaves the employee
- * exactly as they were — still active, still with their access.
- *
- * DISABLED is where an approved offboarding ends up, and it is also what HC
- * applies directly as a reversible suspension that needs no approval. Keeping
- * one status for both is deliberate: in either case the person keeps their
- * record and their history, and can be switched back on.
+ * Proposed changes now live on a LifecycleRequest (see src/lib/lifecycle), and
+ * the directory keeps telling the truth about the account until an execution is
+ * verified.
  */
 
-export const EMPLOYEE_STATUSES = [
-  "PENDING_MANAGER_APPROVAL",
-  "PENDING_SECURITY_SETUP",
-  "ACTIVE",
-  "DISABLED",
-  "REJECTED",
-  "PENDING_TRANSFER_APPROVAL",
-  "PENDING_TRANSFER_SETUP",
-  "PENDING_OFFBOARDING_APPROVAL",
-  "PENDING_OFFBOARDING_SETUP",
-] as const;
+export const EMPLOYEE_STATUSES = ["ACTIVE", "DISABLED"] as const;
 
 export type EmployeeStatus = (typeof EMPLOYEE_STATUSES)[number];
 
@@ -69,13 +49,33 @@ export interface Employee {
   /** Free-text note HC captured when the account was requested. */
   description?: string;
   status: EmployeeStatus;
-  /** The access request currently acting on this employee, if any. */
-  activeRequestId?: string;
+  /**
+   * The directory object this record corresponds to, once one has been created
+   * and verified. Email and distinguished name both change over a person's time
+   * at a company; this does not, so it is what execution keys on.
+   *
+   * Absent for records that predate execution, or whose account was never made.
+   */
+  objectGUID?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-/** What the request asks for. Both types share the same approval chain. */
+/* -------------------------------------------------------------------------- */
+/* Legacy archive                                                             */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Everything below describes the OLD workflow, which ran on Jira tickets and
+ * emailed links. Nothing writes it any more and no screen reads it — the
+ * lifecycle domain replaced it entirely.
+ *
+ * It survives as a type because the store still holds thirteen of these
+ * records, and they are the only evidence those requests were ever raised.
+ * Deleting the type would mean deleting the history with it.
+ */
+
+/** What the legacy request asked for. */
 export const REQUEST_TYPES = ["ONBOARDING", "TRANSFER", "OFFBOARDING"] as const;
 
 export type RequestType = (typeof REQUEST_TYPES)[number];
@@ -176,32 +176,6 @@ export interface AccessRequest {
   processedSignals: string[];
   createdAt: string;
   updatedAt: string;
-}
-
-/** Payload accepted by `POST /api/users`. */
-export interface NewUserInput {
-  firstName: string;
-  lastName: string;
-  displayName: string;
-  email: string;
-  jobTitle: string;
-  jobDescription?: string;
-  department: string;
-  employmentType?: "PERMANENT" | "CONTRACT";
-  expiredDate?: string;
-  locationType?: "PUSAT" | "CABANG";
-  branchName?: string;
-  managerName: string;
-  managerEmail: string;
-  /** Free-text note included in the approval emails. */
-  description?: string;
-  /** Optional override; normally resolved from `managerEmail`. */
-  managerAccountId?: string;
-}
-
-/** Payload accepted by `POST /api/users/:id/transfer`. */
-export interface TransferInput extends TransferTarget {
-  reason?: string;
 }
 
 /**

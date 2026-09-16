@@ -1,4 +1,5 @@
-import { getActorName } from "@/lib/auth/current";
+import { actorNameOf } from "@/lib/auth/current";
+import { requirePermission } from "@/lib/auth/guard";
 import { getEmployeeById, updateEmployeeProfile } from "@/lib/db/repository";
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
 import { parseEmployeeProfileInput } from "@/lib/validation/employeeProfileInput";
@@ -7,6 +8,9 @@ export const dynamic = "force-dynamic";
 
 /** GET /api/users/[id] — one employee record. */
 export async function GET(_request: Request, ctx: RouteContext<"/api/users/[id]">) {
+  const guarded = await requirePermission("directory.read");
+  if (!guarded.ok) return guarded.response;
+
   const { id } = await ctx.params;
 
   const employee = await getEmployeeById(id);
@@ -22,12 +26,13 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/users/[id]"
  * description, recording that someone moved from contract to permanent. None
  * of it changes who has access, which is why it needs no approval.
  *
- * Anything that *does* change access goes elsewhere on purpose — a division
- * move through POST /api/users/[id]/transfer, enable/disable through
- * /api/users/[id]/access — so this route cannot be used to route a change
- * around the manager.
+ * Anything that *does* change access goes elsewhere on purpose, so this route
+ * cannot be used to route a change around the manager.
  */
 export async function PUT(request: Request, ctx: RouteContext<"/api/users/[id]">) {
+  const guarded = await requirePermission("employee.update");
+  if (!guarded.ok) return guarded.response;
+
   const { id } = await ctx.params;
 
   const parsed = parseEmployeeProfileInput(await readJson(request));
@@ -36,7 +41,7 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/users/[id]">
   }
 
   try {
-    const employee = await updateEmployeeProfile(id, parsed.value, await getActorName());
+    const employee = await updateEmployeeProfile(id, parsed.value, actorNameOf(guarded.session));
     return ok({ employee, message: "Profil karyawan diperbarui." });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Gagal memperbarui profil.";

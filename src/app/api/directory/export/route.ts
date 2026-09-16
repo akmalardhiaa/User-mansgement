@@ -1,11 +1,10 @@
-
-
-import { getActorName, getCurrentUser } from "@/lib/auth/current";
+import { actorNameOf } from "@/lib/auth/current";
+import { requirePermission } from "@/lib/auth/guard";
 import { getBrand } from "@/lib/config/brand";
 import { filterEmployees, sanitiseFilters, sortEmployees } from "@/lib/dashboard/directory";
 import { listEmployees, recordActivity } from "@/lib/db/repository";
 import { buildDirectoryWorkbook, describeFilters } from "@/lib/dashboard/workbook";
-import { fail } from "@/lib/http/apiResponse";
+import { loadPendingEmployeeIds } from "@/lib/lifecycle/pendingStore";
 
 export const dynamic = "force-dynamic";
 
@@ -19,20 +18,19 @@ export const dynamic = "force-dynamic";
  * exported as it stands now rather than as a stale copy.
  */
 export async function POST(request: Request) {
-  const session = await getCurrentUser();
-  // The proxy already refused anonymous callers; this is for the name on
-  // the file, and a belt-and-braces check because that name is the only thing
-  // making the export attributable.
-  if (!session) return fail("Sesi tidak ditemukan.", 401);
+  const guarded = await requirePermission("directory.export");
+  if (!guarded.ok) return guarded.response;
 
   // Sanitised, not spread: this is a request body, and an unrecognised status
   // spread straight into the defaults reached a lookup that assumed a real one.
   const body = (await request.json().catch(() => ({}))) as { filters?: unknown };
   const filters = sanitiseFilters(body.filters);
 
-  const employees = await listEmployees();
+  // The same two reads the screen made, so an export taken from a filtered view
+  // contains the same rows the person was looking at.
+  const [employees, pendingIds] = await Promise.all([listEmployees(), loadPendingEmployeeIds()]);
   const visible = sortEmployees(
-    filterEmployees(employees, filters),
+    filterEmployees(employees, filters, pendingIds),
     filters.sort,
     filters.direction,
   );
@@ -41,14 +39,14 @@ export async function POST(request: Request) {
     employees: visible,
     total: employees.length,
     filters,
-    exportedBy: session.name,
+    exportedBy: guarded.session.fullName,
     brandName: getBrand().name,
   });
 
   await recordActivity({
     // The same credit the workflow trail uses, so one name identifies one
     // person across both. The file itself keeps the plainer form.
-    actor: await getActorName(),
+    actor: actorNameOf(guarded.session),
     action: "directory.exported",
     detail: `Mengekspor ${visible.length} dari ${employees.length} baris direktori — ${describeFilters(filters)}.`,
   });

@@ -1,39 +1,55 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
+import Link from "next/link";
 
+import { PendingBadge } from "@/components/dashboard/PendingBadge";
 import { Button } from "@/components/ui/Button";
 import {
-  IconAlert,
   IconBriefcase,
   IconBuilding,
-  IconCheck,
-  IconClock,
   IconClose,
   IconDownload,
-  IconExternal,
   IconMail,
   IconPower,
   IconSwap,
-  IconUser,
   IconUserCheck,
 } from "@/components/ui/Icons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { useToast } from "@/components/ui/Toast";
+import type { PendingMarker } from "@/lib/lifecycle/pending";
 import { TRANSITION_FAST } from "@/lib/motion";
-import type { Employee, ApprovalReference } from "@/lib/types";
+import type { Employee } from "@/lib/types";
 
 interface EmployeeDetailDrawerProps {
   employee: Employee | null;
-  activeTicket?: ApprovalReference;
+  /** The open lifecycle request for this person, if there is one. */
+  pending?: PendingMarker;
+  /** Whether this viewer may raise a lifecycle request. */
+  canRequest?: boolean;
   onClose: () => void;
-  onToggleAccess: (employee: Employee) => void;
-  onOpenTransfer: (employee: Employee) => void;
   onOpenReportPDF?: (employee: Employee) => void;
-  busy?: boolean;
 }
 
+/**
+ * One person, in detail.
+ *
+ * Three things were removed from this panel, and all three for the same reason:
+ * they showed the user something that was not true.
+ *
+ *   - A "Riwayat Audit" tab listing four approval steps that were hard-coded.
+ *     It rendered the same four lines for every employee, including people
+ *     whose account had never been approved by anyone. The real trail lives on
+ *     the request, and is now linked to instead.
+ *   - A temporary-password generator that invented a string in the browser and
+ *     announced it had been created. Nothing received it and no account had it.
+ *     Initial credentials are the worker's job, over a channel HC agrees, and
+ *     never through a page.
+ *   - A "copy activation link" button producing a hard-coded URL on a domain
+ *     this app does not serve.
+ *
+ * What is left states what the directory actually knows, and hands off to the
+ * request flow for anything that would change it.
+ */
 function initials(name: string): string {
   return (
     name
@@ -47,43 +63,23 @@ function initials(name: string): string {
 
 export function EmployeeDetailDrawer({
   employee,
-  activeTicket,
+  pending,
+  canRequest = false,
   onClose,
-  onToggleAccess,
-  onOpenTransfer,
   onOpenReportPDF,
-  busy = false,
 }: EmployeeDetailDrawerProps) {
-  const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"overview" | "timeline" | "credentials">("overview");
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [generatedPass, setGeneratedPass] = useState<string | null>(null);
-
   if (!employee) return null;
 
-  function generateTempPassword() {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$";
-    let pass = "HC-";
-    for (let i = 0; i < 8; i++) {
-      pass += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setGeneratedPass(pass);
-    toast("Kredensial sementara berhasil dibuat!", "success");
-  }
-
-  function copyActivationLink() {
-    if (!employee) return;
-    const link = `https://hc.mandirisekuritas.co.id/activate?token=act_${employee.id}_${Date.now()}`;
-    navigator.clipboard.writeText(link);
-    setCopiedLink(true);
-    toast("Link aktivasi disalin ke clipboard!", "info");
-    setTimeout(() => setCopiedLink(false), 3000);
-  }
+  const rows: Array<[typeof IconBriefcase, string, string]> = [
+    [IconBriefcase, "Jabatan", employee.jobTitle],
+    [IconBuilding, "Divisi", employee.department],
+    [IconUserCheck, "Manager", employee.managerName],
+    [IconMail, "Email manager", employee.managerEmail],
+  ];
 
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 overflow-hidden">
-        {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -99,10 +95,9 @@ export function EmployeeDetailDrawer({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="relative w-screen max-w-md border-l border-hairline-strong/80 bg-surface p-6 shadow-2xl overflow-y-auto flex flex-col justify-between"
+            className="relative flex w-screen max-w-md flex-col justify-between overflow-y-auto border-l border-hairline-strong/80 bg-surface p-6 shadow-2xl"
           >
             <div>
-              {/* Drawer Header */}
               <div className="flex items-start justify-between gap-4 border-b border-hairline pb-5">
                 <div className="flex items-center gap-3.5">
                   <div className="grid size-12 shrink-0 place-items-center rounded-2xl border border-accent/40 bg-accent/15 text-base font-bold text-accent shadow-[0_0_15px_rgba(253,183,19,0.2)]">
@@ -118,215 +113,88 @@ export function EmployeeDetailDrawer({
                 <button
                   type="button"
                   onClick={onClose}
+                  aria-label="Tutup panel"
                   className="rounded-lg p-1.5 text-ink-faint transition-colors hover:bg-elevated hover:text-ink"
                 >
                   <IconClose className="size-5" />
                 </button>
               </div>
 
-              {/* Status & Quick Pill */}
-              <div className="mt-4 flex items-center justify-between gap-3">
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <StatusBadge status={employee.status} />
-                <span className="text-xs font-mono text-ink-faint">ID: {employee.id}</span>
+                <span className="font-mono text-xs text-ink-faint">ID: {employee.id}</span>
               </div>
 
-              {/* Tab Navigation */}
-              <div className="mt-5 flex gap-1 rounded-xl border border-hairline bg-canvas/60 p-1">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("overview")}
-                  className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors ${
-                    activeTab === "overview"
-                      ? "bg-elevated text-ink shadow-sm"
-                      : "text-ink-muted hover:text-ink"
-                  }`}
-                >
-                  Ikhtisar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("timeline")}
-                  className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors ${
-                    activeTab === "timeline"
-                      ? "bg-elevated text-ink shadow-sm"
-                      : "text-ink-muted hover:text-ink"
-                  }`}
-                >
-                  Riwayat Audit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("credentials")}
-                  className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors ${
-                    activeTab === "credentials"
-                      ? "bg-elevated text-ink shadow-sm"
-                      : "text-ink-muted hover:text-ink"
-                  }`}
-                >
-                  Kredensial
-                </button>
+              <div className="mt-5 space-y-2.5 rounded-xl border border-hairline/80 bg-elevated/40 p-3.5 text-sm">
+                {rows.map(([Glyph, label, value]) => (
+                  <div key={label} className="flex items-center gap-2.5 text-ink-muted">
+                    <Glyph className="size-4 text-accent" />
+                    <span className="text-xs text-ink-faint">{label}:</span>
+                    <span className="ml-auto min-w-0 truncate font-medium text-ink">{value}</span>
+                  </div>
+                ))}
               </div>
 
-              {/* Tab Content */}
-              <div className="mt-5 space-y-4">
-                {activeTab === "overview" ? (
-                  <div className="space-y-3.5 text-sm">
-                    <div className="rounded-xl border border-hairline/80 bg-elevated/40 p-3.5 space-y-2.5">
-                      <div className="flex items-center gap-2.5 text-ink-muted">
-                        <IconBriefcase className="size-4 text-accent" />
-                        <span className="text-xs text-ink-faint">Jabatan:</span>
-                        <span className="ml-auto font-medium text-ink">{employee.jobTitle}</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-ink-muted">
-                        <IconBuilding className="size-4 text-accent" />
-                        <span className="text-xs text-ink-faint">Divisi:</span>
-                        <span className="ml-auto font-medium text-ink">{employee.department}</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-ink-muted">
-                        <IconUserCheck className="size-4 text-accent" />
-                        <span className="text-xs text-ink-faint">Manager:</span>
-                        <span className="ml-auto font-medium text-ink">{employee.managerName}</span>
-                      </div>
-                      <div className="flex items-center gap-2.5 text-ink-muted">
-                        <IconMail className="size-4 text-accent" />
-                        <span className="text-xs text-ink-faint">Email Manager:</span>
-                        <span className="ml-auto font-mono text-xs text-ink">{employee.managerEmail}</span>
-                      </div>
-                    </div>
+              {employee.description ? (
+                <div className="mt-4 rounded-xl border border-hairline/80 bg-canvas/50 p-3.5">
+                  <p className="text-xs font-medium text-ink-faint">Catatan HC:</p>
+                  <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                    {employee.description}
+                  </p>
+                </div>
+              ) : null}
 
-                    {employee.description ? (
-                      <div className="rounded-xl border border-hairline/80 bg-canvas/50 p-3.5">
-                        <p className="text-xs font-medium text-ink-faint">Catatan Pengajuan:</p>
-                        <p className="mt-1 text-xs leading-relaxed text-ink-muted">{employee.description}</p>
-                      </div>
-                    ) : null}
-
-                    {activeTicket ? (
-                      <div className="rounded-xl border border-accent/30 bg-accent/10 p-3.5 flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-semibold text-accent">Persetujuan Email Aktif</p>
-                          <p className="text-xs text-ink-muted mt-0.5">Menunggu proses approval</p>
-                        </div>
-                        <a
-                          href={activeTicket.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 font-mono text-xs font-bold text-accent hover:underline"
-                        >
-                          {activeTicket.key}
-                          <IconExternal className="size-3.5" />
-                        </a>
-                      </div>
-                    ) : null}
+              <div className="mt-4 rounded-xl border border-hairline/80 bg-canvas/50 p-3.5">
+                <p className="text-xs font-semibold text-ink">Pengajuan berjalan</p>
+                {pending ? (
+                  <div className="mt-2">
+                    <PendingBadge marker={pending} />
+                    <p className="mt-2 text-[11px] leading-relaxed text-ink-muted">
+                      Status akun di atas belum berubah. Direktori baru mengikuti setelah
+                      perubahan benar-benar dijalankan dan diverifikasi.
+                    </p>
                   </div>
-                ) : null}
-
-                {activeTab === "timeline" ? (
-                  <div className="space-y-4">
-                    <p className="text-xs text-ink-muted">Simulasi rekam jejak audit persetujuan akun:</p>
-                    <div className="relative pl-5 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-hairline-strong">
-                      <div className="relative flex items-start gap-3">
-                        <span className="absolute -left-5 top-1 size-2.5 rounded-full bg-ok shadow-[0_0_8px_var(--color-ok)]" />
-                        <div>
-                          <p className="text-xs font-semibold text-ink">Akun Terverifikasi & Aktif</p>
-                          <p className="text-[11px] text-ink-faint">Sistem HC · {new Date(employee.updatedAt).toLocaleDateString("id-ID")}</p>
-                        </div>
-                      </div>
-                      <div className="relative flex items-start gap-3">
-                        <span className="absolute -left-5 top-1 size-2.5 rounded-full bg-info" />
-                        <div>
-                          <p className="text-xs font-semibold text-ink">IT Security Configured Access</p>
-                          <p className="text-[11px] text-ink-faint">Oleh: Bagus Nugroho (IT Security)</p>
-                        </div>
-                      </div>
-                      <div className="relative flex items-start gap-3">
-                        <span className="absolute -left-5 top-1 size-2.5 rounded-full bg-accent" />
-                        <div>
-                          <p className="text-xs font-semibold text-ink">Manager Approved Request</p>
-                          <p className="text-[11px] text-ink-faint">Oleh: {employee.managerName}</p>
-                        </div>
-                      </div>
-                      <div className="relative flex items-start gap-3">
-                        <span className="absolute -left-5 top-1 size-2.5 rounded-full bg-ink-faint" />
-                        <div>
-                          <p className="text-xs font-semibold text-ink">Akun Diajukan di HC Portal</p>
-                          <p className="text-[11px] text-ink-faint">{new Date(employee.createdAt).toLocaleDateString("id-ID")}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {activeTab === "credentials" ? (
-                  <div className="space-y-3.5">
-                    <div className="rounded-xl border border-hairline/80 bg-canvas/50 p-4 space-y-3">
-                      <p className="text-xs font-semibold text-ink">Generator Kredensial Akses Awal</p>
-                      <p className="text-xs text-ink-muted">
-                        Buat kata sandi sementara untuk aktivasi pertama kali karyawan.
-                      </p>
-
-                      {generatedPass ? (
-                        <div className="rounded-lg border border-accent/40 bg-surface p-3 flex items-center justify-between">
-                          <span className="font-mono text-sm font-bold text-accent">{generatedPass}</span>
-                          <span className="text-[10px] text-ok font-semibold">Berlaku 24 jam</span>
-                        </div>
-                      ) : (
-                        <Button size="sm" onClick={generateTempPassword}>
-                          Generate Password Sementara
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="rounded-xl border border-hairline/80 bg-canvas/50 p-4 space-y-3">
-                      <p className="text-xs font-semibold text-ink">Link Aktivasi Langsung</p>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={copyActivationLink}
-                        className="w-full justify-center"
-                      >
-                        {copiedLink ? "Link Disalin!" : "Salin Link Aktivasi Akun"}
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
+                ) : (
+                  <p className="mt-1.5 text-xs text-ink-muted">
+                    Tidak ada pengajuan yang sedang berjalan untuk karyawan ini.
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* Bottom Actions */}
-            <div className="mt-8 border-t border-hairline pt-4 space-y-2">
+            <div className="mt-8 space-y-2 border-t border-hairline pt-4">
               <Button
                 variant="secondary"
-                onClick={() => {
-                  onOpenReportPDF?.(employee);
-                }}
+                onClick={() => onOpenReportPDF?.(employee)}
                 className="w-full justify-center"
                 icon={<IconDownload />}
               >
-                Export PDF Laporan Karyawan
+                Cetak profil karyawan
               </Button>
-              <div className="flex gap-2">
-                <Button
-                  variant={employee.status === "ACTIVE" ? "danger" : "success"}
-                  loading={busy}
-                  onClick={() => onToggleAccess(employee)}
-                  className="flex-1 justify-center"
-                  icon={<IconPower />}
-                >
-                  {employee.status === "ACTIVE" ? "Nonaktifkan" : "Aktifkan"}
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    onClose();
-                    onOpenTransfer(employee);
-                  }}
-                  className="flex-1 justify-center"
-                  icon={<IconSwap />}
-                >
-                  Ubah Posisi
-                </Button>
-              </div>
+
+              {canRequest && !pending ? (
+                <div className="flex gap-2">
+                  <Link
+                    href={`/pengajuan/baru?type=MOVEMENT&employeeId=${employee.id}`}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-hairline-strong bg-elevated px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-accent/50"
+                  >
+                    <IconSwap className="size-4" />
+                    Ajukan Movement
+                  </Link>
+                  <Link
+                    href={`/pengajuan/baru?type=TERMINATION&employeeId=${employee.id}`}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3.5 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/20"
+                  >
+                    <IconPower className="size-4" />
+                    Ajukan Termination
+                  </Link>
+                </div>
+              ) : null}
+
+              <p className="text-[11px] leading-relaxed text-ink-faint">
+                Perubahan akses selalu melewati persetujuan manager dan CISO. Tidak ada tombol di
+                halaman ini yang mengubah akun secara langsung.
+              </p>
             </div>
           </motion.div>
         </div>

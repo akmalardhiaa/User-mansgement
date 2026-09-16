@@ -13,7 +13,7 @@ import {
   staggerItem,
 } from "@/lib/motion";
 import { usePointerGlow } from "@/lib/motion/usePointerGlow";
-import { isPending, type StatusFilter } from "@/lib/dashboard/directory";
+import type { StatusFilter } from "@/lib/dashboard/directory";
 import type { Employee } from "@/lib/types";
 
 /**
@@ -37,10 +37,17 @@ interface StatDefinition {
 
 export function StatsRow({
   employees,
+  pendingCount,
   active = "ALL",
   onSelect,
 }: {
   employees: Employee[];
+  /**
+   * How many people have a lifecycle request in flight. Passed in rather than
+   * derived from the roster: it is a fact about requests, and the directory no
+   * longer pretends to know it.
+   */
+  pendingCount: number;
   /** The status filter currently applied, so the matching card reads as pressed. */
   active?: StatusFilter;
   onSelect?: (status: StatusFilter) => void;
@@ -50,8 +57,6 @@ export function StatsRow({
   const glow = usePointerGlow<HTMLButtonElement>();
 
   const count = (predicate: (employee: Employee) => boolean) => employees.filter(predicate).length;
-
-  const pending = count((employee) => isPending(employee.status));
 
   const stats: StatDefinition[] = [
     {
@@ -73,28 +78,22 @@ export function StatsRow({
       caption: "Akses berjalan normal",
     },
     {
-      /*
-       * Counts transfers too. It previously totted up only the two onboarding
-       * statuses, so an employee waiting on a manager to approve their move
-       * between divisions was invisible here — the one number whose whole job is
-       * to say what is waiting.
-       */
       key: "PENDING",
-      label: "Dalam persetujuan",
-      value: pending,
+      label: "Ada pengajuan",
+      value: pendingCount,
       tone: "text-warn",
       ring: "hover:border-warn/40",
       icon: IconApprovals,
-      caption: "Akun baru dan pindah divisi",
+      caption: "Perubahan yang belum dijalankan",
     },
     {
       key: "DISABLED",
-      label: "Dinonaktifkan",
+      label: "Nonaktif",
       value: count((employee) => employee.status === "DISABLED"),
       tone: "text-ink-muted",
       ring: "hover:border-hairline-strong",
       icon: IconPower,
-      caption: "Akses ditangguhkan",
+      caption: "Akun tidak berjalan",
     },
   ];
 
