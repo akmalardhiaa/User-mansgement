@@ -1,0 +1,48 @@
+# One command to run the portal:
+#
+#   docker compose up --build
+#
+# Then open http://localhost:3000 and sign in as ayu.prameswari / mock12345.
+
+services:
+  portal:
+    build: .
+    # Named so `docker compose logs portal` and `docker compose exec portal sh`
+    # read the same way whatever the directory is called.
+    container_name: hc-portal
+
+    # Published on the same port it listens on, and that matters beyond
+    # convenience: APP_BASE_URL is baked into every approval link an email
+    # carries. Publish this on 8080 without changing APP_BASE_URL to match and
+    # the links in those emails point at a port nothing is serving.
+    ports:
+      - "3000:3000"
+
+    # Secrets arrive at run time, never in a layer. .dockerignore keeps .env*
+    # out of the build context entirely, so this file is the only way in.
+    env_file:
+      - .env.docker
+
+    volumes:
+      # The state the portal actually owns: the employee roster, server-side
+      # sessions, the simulated directory, and the file-driver outbox. Bound to
+      # the host so it survives `docker compose down` — and so the accounts
+      # already seeded by `npm run mock-ad:roles` are the ones the container
+      # sees, rather than an empty directory nobody can log in to.
+      - ./data:/app/data
+
+    # A crashed container comes back; a stopped one stays stopped. `always`
+    # would restart it after an explicit `docker compose stop`, which is rarely
+    # what anybody means.
+    restart: unless-stopped
+
+    # Compose reports the container healthy only once the app actually answers,
+    # rather than as soon as the process exists. start_period covers the first
+    # compile, which Turbopack does on demand and is slower than every request
+    # after it.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s

@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+# The negation above matches that one name exactly, so every other template has
+# to be named too — without this line .env.docker.example is ignored like a real
+# secrets file, and the template nobody can commit helps nobody.
+!.env.docker.example
 
 # local JSON data store
 /data
