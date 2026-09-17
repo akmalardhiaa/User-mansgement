@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "ad:check": "node scripts/ad-check.mjs",
+    "mock-ad:roles": "node scripts/mock-ad-roles.mjs",
     "gmail:auth": "node scripts/gmail-auth.mjs"
   },
   "dependencies": {
