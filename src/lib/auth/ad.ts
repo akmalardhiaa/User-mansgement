@@ -1,4 +1,5 @@
 import { DEV_USERS } from "./devUsers";
+import { authViaMockAd, isMockAdLoginEnabled } from "./mockAdAuth";
 import { rolesFromGroups } from "./roleMapping";
 import type { PortalRole } from "./roles";
 
@@ -54,6 +55,31 @@ export async function authenticateAD(username: string, password: string): Promis
       "LDAP_URL belum diset. Login Active Directory tidak bisa dijalankan di production tanpa alamat server AD.",
     );
   }
+
+  /*
+   * The simulated directory, when asked for.
+   *
+   * Tried ahead of the hardcoded list because it is the more faithful of the
+   * two: roles come from group membership rather than being written out per
+   * account, so signing in exercises the same mapping a real domain controller
+   * would.
+   *
+   * An account it does not recognise FALLS THROUGH rather than being refused.
+   * Turning this on would otherwise silently kill the demo logins — `admin` and
+   * the rest live only in devUsers.ts — and a switch that locks somebody out of
+   * their own portal is not a switch anybody should have to think twice about.
+   * The two name sets do not overlap, so there is nothing ambiguous about
+   * consulting both.
+   *
+   * Its own variable rather than reusing AD_DRIVER, which selects the EXECUTION
+   * driver. One switch that silently changed both would be a switch nobody could
+   * reason about.
+   */
+  if (isMockAdLoginEnabled()) {
+    const viaMock = await authViaMockAd(user, password);
+    if (viaMock) return viaMock;
+  }
+
   return authViaDev(user, password);
 }
 
