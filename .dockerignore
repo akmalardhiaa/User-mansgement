@@ -1,0 +1,57 @@
+# What must never enter the build context.
+#
+# Two entries here are security, not tidiness, and they are the reason this file
+# exists before the Dockerfile does:
+#
+#   .env*   holds a live SMTP App Password. Anything copied into an image stays
+#           in that layer forever, readable by anyone who can pull it — even if
+#           a later layer deletes the file.
+#   data/   holds session id hashes, sealed outbox payloads, and the approval
+#           token table. Baking a snapshot of those into an image would ship
+#           somebody's live credentials with the application.
+#
+# Both are mounted at run time instead: secrets through the environment, state
+# through a volume.
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.bak-*
+
+# Runtime state — mounted as a volume, never copied
+data/
+
+# Build output and dependencies. node_modules is rebuilt inside the image from
+# the lockfile; copying the host's would import platform-specific binaries and
+# whatever has drifted since the last install.
+node_modules/
+.next/
+.next-*/
+out/
+build/
+*.tsbuildinfo
+
+# Version control and CI
+.git/
+.github/
+.gitignore
+
+# Editor and OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Test and coverage artefacts
+coverage/
+
+# Documentation that does not affect the build
+README.md
+AGENTS.md
+CLAUDE.md
+
+# The Docker files themselves
+Dockerfile*
+docker-compose*.yml
+.dockerignore
