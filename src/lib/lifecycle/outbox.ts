@@ -5,7 +5,7 @@ import type { StoreShape } from "@/lib/db/store";
 import { issueToken, revokeTokens } from "./approvalToken";
 import { seal } from "./outboxCrypto";
 import type { OutboxEvent, OutboxKind } from "./outboxTypes";
-import type { ApprovalStage, LifecycleRequest, LifecycleType } from "./types";
+import type { ApprovalStage, LifecyclePayload, LifecycleRequest, LifecycleType } from "./types";
 
 /**
  * Emitting the emails a state change owes.
@@ -33,6 +33,14 @@ export interface ApprovalMailPayload {
   requesterName: string;
   approverName: string;
   effectiveAt?: string;
+  /**
+   * The request itself, so an approver can judge it from the message rather
+   * than being asked to decide on a summary and a link.
+   *
+   * Optional because a message queued before this field existed has none, and a
+   * dispatcher working through the backlog must still be able to render it.
+   */
+  payload?: LifecyclePayload;
   /** Shown to the CISO: the manager has already answered, and when. */
   managerDecision?: { by: string; at: string };
   /** For a result email — approved, rejected, and why. */
@@ -55,6 +63,36 @@ function push(
   };
   draft.outboxEvents.push(created);
   return created;
+}
+
+/**
+ * The payload minus anything that must not travel in an email.
+ *
+ * Only the termination note today. It is an internal HC record of why somebody
+ * is leaving, it is not part of what an approver needs in order to decide, and
+ * the plan is explicit that those circumstances travel no further than they
+ * must.
+ *
+ * Dropped HERE rather than in the renderer, deliberately. If the renderer were
+ * the only thing keeping it out, the note would still be sitting in the queued
+ * message, one careless template change away from an inbox. Removing it at the
+ * boundary means it never enters the mail path at all.
+ *
+ * Written as an allow list rather than by discarding `note`, which matters more
+ * than it looks: a sensitive field added to TerminationPayload later stays out
+ * by default and has to be named to travel. Excluding by omission puts the
+ * burden on whoever adds the field to remember; this way forgetting is safe.
+ */
+function mailSafePayload(payload: LifecyclePayload): LifecyclePayload {
+  if (payload.kind !== "TERMINATION") return payload;
+
+  return {
+    kind: payload.kind,
+    employeeId: payload.employeeId,
+    reasonCategory: payload.reasonCategory,
+    lastWorkingDate: payload.lastWorkingDate,
+    handoverTo: payload.handoverTo,
+  };
 }
 
 /**
@@ -97,6 +135,7 @@ export function emitApprovalRequest(
     requesterName: request.requester.name,
     approverName: step.approver.name,
     effectiveAt: request.effectiveAt,
+    payload: mailSafePayload(request.payload),
     managerDecision:
       managerStep?.decidedAt && managerStep.decidedBy
         ? { by: managerStep.decidedBy.name, at: managerStep.decidedAt }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Card, TextareaField } from "@/components/ui/Field";
@@ -17,9 +17,32 @@ import { postJson } from "@/lib/client/accountsApi";
  * instead of deciding: anything that follows URLs in a mailbox must not be able
  * to approve anything.
  */
-export function TokenDecisionForm({ token, stage }: { token: string; stage: "MANAGER" | "CISO" }) {
+export function TokenDecisionForm({
+  token,
+  stage,
+  initial,
+}: {
+  token: string;
+  stage: "MANAGER" | "CISO";
+  /**
+   * Which button the approver pressed in the email.
+   *
+   * "APPROVED" submits on mount: the decision was made in the inbox, and asking
+   * for it again here was the step this page existed to impose.
+   *
+   * Be clear about what that costs. Anything which opens the link AND runs its
+   * scripts now approves — a security gateway that clicks links on the way in,
+   * or a forwarded message someone else opens. The endpoint is still POST-only,
+   * so merely fetching the URL decides nothing; executing the page does. That is
+   * a narrower exposure than a GET that mutates, and it is not zero.
+   *
+   * "REJECTED" never auto-submits. A rejection requires a reason, the requester
+   * reads it, and there is nothing to submit until somebody writes one.
+   */
+  initial?: "APPROVED" | "REJECTED";
+}) {
   const [reason, setReason] = useState("");
-  const [rejecting, setRejecting] = useState(false);
+  const [rejecting, setRejecting] = useState(initial === "REJECTED");
   const [busy, setBusy] = useState<"APPROVED" | "REJECTED" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ decision: string; status: string } | null>(null);
@@ -41,6 +64,21 @@ export function TokenDecisionForm({ token, stage }: { token: string; stage: "MAN
     setError(result.failure.message);
     setBusy(null);
   }
+
+  /*
+   * Fires once. React runs effects twice in development's strict mode, and the
+   * token is single-use — a second POST would come back "already consumed" and
+   * show the approver an error for something that in fact worked.
+   */
+  const submitted = useRef(false);
+  useEffect(() => {
+    if (initial !== "APPROVED" || submitted.current) return;
+    submitted.current = true;
+    void decide("APPROVED");
+    // `decide` is stable for the life of this component; re-running on its
+    // identity would defeat the guard above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial]);
 
   if (done) {
     const approved = done.decision === "APPROVED";

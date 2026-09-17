@@ -42,6 +42,22 @@ function isActive(pathname: string, href: string): boolean {
 }
 
 /**
+ * Pages that get no chrome at all.
+ *
+ * The approval page is reached from a link in an email by somebody who may have
+ * no account here. Wrapping their decision in a portal header, a navigation rail
+ * they cannot use and a footer makes it look like they arrived at an
+ * application, when all they did was answer a question. It also invites the
+ * thought that they should sign in first.
+ *
+ * Anchored at a segment boundary rather than a bare prefix, so a future
+ * `/persetujuanku` does not quietly inherit this.
+ */
+function isBare(pathname: string): boolean {
+  return pathname === "/persetujuan" || pathname.startsWith("/persetujuan/");
+}
+
+/**
  * The static GitHub Pages build exports a single page, so the multi-route nav
  * would only produce dead links. Inlined at build time.
  */
@@ -104,6 +120,21 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
     router.refresh();
+  }
+
+  /*
+   * Placed after every hook above, deliberately. React requires the same hooks
+   * to run in the same order on every render, so an early return above
+   * `useState` or `useScroll` would break the rules of hooks the first time
+   * somebody navigated between a bare route and a normal one.
+   */
+  if (isBare(pathname)) {
+    return (
+      <div className="mx-auto w-full max-w-2xl px-5 py-10">
+        <ThemeToggle />
+        {children}
+      </div>
+    );
   }
 
   return (

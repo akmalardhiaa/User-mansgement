@@ -2,7 +2,6 @@ import {
   LifecycleStatusBadge,
   LifecycleTypeBadge,
 } from "@/components/lifecycle/LifecycleStatusBadge";
-import { RequestPayloadSummary } from "@/components/lifecycle/RequestPayloadSummary";
 import { TokenDecisionForm } from "@/components/lifecycle/TokenDecisionForm";
 import { BrandMark } from "@/components/ui/BrandMark";
 import { Card } from "@/components/ui/Field";
@@ -36,11 +35,25 @@ function formatDate(iso: string): string {
  */
 export default async function ApprovalPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ putusan?: string }>;
 }) {
   const { token } = await params;
+  const { putusan } = await searchParams;
   const result = await previewByToken(token);
+
+  /*
+   * Which button was pressed in the email.
+   *
+   * Matched against a closed set rather than trusted: anything else is ignored
+   * and the form opens neutral. This only preselects — the decision is still a
+   * POST a person makes, because a page that decided on load would be decided
+   * by the first scanner that followed the link.
+   */
+  const initial =
+    putusan === "setuju" ? "APPROVED" : putusan === "tolak" ? "REJECTED" : undefined;
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6 py-4">
@@ -83,17 +96,19 @@ export default async function ApprovalPage({
               </p>
             ) : null}
 
-            <div className="mt-5 border-t border-hairline pt-4">
-              <h2 className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
-                Isi pengajuan
-              </h2>
-              <div className="mt-2">
-                <RequestPayloadSummary payload={result.preview.payload} />
-              </div>
-            </div>
+            {/*
+              * The request's contents are deliberately not repeated here.
+              *
+              * The approval email carries every field, and the approver has
+              * just read it — that is where the decision is actually made. This
+              * page exists for one reason: a decision has to be a POST somebody
+              * makes, because mail scanners follow every link in a message and
+              * a GET that approved would be approved by a spam filter. So it
+              * shows who and what, and then gets out of the way.
+              */}
           </Card>
 
-          <TokenDecisionForm token={token} stage={result.preview.stage} />
+          <TokenDecisionForm token={token} stage={result.preview.stage} initial={initial} />
 
           <p className="text-center text-xs text-ink-faint">
             Tautan ini sekali pakai dan memiliki masa berlaku. Jangan meneruskannya.

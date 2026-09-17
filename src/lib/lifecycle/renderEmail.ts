@@ -1,7 +1,8 @@
 import type { EmailMessage } from "@/lib/email/types";
 
+import { accessProfileLabel } from "./accessProfiles";
 import type { ApprovalMailPayload } from "./outbox";
-import type { LifecycleType } from "./types";
+import type { LifecyclePayload, LifecycleType, TerminationReason } from "./types";
 
 /**
  * Turning a queued event into the message somebody actually reads.
@@ -56,6 +57,88 @@ ${body}
 </div></body></html>`;
 }
 
+/** Same wording as the portal's summary, so the two never say different things. */
+const REASON_LABEL: Record<TerminationReason, string> = {
+  RESIGN: "Mengundurkan diri",
+  CONTRACT_END: "Kontrak berakhir",
+  RETIREMENT: "Pensiun",
+  TERMINATION: "Pemutusan hubungan kerja",
+  OTHER: "Lainnya",
+};
+
+/**
+ * The request itself, as the approver needs to see it.
+ *
+ * Mirrors RequestPayloadSummary field for field. An approver reading the email
+ * and an approver reading the portal must be deciding on the same text — a
+ * shorter version in the inbox is how somebody approves something they never
+ * actually read.
+ *
+ * The termination note is absent here and, more importantly, absent from the
+ * payload this is given: see mailSafePayload in outbox.ts.
+ */
+function payloadRows(payload: LifecyclePayload): Array<[string, string]> {
+  if (payload.kind === "ONBOARDING") {
+    return [
+      ["NIK", payload.nik],
+      ["Nama", payload.displayName],
+      ["Email", payload.email],
+      ["Jabatan", payload.jobTitle],
+      ["Departemen", payload.department],
+      [
+        "Status kepegawaian",
+        payload.employmentType === "CONTRACT"
+          ? `Kontrak · berakhir ${payload.expiredDate ?? "—"}`
+          : "Karyawan tetap",
+      ],
+      [
+        "Lokasi",
+        payload.locationType === "CABANG"
+          ? `Cabang · ${payload.branchName ?? "—"}`
+          : "Kantor pusat",
+      ],
+      ["Manager", `${payload.managerName} · ${payload.managerEmail}`],
+      ["Mulai bekerja", payload.startDate],
+      ["Profil akses", accessProfileLabel(payload.accessProfileId)],
+      ...(payload.jobDescription
+        ? [["Keterangan jabatan", payload.jobDescription] as [string, string]]
+        : []),
+    ];
+  }
+
+  if (payload.kind === "MOVEMENT") {
+    return [
+      ["Departemen tujuan", payload.toDepartment],
+      ["Jabatan tujuan", payload.toJobTitle],
+      ["Manager tujuan", `${payload.toManagerName} · ${payload.toManagerEmail}`],
+      ["Profil akses baru", accessProfileLabel(payload.accessProfileId)],
+      ["Alasan", payload.reason],
+      ...(payload.toJobDescription
+        ? [["Keterangan jabatan", payload.toJobDescription] as [string, string]]
+        : []),
+    ];
+  }
+
+  return [
+    ["Kategori alasan", REASON_LABEL[payload.reasonCategory]],
+    ["Tanggal terakhir bekerja", payload.lastWorkingDate],
+    ...(payload.handoverTo
+      ? [["Serah terima kepada", payload.handoverTo] as [string, string]]
+      : []),
+    ["Tindakan", "Nonaktifkan dan karantina akun — bukan hapus permanen"],
+  ];
+}
+
+function rowsToHtml(rows: Array<[string, string]>): string {
+  return rows
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding:6px 12px 6px 0;color:#44607f;font-size:13px;vertical-align:top">${escapeHtml(label)}</td>` +
+        `<td style="padding:6px 0;font-size:13px;font-weight:600">${escapeHtml(value)}</td></tr>`,
+    )
+    .join("");
+}
+
 function detailRows(payload: ApprovalMailPayload): string {
   const rows: Array<[string, string]> = [
     ["Jenis", TYPE_LABEL[payload.type]],
@@ -105,6 +188,11 @@ function buildCard(payload: ApprovalMailPayload, actionUrl: string): unknown {
           { title: "Versi", value: String(payload.version) },
           ...(payload.managerDecision
             ? [{ title: "Manager", value: `${payload.managerDecision.by} menyetujui` }]
+            : []),
+          // The card and the link have to say the same things; enriching one
+          // and not the other is how two versions of a request start existing.
+          ...(payload.payload
+            ? payloadRows(payload.payload).map(([title, value]) => ({ title, value }))
             : []),
         ],
       },
@@ -156,8 +244,18 @@ export function renderEmail(payload: ApprovalMailPayload, recipient: string): Em
 <h1 style="margin:0 0 12px;font-size:20px">Permintaan persetujuan ${escapeHtml(TYPE_LABEL[payload.type])}</h1>
 <p style="margin:0 0 16px;font-size:14px;line-height:1.6">Halo ${escapeHtml(payload.approverName)}, ada pengajuan yang menunggu keputusan Anda sebagai <strong>${payload.stage === "MANAGER" ? "Manager" : "CISO"}</strong>.</p>
 <table style="width:100%;border-collapse:collapse;margin-bottom:20px">${detailRows(payload)}</table>
-<a href="${escapeHtml(decisionUrl)}" style="display:inline-block;background:#fdb713;color:#0a1c33;font-weight:600;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:14px">Buka halaman keputusan</a>
-<p style="margin:20px 0 0;font-size:12px;color:#44607f;line-height:1.6">Tautan ini sekali pakai dan memiliki masa berlaku. Belum ada perubahan apa pun pada akun — perubahan baru dijalankan setelah kedua persetujuan masuk dan hasilnya diverifikasi.</p>`;
+${
+  payload.payload
+    ? `<p style="margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#44607f">Isi pengajuan</p>
+<table style="width:100%;border-collapse:collapse;margin-bottom:20px;border-top:1px solid #d5e0ee">${rowsToHtml(payloadRows(payload.payload))}</table>`
+    : ""
+}
+<table role="presentation" style="border-collapse:collapse"><tr>
+<td style="padding-right:10px"><a href="${escapeHtml(`${decisionUrl}?putusan=setuju`)}" style="display:inline-block;background:#1f8f4e;color:#ffffff;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px">Setujui</a></td>
+<td><a href="${escapeHtml(`${decisionUrl}?putusan=tolak`)}" style="display:inline-block;background:#ffffff;color:#b3261e;font-weight:600;text-decoration:none;padding:11px 23px;border-radius:8px;font-size:14px;border:1px solid #b3261e">Tolak</a></td>
+</tr></table>
+<p style="margin:20px 0 0;font-size:12px;color:#44607f;line-height:1.6"><strong>Setujui</strong> langsung tercatat begitu Anda menekannya — tab yang terbuka hanya menampilkan hasilnya. <strong>Tolak</strong> membuka satu kotak alasan, karena alasannya wajib dan pemohon membacanya.</p>
+<p style="margin:10px 0 0;font-size:12px;color:#44607f;line-height:1.6">Tautan ini sekali pakai dan memiliki masa berlaku. Belum ada perubahan apa pun pada akun — perubahan baru dijalankan setelah kedua persetujuan masuk dan hasilnya diverifikasi.</p>`;
 
     return {
       to: { address: recipient, name: payload.approverName },
