@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import { LoginAside } from "@/components/auth/LoginAside";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Reveal } from "@/components/motion/Reveal";
@@ -5,6 +7,7 @@ import { BrandMark } from "@/components/ui/BrandMark";
 import { Card } from "@/components/ui/Field";
 import { IconAlert } from "@/components/ui/Icons";
 import { isAuthConfigured, isLdapConfigured } from "@/lib/auth/ad";
+import { getSession } from "@/lib/auth/current";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +19,26 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  // Only same-site paths, so `?next=` can never bounce someone to another host.
-  const destination = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  /*
+   * Only same-site paths, so `?next=` can never bounce someone to another host.
+   *
+   * `/login` is excluded as well, and not for tidiness: sending a signed-in
+   * visitor back to this page would redirect it to itself without end — the
+   * same loop this file's redirect exists to have fixed.
+   */
+  const destination =
+    next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/login")
+      ? next
+      : "/";
+
+  /*
+   * Somebody already signed in has no reason to see the form.
+   *
+   * Decided here rather than in proxy.ts because this is the layer that can
+   * resolve a session. The proxy sees only that a cookie exists, and acting on
+   * that alone locked out anyone holding a stale one.
+   */
+  if (await getSession()) redirect(destination);
   const configured = isAuthConfigured();
   // No LDAP server wired up yet: the app is running on its local demo accounts.
   const demoMode = !isLdapConfigured() && process.env.NODE_ENV !== "production";

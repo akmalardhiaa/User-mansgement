@@ -42,9 +42,6 @@ const PUBLIC_PATHS = [
   "/api/approval-actions",
 ];
 
-/** Pages a signed-in person has no reason to see. */
-const SIGNED_IN_REDIRECTS = new Set(["/login"]);
-
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((entry) => {
     // Entries may or may not carry a trailing slash. Normalising first keeps
@@ -168,17 +165,19 @@ export async function proxy(request: NextRequest) {
     return response;
   };
 
-  if (hasCookie) {
-    // Only a redirect away from the login page. Whether the cookie resolves to
-    // a live session is decided downstream — if it does not, the login page is
-    // where the person lands anyway, one hop later.
-    if (SIGNED_IN_REDIRECTS.has(pathname)) {
-      const redirect = NextResponse.redirect(new URL("/", request.url));
-      redirect.headers.set("Content-Security-Policy", csp);
-      return redirect;
-    }
-    return forward();
-  }
+  /*
+   * A cookie is present, and nothing is decided here on the strength of it.
+   *
+   * This used to redirect /login to / whenever a cookie existed, assuming that
+   * whoever holds one is signed in. They may not be: the cookie can be stale or
+   * revoked, and this layer cannot tell the difference because it reads no
+   * session store. A dead cookie then had no way out — the page turned the
+   * person away to /login, and this sent them straight back, forever.
+   *
+   * "Already signed in, skip the form" belongs in the login page, which
+   * resolves the session and therefore actually knows the answer.
+   */
+  if (hasCookie) return forward();
 
   if (isPublic(pathname)) return forward();
 
