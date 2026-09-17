@@ -255,8 +255,9 @@ orang yang tidak pernah diberi tahu. Menulis satu baris hanya berbiaya jeda.
 Aturan yang ditegakkan kode:
 
 - **`accepted` dicatat, `delivered` tidak.** Graph menjawab `sendMail` dengan
-  202 Accepted — artinya diantrekan, bukan sampai. Tidak ada field `deliveredAt`
-  di mana pun, supaya tidak ada yang mengisinya karena mengira 202 berarti tiba.
+  202 Accepted, Gmail dengan 200 plus id pesan — keduanya berarti diantrekan,
+  bukan sampai. Tidak ada field `deliveredAt` di mana pun, supaya tidak ada yang
+  mengisinya karena mengira jawaban provider berarti pesan tiba.
 - **Duplikat mungkin terjadi dan tidak dipungkiri.** Timeout setelah provider
   menerima pesan tidak menyisakan cara untuk tahu, dan retry mengirimnya lagi.
   Yang membuatnya aman ada di hilir: tautannya sekali pakai dan keputusannya
@@ -274,8 +275,39 @@ Aturan yang ditegakkan kode:
   `Retry-After`, lalu dead-letter. Event yang diulang selamanya adalah event yang
   tidak pernah dibaca siapa pun.
 
-Demo memakai `EMAIL_DRIVER=file`: tiap pesan ditulis sebagai `.html` yang bisa
-dibuka di browser persis seperti yang dilihat penerima. **Production menolaknya.**
+Tiga driver, dipilih eksplisit lewat `EMAIL_DRIVER`:
+
+| Nilai | Keterangan |
+| --- | --- |
+| `file` | Tiap pesan ditulis sebagai `.html` yang bisa dibuka di browser persis seperti yang dilihat penerima. **Ditolak di production.** |
+| `gmail` | Gmail API lewat OAuth refresh token, scope `gmail.send` saja — tidak bisa membaca inbox. Token diperoleh sekali dengan `npm run gmail:auth`. |
+| `graph` | Microsoft Graph `sendMail`, client credentials. |
+
+Dua yang terakhir **belum pernah diuji ke akun atau tenant nyata**. Keduanya
+menolak jalan tanpa konfigurasi lengkap, dan menyebutkan persis nilai mana yang
+belum diisi alih-alih diam-diam mundur ke driver lain.
+
+**`EMAIL_REDIRECT_TO` mengalihkan semua email ke satu alamat**, dengan tujuan
+aslinya tetap terbaca di subjek dan badan pesan. Ini bukan kenyamanan: direktori
+demo memuat alamat manager di domain nyata, dan tiap email persetujuan membawa
+token sekali pakai yang halamannya tidak menuntut login — pesan yang mendarat di
+inbox keliru menyerahkan keputusan yang bukan milik orang itu. Mengalihkan lebih
+dipilih daripada merapikan alamat karena tetap benar saat data berubah:
+merapikan hanya membereskan baris yang ada hari ini. **Ditolak di production.**
+
+**Pengiriman berjalan sendiri.** `src/instrumentation.ts` menyalakan penjadwal
+saat server start, dan tiap `OUTBOX_POLL_SECONDS` detik (default 30 di luar
+production) ia menjalankan dispatcher. Tanpa ini submit hanya mencatat kewajiban
+kirim, dan tangga retry di atas cuma hiasan — percobaan berikutnya dijadwalkan
+tetapi tidak pernah dijemput. Satu putaran tidak pernah tumpang tindih dengan
+yang sebelumnya, dan kesalahan konfigurasi menghentikan penjadwal alih-alih
+mengulang kegagalan identik tiap setengah menit.
+
+**Di production penjadwal mati kecuali diisi eksplisit.** Kunci di `store.ts`
+hanya berlaku per-proses, jadi loop ini benar untuk *tepat satu* instance — dan
+deployment tidak tahu ia punya berapa. Untuk banyak instance, pakai penjadwal di
+luar aplikasi yang memanggil `POST /api/outbox/dispatch`. Tombol manual di panel
+email tetap ada pada kedua kasus.
 
 Token tautan memang berada di URL — itulah bentuk tautan email — sehingga
 `Referrer-Policy: no-referrer` dipasang agar URL itu tidak ikut terkirim ke
@@ -374,6 +406,7 @@ npm run lint       # --max-warnings 0: satu warning pun menggagalkan
 npm run typecheck
 npm test           # unit + integrasi domain lifecycle
 npm run ad:check   # uji konektivitas LDAP
+npm run gmail:auth # tukar consent Google jadi refresh token, sekali saja
 ```
 
 Keempat pemeriksaan di atas dijalankan otomatis pada setiap push dan pull

@@ -1,6 +1,8 @@
 import { FileEmailDriver, type MailFaultMode } from "./fileDriver";
+import { GmailEmailDriver, gmailConfig, missingGmailConfig } from "./gmailDriver";
 import { GraphEmailDriver, graphConfig, missingGraphConfig } from "./graphDriver";
 import { RedirectingEmailDriver, isValidRedirect, redirectTarget } from "./redirect";
+import { SmtpEmailDriver, missingSmtpConfig, smtpConfig } from "./smtpDriver";
 import type { EmailDriver } from "./types";
 
 /**
@@ -42,8 +44,8 @@ function parseFault(): MailFaultMode {
  * Wraps the chosen driver when every message is to go to one mailbox.
  *
  * Applied to whichever driver was selected rather than inside one of them, so
- * `file` and `graph` behave identically and a future driver inherits it without
- * knowing the feature exists.
+ * every driver behaves identically and a future one inherits it without knowing
+ * the feature exists.
  */
 function withRedirect(driver: EmailDriver, production: boolean): EmailDriver {
   const target = redirectTarget();
@@ -91,6 +93,28 @@ function buildDriver(production: boolean): EmailDriver {
     return new GraphEmailDriver(config);
   }
 
+  if (configured === "gmail") {
+    const config = gmailConfig();
+    if (!config) {
+      throw new EmailConfigurationError(
+        `EMAIL_DRIVER=gmail tetapi konfigurasi belum lengkap. Belum diisi: ${missingGmailConfig().join(", ")}.`,
+      );
+    }
+    // Never exercised against a real account yet — see gmailDriver.ts.
+    return new GmailEmailDriver(config);
+  }
+
+  if (configured === "smtp") {
+    const config = smtpConfig();
+    if (!config) {
+      throw new EmailConfigurationError(
+        `EMAIL_DRIVER=smtp tetapi konfigurasi belum lengkap. Belum diisi: ${missingSmtpConfig().join(", ")}.`,
+      );
+    }
+    // Never exercised against a real server yet — see smtpDriver.ts.
+    return new SmtpEmailDriver(config);
+  }
+
   if (configured === "file") {
     if (production) {
       throw new EmailConfigurationError(
@@ -101,7 +125,7 @@ function buildDriver(production: boolean): EmailDriver {
   }
 
   throw new EmailConfigurationError(
-    "EMAIL_DRIVER belum diset. Isi `file` untuk demo, atau `graph` setelah Microsoft Graph dikonfigurasi.",
+    "EMAIL_DRIVER belum diset. Isi `file` untuk demo, `smtp` untuk SMTP, `gmail` untuk Gmail API, atau `graph` untuk Microsoft Graph.",
   );
 }
 
