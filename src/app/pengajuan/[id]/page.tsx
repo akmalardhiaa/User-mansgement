@@ -227,7 +227,11 @@ export default async function RequestDetailPage({
             </ol>
           </Card>
 
-          <EmailDeliveryPanel events={mail.events} deliveries={mail.deliveries} />
+          <EmailDeliveryPanel
+            events={mail.events}
+            deliveries={mail.deliveries}
+            canDispatch={canRun}
+          />
 
           <Card className="p-5">
             <h2 className="text-sm font-semibold text-ink">Rincian</h2>

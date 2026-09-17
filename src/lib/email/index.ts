@@ -1,5 +1,6 @@
 import { FileEmailDriver, type MailFaultMode } from "./fileDriver";
 import { GraphEmailDriver, graphConfig, missingGraphConfig } from "./graphDriver";
+import { RedirectingEmailDriver, isValidRedirect, redirectTarget } from "./redirect";
 import type { EmailDriver } from "./types";
 
 /**
@@ -37,11 +38,45 @@ function parseFault(): MailFaultMode {
   );
 }
 
+/**
+ * Wraps the chosen driver when every message is to go to one mailbox.
+ *
+ * Applied to whichever driver was selected rather than inside one of them, so
+ * `file` and `graph` behave identically and a future driver inherits it without
+ * knowing the feature exists.
+ */
+function withRedirect(driver: EmailDriver, production: boolean): EmailDriver {
+  const target = redirectTarget();
+  if (!target) return driver;
+
+  if (production) {
+    throw new EmailConfigurationError(
+      "EMAIL_REDIRECT_TO ditolak di production. Approver yang tidak pernah menerima " +
+        "permintaan persetujuan adalah kegagalan yang justru dijaga oleh lapisan ini.",
+    );
+  }
+
+  if (!isValidRedirect(target)) {
+    // Silently ignoring it would send to the real addresses — the exact outcome
+    // somebody set this variable to prevent.
+    throw new EmailConfigurationError(
+      `EMAIL_REDIRECT_TO="${target}" bukan alamat email yang sah.`,
+    );
+  }
+
+  return new RedirectingEmailDriver(driver, target);
+}
+
 export function getEmailDriver(): EmailDriver {
   if (cached) return cached;
 
-  const configured = process.env.EMAIL_DRIVER?.trim().toLowerCase();
   const production = process.env.NODE_ENV === "production";
+  cached = withRedirect(buildDriver(production), production);
+  return cached;
+}
+
+function buildDriver(production: boolean): EmailDriver {
+  const configured = process.env.EMAIL_DRIVER?.trim().toLowerCase();
 
   if (configured === "graph") {
     const config = graphConfig();
@@ -53,8 +88,7 @@ export function getEmailDriver(): EmailDriver {
       );
     }
     // Never exercised against a real tenant yet — see graphDriver.ts.
-    cached = new GraphEmailDriver(config);
-    return cached;
+    return new GraphEmailDriver(config);
   }
 
   if (configured === "file") {
@@ -63,8 +97,7 @@ export function getEmailDriver(): EmailDriver {
         "EMAIL_DRIVER=file ditolak di production. Email persetujuan tidak boleh berakhir di folder lokal.",
       );
     }
-    cached = new FileEmailDriver(parseFault());
-    return cached;
+    return new FileEmailDriver(parseFault());
   }
 
   throw new EmailConfigurationError(
