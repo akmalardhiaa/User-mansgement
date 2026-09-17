@@ -24,15 +24,57 @@ const ROLE_GROUP_ENV: Record<PortalRole, string> = {
 };
 
 /**
+ * Splits a distinguished name into its components, normalised for comparison.
+ *
+ * `CN=HC Admins,OU=Groups,DC=corp` becomes `["cn=hc admins", "ou=groups",
+ * "dc=corp"]`. AD is inconsistent about the space after a comma, so each part is
+ * trimmed rather than compared as written.
+ */
+function components(dn: string): string[] {
+  return dn
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/**
+ * Whether one `memberOf` entry is the configured group.
+ *
+ * This used to be `group.includes(needle)`, and a bare substring is the wrong
+ * test for a DN: `CN=HC Admins` also matched `CN=Former HC Admins,OU=Archive`
+ * and `CN=HC Admins Read-Only`, so membership of an archived or read-only group
+ * silently conferred the real one's authority. A comparison that decides who may
+ * approve access cannot be one that matches half a name.
+ *
+ * Components are compared whole, and the configured value may be either the full
+ * DN or a leading run of it — which keeps both documented forms working.
+ */
+function matchesGroup(memberOf: string, configured: string): boolean {
+  const group = components(memberOf);
+  const needle = components(configured);
+  if (group.length === 0 || needle.length === 0) return false;
+
+  // A bare name, `HC Officers` rather than `CN=HC Officers`. Undocumented but
+  // an easy thing to type, so it is accepted explicitly against the common name
+  // rather than by falling back to a loose match.
+  if (needle.length === 1 && !needle[0].includes("=")) {
+    const [attribute, ...value] = group[0].split("=");
+    return attribute === "cn" && value.join("=") === needle[0];
+  }
+
+  return needle.every((part, index) => group[index] === part);
+}
+
+/**
  * Resolves the roles carried by a user's `memberOf` list.
  *
- * Matching is a case-insensitive substring so an operator can configure either
- * the full distinguished name or just `CN=HC Admins`. `LDAP_ADMIN_GROUP` is
- * still honoured as an alias for the SYSTEM_ADMIN group, so a deployment that
- * predates this change keeps working.
+ * An operator may configure the full distinguished name, a leading part of it
+ * such as `CN=HC Admins`, or the bare common name. What is never accepted is a
+ * partial word — see `matchesGroup`. `LDAP_ADMIN_GROUP` is still honoured as an
+ * alias for the SYSTEM_ADMIN group, so a deployment that predates this keeps
+ * working.
  */
 export function rolesFromGroups(groups: readonly string[]): PortalRole[] {
-  const memberOf = groups.map((group) => group.toLowerCase());
   const roles: PortalRole[] = [];
 
   for (const role of PORTAL_ROLES) {
@@ -42,9 +84,9 @@ export function rolesFromGroups(groups: readonly string[]): PortalRole[] {
     ];
 
     for (const raw of configured) {
-      const needle = raw?.trim().toLowerCase();
+      const needle = raw?.trim();
       if (!needle) continue;
-      if (memberOf.some((group) => group.includes(needle))) {
+      if (groups.some((group) => matchesGroup(group, needle))) {
         roles.push(role);
         break;
       }
