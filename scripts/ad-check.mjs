@@ -45,6 +45,29 @@ function firstString(value) {
   return value === undefined || value === null ? "" : String(value);
 }
 
+// Mirrors matchesGroup in src/lib/auth/roleMapping.ts. A substring test would
+// report ADMIN for membership of `CN=Former HC Admins`, and a diagnostic that
+// disagrees with the app it is meant to be checking is worse than none.
+function components(dn) {
+  return dn
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function matchesGroup(memberOf, configured) {
+  const group = components(memberOf);
+  const needle = components(configured);
+  if (group.length === 0 || needle.length === 0) return false;
+
+  if (needle.length === 1 && !needle[0].includes("=")) {
+    const [attribute, ...value] = group[0].split("=");
+    return attribute === "cn" && value.join("=") === needle[0];
+  }
+
+  return needle.every((part, index) => group[index] === part);
+}
+
 const client = new Client({ url, timeout: 8000, connectTimeout: 8000 });
 
 try {
@@ -67,7 +90,8 @@ try {
     );
   } else {
     const groups = [].concat(entry.memberOf ?? []).map(String);
-    const role = adminGroup && groups.some((group) => group.toLowerCase().includes(adminGroup)) ? "ADMIN" : "USER";
+    const role =
+      adminGroup && groups.some((group) => matchesGroup(group, adminGroup)) ? "ADMIN" : "USER";
     console.info("  Nama    : " + (firstString(entry.displayName) || "(kosong)"));
     console.info("  Email   : " + (firstString(entry.mail) || "(kosong)"));
     console.info("  Divisi  : " + (firstString(entry.department) || "(kosong)"));
