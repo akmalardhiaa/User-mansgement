@@ -53,14 +53,26 @@ const securityHeaders = [
    */
 ];
 
+/**
+ * Where the build output goes.
+ *
+ * Overridable so a production build can be taken WITHOUT overwriting the tree a
+ * running `next dev` is serving from. Sharing one directory between the two
+ * leaves a mixed `.next`, and the symptom is baffling: nested route handlers
+ * start answering with a 404 HTML page while their parent still works.
+ */
+const distDir = process.env.NEXT_DIST_DIR?.trim() || ".next";
+
 const nextConfig: NextConfig = isStaticExport
   ? {
       output: "export",
       basePath,
       trailingSlash: true,
+      distDir,
       images: { unoptimized: true },
     }
   : {
+      distDir,
       async headers() {
         return [{ source: "/:path*", headers: securityHeaders }];
       },
