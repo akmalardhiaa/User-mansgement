@@ -1,3 +1,4 @@
+import { SendPendingMailButton } from "@/components/lifecycle/SendPendingMailButton";
 import { Card } from "@/components/ui/Field";
 import type { EmailDelivery, OutboxEvent } from "@/lib/lifecycle/outboxTypes";
 
@@ -34,15 +35,25 @@ function formatDate(iso: string): string {
 export function EmailDeliveryPanel({
   events,
   deliveries,
+  canDispatch = false,
 }: {
   events: OutboxEvent[];
   deliveries: EmailDelivery[];
+  /** Whether the viewer holds `execution.run` and may send what is queued. */
+  canDispatch?: boolean;
 }) {
   if (events.length === 0) return null;
 
+  // Offered only when there is something to send. A button that runs the
+  // dispatcher against an empty queue teaches the operator to ignore it.
+  const hasPending = events.some((event) => event.state === "PENDING");
+
   return (
     <Card className="p-5">
-      <h2 className="text-sm font-semibold text-ink">Email persetujuan</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-ink">Email persetujuan</h2>
+        {canDispatch && hasPending ? <SendPendingMailButton /> : null}
+      </div>
 
       <ol className="mt-4 space-y-4">
         {events.map((event) => {
