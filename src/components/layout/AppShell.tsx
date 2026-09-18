@@ -140,7 +140,7 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
   return (
     <div className="flex min-h-screen flex-col">
       <header
-        className={`sticky top-0 z-30 border-b bg-canvas/80 backdrop-blur-md transition-[border-color,box-shadow] duration-300 ${
+        className={`sticky top-0 z-30 border-b bg-canvas/95 transition-[border-color,box-shadow] duration-300 ${
           scrolled
             ? "border-hairline-strong shadow-[var(--shadow-header)]"
             : "border-hairline shadow-none"

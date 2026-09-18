@@ -259,46 +259,18 @@ body::before {
 }
 
 /*
- * Loading placeholder skeleton shimmer
+ * The brand gradient, held still.
+ *
+ * It used to sweep, on a 6-second loop, and the sweep was the expensive part:
+ * animating `background-position` is a repaint every frame, not compositor
+ * work like a transform. Three of these rendered at once on the dashboard —
+ * the header lockup, the badge and the title — so the page never stopped
+ * repainting while sitting idle.
+ *
+ * `background-size` drops to 100% with it. At 200% the gradient was twice the
+ * width of the text so it had somewhere to travel; left at 200% without the
+ * animation, only its left half would ever show.
  */
-@keyframes shimmer {
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-@utility skeleton {
-  position: relative;
-  overflow: hidden;
-  background-color: color-mix(in oklab, var(--color-elevated) 70%, transparent);
-
-  &::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    transform: translateX(-100%);
-    background-image: linear-gradient(
-      90deg,
-      transparent,
-      color-mix(in oklab, var(--color-hairline-strong) 45%, transparent),
-      transparent
-    );
-    animation: shimmer 1.6s infinite;
-  }
-}
-
-/*
- * Eye-candy text shimmer animation for brand & title highlights
- */
-@keyframes text-glow-shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
 @utility text-shimmer-brand {
   background: linear-gradient(
     110deg,
@@ -308,10 +280,9 @@ body::before {
     var(--color-accent-soft) 75%,
     var(--color-accent) 100%
   );
-  background-size: 200% 100%;
+  background-size: 100% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: text-glow-shimmer 6s linear infinite;
 }
 
 :root[data-theme="light"] .text-shimmer-brand {
@@ -323,7 +294,7 @@ body::before {
     #8a5c00 75%,
     #d99b00 100%
   );
-  background-size: 200% 100%;
+  background-size: 100% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
