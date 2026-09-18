@@ -1,12 +1,33 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useState } from "react";
 
-import { EmployeeDetailDrawer } from "@/components/dashboard/EmployeeDetailDrawer";
-import { EmployeeReportModal } from "@/components/dashboard/EmployeeReportModal";
 import { PendingBadge } from "@/components/dashboard/PendingBadge";
+
+/*
+ * The drawer and the report are loaded when somebody opens one, not before.
+ *
+ * Both are mounted unconditionally below and return null until an employee is
+ * selected, so they cost nothing to render — but a static import puts their
+ * code in the dashboard's bundle for every visitor, including the majority who
+ * never open either. Between them that is roughly 19 KB of source on the
+ * critical path of the page people land on.
+ *
+ * `ssr: false` because neither can appear until a click has happened, so there
+ * is no first paint for them to be part of.
+ */
+const EmployeeDetailDrawer = dynamic(
+  () => import("@/components/dashboard/EmployeeDetailDrawer").then((m) => m.EmployeeDetailDrawer),
+  { ssr: false },
+);
+
+const EmployeeReportModal = dynamic(
+  () => import("@/components/dashboard/EmployeeReportModal").then((m) => m.EmployeeReportModal),
+  { ssr: false },
+);
 import { Button } from "@/components/ui/Button";
 import { IconArrowUp, IconSearch, IconSwap } from "@/components/ui/Icons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
