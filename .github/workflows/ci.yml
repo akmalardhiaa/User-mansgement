@@ -53,3 +53,21 @@ jobs:
           # that needs them belongs in a deployment step, not here.
           AD_DRIVER: mock
           EMAIL_DRIVER: file
+
+      # The image is not published anywhere; this only proves it still builds.
+      # Without it the Dockerfile is guarded by nothing — a dependency that
+      # stops installing under Linux, or a file the .dockerignore now excludes,
+      # would be discovered by whoever next tried to run the container rather
+      # than by the gate.
+      #
+      # `load: false` keeps the result in the build cache instead of importing
+      # it into the runner's daemon: nothing here runs the image, and the import
+      # is pure cost.
+      - name: Docker image builds
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
