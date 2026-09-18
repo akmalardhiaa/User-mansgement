@@ -29,6 +29,85 @@ menyetujui.
 Akun demo ditolak di production: di sana `LDAP_URL` yang belum diisi adalah
 kesalahan konfigurasi, bukan alasan untuk meloloskan siapa pun.
 
+### Masuk lewat direktori simulasi
+
+Pilihan tengah antara daftar di atas dan AD sungguhan, dan alasan memilihnya
+bukan kenyamanan: peran diambil dari **keanggotaan group** tiap akun, lewat
+`rolesFromGroups` yang sama persis dengan yang membaca `memberOf` dari domain
+controller. `devUsers.ts` menuliskan peran per akun, jadi login lewat daftar itu
+tidak pernah sekali pun menjalankan pemetaan yang menentukan wewenang di
+deployment sungguhan — salah isi `AD_GROUP_*` baru ketahuan pada hari AD asli
+dihubungkan.
+
+```bash
+MOCK_AD_LOGIN=true
+MOCK_AD_PASSWORD=mock12345
+```
+
+Direktori hasil seed hanya membawa group **akses** (`CN=HC-Base`), bukan group
+**peran**. Tanpa langkah berikut semua akun masuk tanpa wewenang apa pun dan
+hanya melihat profilnya sendiri — benar, bukan rusak:
+
+```bash
+npm run mock-ad:roles          # beri group peran ke tiga akun
+npm run mock-ad:roles -- --undo  # kembalikan tepat yang ditambahkannya
+```
+
+| Akun | Peran yang didapat |
+| --- | --- |
+| `ayu.prameswari` | `HC_REQUESTER` + `SYSTEM_ADMIN` |
+| `sarah.wijaya` | `MANAGER` |
+| `bagus.nugroho` | `CISO_APPROVER` |
+
+DN yang ditulis dibaca dari `AD_GROUP_*`, jadi direktori dan konfigurasi cocok
+secara konstruksi. Nama yang tidak dikenal direktori simulasi **jatuh ke daftar
+demo di atas**, sehingga menyalakan ini tidak pernah mengunci siapa pun keluar.
+Akun yang dinonaktifkan tidak bisa masuk — itulah yang membuat Termination
+terlihat utuh: login berhenti bekerja sebagai *akibat* pengajuan, bukan sebagai
+langkah terpisah yang harus diingat seseorang. **Ditolak di production.**
+
+## Menjalankan dengan Docker
+
+```bash
+cp .env.docker.example .env.docker   # isi dua placeholder di dalamnya
+docker compose up --build
+```
+
+Lalu buka `http://localhost:3000`.
+
+**Container ini sengaja berjalan dalam mode development**, dan itu bukan
+kemalasan. Aplikasi ini memuat sembilan penjagaan produksi, dan konfigurasi demo
+melanggar hampir semuanya: tanpa `LDAP_URL`, `authenticateAD` **melempar error**
+alih-alih menurunkan mutu — tidak ada yang bisa masuk sama sekali; `AD_DRIVER=mock`,
+`MOCK_AD_LOGIN`, `EMAIL_DRIVER=file`, dan `EMAIL_REDIRECT_TO` masing-masing
+ditolak; dan cookie sesi menyalakan `secure`, sehingga browser tidak akan
+mengirimnya lewat `http://localhost` dan login tidak pernah nempel tanpa TLS.
+`next start` akan menghasilkan container yang menyala bersih lalu menolak setiap
+login — lebih buruk daripada tidak ada container, karena ia tampak berfungsi.
+
+Image produksi adalah artefak berbeda dengan masukan berbeda: domain controller
+sungguhan, mailbox sungguhan, kunci enkripsi yang dibangkitkan, dan proxy yang
+menerminasi TLS. Bukan berkas ini dengan satu flag dibalik.
+
+`.dockerignore` adalah keamanan, bukan kerapian, dan merupakan berkas yang tidak
+boleh ditinggalkan saat Dockerfile dibagikan. Apa pun yang tersalin ke sebuah
+layer menetap di sana dan terbaca siapa pun yang bisa menarik image — sekalipun
+layer berikutnya menghapusnya. `.env*` memuat App Password yang hidup, dan
+`data/` memuat hash id sesi, payload outbox tersegel, serta tabel token
+persetujuan. Keduanya masuk saat runtime: rahasia lewat `env_file`, state lewat
+bind mount.
+
+Satu volume menutupi semuanya, karena keempat berkas yang ditulis aplikasi —
+`hc-store.json`, `hc-sessions.json`, `mock-ad.json`, dan `outbox-mail/` — berada
+di bawah `data/`. Mengikatnya ke host juga yang membuat container melihat akun
+yang sudah di-seed `npm run mock-ad:roles`, bukan direktori kosong yang tidak
+bisa dimasuki siapa pun.
+
+Container dan `npm run dev` **tidak boleh jalan bersamaan**. Keduanya menulis
+`data/` yang sama, sedangkan kunci di `store.ts` hanyalah antrean per-proses dan
+tidak bisa menengahi dua proses — dan dua penjadwal outbox yang menyapu antrean
+yang sama berarti satu email persetujuan bisa terkirim dua kali.
+
 ## Identitas dan wewenang
 
 Keduanya sengaja dipisah:
@@ -41,6 +120,14 @@ Keduanya sengaja dipisah:
 
 Pemetaan group diatur lewat `AD_GROUP_*` (lihat `.env.example`). Satu orang
 boleh memegang beberapa peran sekaligus.
+
+Pencocokannya membandingkan **komponen DN secara utuh**, bukan substring. Boleh
+diisi DN lengkap, bagian depannya seperti `CN=HC Admins`, atau nama umumnya saja
+— ketiganya bekerja. Yang tidak akan cocok adalah separuh nama: `CN=HC Admins`
+sengaja **tidak** cocok dengan `CN=Former HC Admins` maupun
+`CN=HC Admins Read-Only`. Sebelumnya pencocokan substring membuat keanggotaan
+group arsip atau read-only diam-diam memberikan wewenang group aslinya —
+termasuk `SYSTEM_ADMIN`.
 
 | Peran | Wewenang |
 | --- | --- |
@@ -268,24 +355,35 @@ Aturan yang ditegakkan kode:
 - **Tautan terikat satu tahap dan satu versi.** Tautan manager tidak bisa
   menjawab pertanyaan CISO, dan tautan untuk versi 1 tidak bisa menyetujui
   versi 2. Revisi mencabut seluruh tautan yang masih hidup.
-- **Membuka tautan tidak memutuskan apa pun.** Keputusan adalah POST terpisah,
-  karena pemindai email dan pratinjau tautan mengikuti setiap URL dalam pesan —
-  dan halaman yang menyetujui saat dimuat akan disetujui oleh filter spam.
+- **Mengambil tautan tidak memutuskan apa pun; membukanya di browser bisa.**
+  Endpoint keputusan hanya menerima POST, jadi pemindai email dan pratinjau
+  tautan yang sekadar mengikuti URL tidak menyetujui apa pun. Tetapi tombol
+  **Setujui** membawa `?putusan=setuju`, dan halamannya mengirim keputusan itu
+  sendiri begitu dimuat — sehingga apa pun yang membuka tautan **dan
+  menjalankan JavaScript-nya** akan menyetujui: gateway keamanan email yang
+  merender halaman di sandbox, pesan yang diteruskan lalu dibuka orang lain,
+  atau tab lama yang dimuat ulang. Ini harga yang dipilih sadar demi keputusan
+  satu klik dari inbox, dan ia lebih sempit daripada GET yang mengubah data —
+  tetapi bukan nol. Perlu diketahui juga bahwa keputusan dicatat atas nama
+  **approver yang dituju**, bukan yang mengklik, jadi persetujuan yang terpicu
+  pemindai akan tercatat sebagai persetujuan orang itu.
 - Retry mengikuti tangga 1, 5, 15, 30, 60 menit dengan jitter, menghormati
   `Retry-After`, lalu dead-letter. Event yang diulang selamanya adalah event yang
   tidak pernah dibaca siapa pun.
 
-Tiga driver, dipilih eksplisit lewat `EMAIL_DRIVER`:
+Empat driver, dipilih eksplisit lewat `EMAIL_DRIVER`:
 
 | Nilai | Keterangan |
 | --- | --- |
 | `file` | Tiap pesan ditulis sebagai `.html` yang bisa dibuka di browser persis seperti yang dilihat penerima. **Ditolak di production.** |
+| `smtp` | SMTP lewat nodemailer. Untuk Gmail, isinya App Password 16 karakter dan menuntut 2-Step Verification aktif — password akun biasa sudah tidak diterima. |
 | `gmail` | Gmail API lewat OAuth refresh token, scope `gmail.send` saja — tidak bisa membaca inbox. Token diperoleh sekali dengan `npm run gmail:auth`. |
 | `graph` | Microsoft Graph `sendMail`, client credentials. |
 
-Dua yang terakhir **belum pernah diuji ke akun atau tenant nyata**. Keduanya
-menolak jalan tanpa konfigurasi lengkap, dan menyebutkan persis nilai mana yang
-belum diisi alih-alih diam-diam mundur ke driver lain.
+`smtp` sudah benar-benar mengirim email ke inbox nyata. `gmail` dan `graph`
+**belum pernah diuji ke akun atau tenant nyata**. Ketiganya menolak jalan tanpa
+konfigurasi lengkap, dan menyebutkan persis nilai mana yang belum diisi alih-alih
+diam-diam mundur ke driver lain.
 
 **`EMAIL_REDIRECT_TO` mengalihkan semua email ke satu alamat**, dengan tujuan
 aslinya tetap terbaca di subjek dan badan pesan. Ini bukan kenyamanan: direktori
@@ -402,14 +500,28 @@ Nonaktif. Menebak Aktif sama dengan mengarang akses.
 npm run dev
 npm run build
 npm run start
-npm run lint       # --max-warnings 0: satu warning pun menggagalkan
+npm run lint        # --max-warnings 0: satu warning pun menggagalkan
 npm run typecheck
-npm test           # unit + integrasi domain lifecycle
-npm run ad:check   # uji konektivitas LDAP
-npm run gmail:auth # tukar consent Google jadi refresh token, sekali saja
+npm test            # unit + integrasi domain lifecycle
+npm run ad:check    # uji konektivitas LDAP
+npm run gmail:auth  # tukar consent Google jadi refresh token, sekali saja
+npm run mock-ad:roles          # beri group peran di direktori simulasi
+npm run mock-ad:roles -- --undo  # kembalikan tepat yang ditambahkannya
 ```
 
-Keempat pemeriksaan di atas dijalankan otomatis pada setiap push dan pull
-request lewat `.github/workflows/ci.yml`. Sebelum ada berkas itu, "semuanya
-lulus" adalah sesuatu yang harus diingat seseorang untuk diperiksa; sekarang ia
-syarat untuk merge.
+`NEXT_DIST_DIR` memindahkan keluaran build ke direktori lain. Berguna justru
+karena gejalanya membingungkan bila diabaikan: `next build` dan `next dev`
+berbagi `.next`, dan build yang diambil selagi dev server melayani dari sana
+meninggalkan pohon campuran — route handler bersarang mulai menjawab dengan
+halaman 404 HTML sementara route induknya masih bekerja, yang terbaca seperti
+bug routing di aplikasi.
+
+```bash
+NEXT_DIST_DIR=.next-build npm run build   # dev server di .next tetap aman
+```
+
+Pemeriksaan di atas dijalankan `.github/workflows/ci.yml` — **pada push ke
+`main` dan pada setiap pull request**, bukan pada setiap push. Push ke branch
+biasa tidak memicunya; bukalah pull request bila ingin diperiksa sebelum
+digabung. Urutannya: `npm ci`, typecheck, lint, test, build Next, lalu build
+image Docker.
