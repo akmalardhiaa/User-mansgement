@@ -46,15 +46,22 @@ export default async function DashboardPage() {
         }
         description="Portal terpadu direktori karyawan dan pengelolaan izin akses, dengan login Active Directory."
         actions={
-          <>
-            <Link
-              href="/users/new"
-              className={buttonClasses()}
-            >
+          /*
+           * This pointed at /users/new, which does not exist — the only route
+           * under /users is /users/edit — so the primary action on the landing
+           * page was a 404.
+           *
+           * Adding somebody is an Onboarding request now: it carries the
+           * manager's and the CISO's approval and is applied by the execution
+           * worker. So the button goes where that actually starts, and only
+           * appears for somebody allowed to raise one.
+           */
+          canRequest ? (
+            <Link href="/pengajuan/baru?type=ONBOARDING" className={buttonClasses()}>
               <IconUserPlus className="size-4" />
               Tambah karyawan
             </Link>
-          </>
+          ) : null
         }
       />
 
