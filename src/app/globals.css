@@ -136,11 +136,17 @@ body {
  * The two washes that give the flat ground depth — a cool one on one side, a
  * warm gold one on the other, neither strong enough to compete with content.
  *
- * They sit on a pseudo-element rather than on `body` so they can drift. A
- * background-image cannot be animated cheaply, but a fixed layer carrying the
- * same gradients can be moved with `transform`, which the compositor handles
- * without repainting the page underneath it. Oversized by 20% on every side, so
- * the drift never pulls a gradient's own edge into view.
+ * They sit on a fixed pseudo-element rather than on `body` so they stay put
+ * while the page scrolls, and so they cost one composited layer rather than a
+ * repaint. Still oversized by 20% on every side, which keeps each gradient's
+ * own edge outside the viewport at any window size.
+ *
+ * This used to drift, on a 48-second loop. The drift is gone and the appearance
+ * is not: at that speed it was — by its own former comment — "barely a drift",
+ * so any single frame looked like this one. What it cost was continuous: an
+ * animating layer on every page of an application people leave open all day,
+ * which never let the compositor go idle and which every backdrop-filter
+ * stacked above it had to re-rasterise against.
  */
 body::before {
   content: "";
@@ -152,25 +158,6 @@ body::before {
     radial-gradient(60rem 32rem at 21% 9%, var(--wash-cool), transparent),
     radial-gradient(46rem 26rem at 81% 14%, var(--wash-warm), transparent);
   background-repeat: no-repeat;
-  animation: aurora 48s ease-in-out infinite;
-}
-
-/*
- * A minute-long breath, deliberately below the speed anyone can point at.
- * Watched directly it is barely a drift; what it does is stop the page reading
- * as a printed sheet while someone spends an afternoon on a table sitting on it.
- */
-@keyframes aurora {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  33% {
-    transform: translate3d(2.5%, 1.5%, 0) scale(1.08);
-  }
-  66% {
-    transform: translate3d(-2%, 3%, 0) scale(1.04);
-  }
 }
 
 /*
