@@ -1,11 +1,39 @@
 "use client";
 
 import { motion } from "framer-motion";
-import gsap from "gsap";
-import { useEffect, useRef } from "react";
 
 import { IconApprovals, IconCheck, IconUser } from "@/components/ui/Icons";
 import { stagger, staggerItem, TRANSITION_FAST } from "@/lib/motion";
+
+/**
+ * The three ambient orbs behind the panel.
+ *
+ * Framer rather than GSAP, which used to drive these through a `gsap.context`.
+ * That was the only other thing in the app GSAP did — a second animation
+ * runtime, 68.5 KB of client bundle confirmed by inspecting the built chunks,
+ * for this and one counter. Framer was already loaded for everything else.
+ *
+ * `repeatType: "reverse"` is GSAP's `yoyo`, and the drift is unchanged.
+ * Reduced motion is no longer asked about by hand: MotionProvider sets
+ * `reducedMotion="user"` app-wide, so Framer drops these transforms itself.
+ */
+const ORBS = [
+  {
+    className: "-top-20 -left-12 size-64 bg-accent/25",
+    animate: { x: 45, y: -35, scale: 1.2 },
+    duration: 9,
+  },
+  {
+    className: "-right-16 -bottom-20 size-72 bg-info/20",
+    animate: { x: -40, y: 30, scale: 0.85 },
+    duration: 11,
+  },
+  {
+    className: "top-1/2 left-1/3 size-56 -translate-y-1/2 bg-purple-500/15",
+    animate: { x: 25, y: 40, scale: 1.1 },
+    duration: 13,
+  },
+] as const;
 
 const FEATURE_POINTS = [
   {
@@ -26,62 +54,23 @@ const FEATURE_POINTS = [
 ];
 
 export function LoginAside() {
-  const root = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    const context = gsap.context(() => {
-      gsap.to(".login-orb-a", {
-        x: 45,
-        y: -35,
-        scale: 1.2,
-        duration: 9,
-        repeat: -1,
-        yoyo: true,
-        ease: "sine.inOut",
-      });
-      gsap.to(".login-orb-b", {
-        x: -40,
-        y: 30,
-        scale: 0.85,
-        duration: 11,
-        repeat: -1,
-        yoyo: true,
-        ease: "sine.inOut",
-      });
-      gsap.to(".login-orb-c", {
-        x: 25,
-        y: 40,
-        scale: 1.1,
-        duration: 13,
-        repeat: -1,
-        yoyo: true,
-        ease: "sine.inOut",
-      });
-    }, root);
-
-    return () => context.revert();
-  }, []);
-
   return (
-    <div
-      ref={root}
-      className="relative hidden overflow-hidden rounded-3xl border border-hairline-strong/80 bg-surface/70 p-9 backdrop-blur-xl lg:block shadow-[0_20px_50px_rgba(7,19,33,0.5)]"
-    >
+    <div className="relative hidden overflow-hidden rounded-3xl border border-hairline-strong/80 bg-surface/70 p-9 backdrop-blur-xl lg:block shadow-[0_20px_50px_rgba(7,19,33,0.5)]">
       {/* Ambient background glowing orbs */}
-      <div
-        className="login-orb-a pointer-events-none absolute -top-20 -left-12 size-64 rounded-full bg-accent/25 blur-3xl"
-        aria-hidden
-      />
-      <div
-        className="login-orb-b pointer-events-none absolute -right-16 -bottom-20 size-72 rounded-full bg-info/20 blur-3xl"
-        aria-hidden
-      />
-      <div
-        className="login-orb-c pointer-events-none absolute top-1/2 left-1/3 size-56 -translate-y-1/2 rounded-full bg-purple-500/15 blur-3xl"
-        aria-hidden
-      />
+      {ORBS.map((orb) => (
+        <motion.div
+          key={orb.className}
+          aria-hidden
+          animate={orb.animate}
+          transition={{
+            duration: orb.duration,
+            repeat: Infinity,
+            repeatType: "reverse",
+            ease: "easeInOut",
+          }}
+          className={`pointer-events-none absolute rounded-full blur-3xl ${orb.className}`}
+        />
+      ))}
 
       <div className="relative z-10">
         {/* Animated Pill Badge */}

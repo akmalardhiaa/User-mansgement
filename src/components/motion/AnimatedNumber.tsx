@@ -1,6 +1,6 @@
 "use client";
 
-import gsap from "gsap";
+import { animate } from "framer-motion";
 import { useEffect, useLayoutEffect, useRef } from "react";
 
 /**
@@ -19,13 +19,23 @@ interface AnimatedNumberProps {
 }
 
 /**
- * A figure that counts up to its value, driven by GSAP.
+ * A figure that counts up to its value.
  *
  * The real number is in the server-rendered markup, so anyone without
  * JavaScript — and anything reading the page as a document — sees the figure
- * itself rather than a zero waiting for a tween. GSAP only takes over after
- * mount, and writes straight to the DOM node instead of through React state,
- * which keeps sixty frames a second out of the reconciler entirely.
+ * itself rather than a zero waiting for a tween. The animation only takes over
+ * after mount, and writes straight to the DOM node instead of through React
+ * state, which keeps sixty frames a second out of the reconciler entirely.
+ *
+ * This used to be driven by GSAP. It is Framer Motion's imperative `animate`
+ * now, and the reason is weight rather than taste: GSAP was a second animation
+ * runtime — 68.5 KB in the client bundle, confirmed by inspecting the built
+ * chunks — earning its place on this file and three orbs on the login screen.
+ * Framer was already there for everything else.
+ *
+ * Reduced motion needs no check here. MotionProvider sets `reducedMotion="user"`
+ * for the whole app, so Framer drops the transform below on its own — where the
+ * old code had to ask `matchMedia` by hand and remember to.
  */
 export function AnimatedNumber({ value, className = "", duration = 0.9 }: AnimatedNumberProps) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -41,19 +51,14 @@ export function AnimatedNumber({ value, className = "", duration = 0.9 }: Animat
     const node = ref.current;
     if (!node) return;
 
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      node.textContent = String(value);
-      shown.current = value;
-      return;
-    }
+    const from = shown.current;
 
-    const counter = { value: shown.current };
-    const tween = gsap.to(counter, {
-      value,
+    const counter = animate(from, value, {
       duration,
-      ease: "power2.out",
-      onUpdate: () => {
-        node.textContent = String(Math.round(counter.value));
+      ease: [0.22, 1, 0.36, 1],
+      onUpdate: (latest) => {
+        node.textContent = String(Math.round(latest));
+        shown.current = latest;
       },
       onComplete: () => {
         shown.current = value;
@@ -61,33 +66,38 @@ export function AnimatedNumber({ value, className = "", duration = 0.9 }: Animat
     });
 
     /*
-     * A swell as the count starts, so a number that changes because of
-     * something the user just did says so. `back.out` overshoots and settles,
-     * which is the difference between a figure that reacted and one that was
-     * replaced.
-     *
      * Anchored on the left edge: these sit at the top of a left-aligned column,
      * and scaling from the middle would slide the first digit sideways and back
      * for no reason.
+     *
+     * Set as a style rather than passed as an animation option, because it is
+     * one — `AnimationOptions` has no `transformOrigin` key, and putting it
+     * there knocks the DOM overload out of the running entirely. TypeScript
+     * then falls back to the plain-object overload and reports `scale` as
+     * invalid on an HTMLSpanElement, which points at the symptom rather than
+     * the cause. The value never changes, so a single assignment is the whole
+     * of it.
+     */
+    node.style.transformOrigin = "left center";
+
+    /*
+     * A swell as the count starts, so a number that changes because of
+     * something the user just did says so. It overshoots and settles, which is
+     * the difference between a figure that reacted and one that was replaced.
      */
     const pop = settled.current
-      ? gsap.fromTo(
-          node,
-          { scale: 1.16 },
-          { scale: 1, duration: 0.55, ease: "back.out(2.4)", transformOrigin: "left center" },
-        )
+      ? animate(node, { scale: [1.16, 1] }, { duration: 0.55, ease: [0.34, 1.56, 0.64, 1] })
       : null;
     settled.current = true;
 
     return () => {
-      // Killing mid-flight leaves `shown` on the last painted figure, so an
+      // Stopping mid-flight leaves `shown` on the last painted figure, so an
       // interrupted count resumes from where the eye left it.
-      shown.current = Math.round(counter.value);
-      tween.kill();
+      counter.stop();
       // Without clearing the transform, an interrupted pop leaves the figure
       // stranded at whatever scale it had reached.
-      pop?.kill();
-      gsap.set(node, { clearProps: "transform" });
+      pop?.stop();
+      node.style.transform = "";
     };
   }, [value, duration]);
 
