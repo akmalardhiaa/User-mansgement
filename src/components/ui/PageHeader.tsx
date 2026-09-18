@@ -20,7 +20,7 @@ export function PageHeader({
   badge?: ReactNode;
 }) {
   return (
-    <Reveal className="relative flex flex-wrap items-end justify-between gap-x-6 gap-y-4 rounded-2xl border border-hairline/60 bg-surface/40 p-6 backdrop-blur-md shadow-[0_8px_30px_rgb(0_0_0_/_0.12)]">
+    <Reveal className="relative flex flex-wrap items-end justify-between gap-x-6 gap-y-4 rounded-2xl border border-hairline/60 bg-surface/70 p-6 shadow-[0_8px_30px_rgb(0_0_0_/_0.12)]">
       {/* Top ambient highlight glow line */}
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
 

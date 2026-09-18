@@ -55,7 +55,6 @@ export function BrandMark({ size = "sm" }: { size?: "sm" | "lg" }) {
           User Management
         </span>
         <span className="relative flex size-2">
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-75" />
           <span className="relative inline-flex size-2 rounded-full bg-accent shadow-[0_0_6px_var(--color-accent)]" />
         </span>
       </span>
