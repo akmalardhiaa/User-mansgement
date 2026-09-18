@@ -33,7 +33,7 @@ import { IconArrowUp, IconSearch, IconSwap } from "@/components/ui/Icons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SORT_LABELS, type SortDirection, type SortKey } from "@/lib/dashboard/directory";
 import type { PendingByEmployee } from "@/lib/lifecycle/pending";
-import { TRANSITION, TRANSITION_FAST, TRANSITION_LAYOUT } from "@/lib/motion";
+import { TRANSITION, TRANSITION_FAST } from "@/lib/motion";
 import type { Employee } from "@/lib/types";
 
 interface EmployeeTableProps {
@@ -171,8 +171,16 @@ export function EmployeeTable({
                     transition: { ...TRANSITION, delay: Math.min(index * 0.025, 0.24) },
                   }}
                   exit={{ opacity: 0, y: -6, transition: TRANSITION_FAST }}
-                  layout="position"
-                  transition={TRANSITION_LAYOUT}
+                  /*
+                   * No `layout` prop. It made Framer measure every row against
+                   * its previous box on each layout pass, so typing in the
+                   * filter box put a full measure-and-compare cycle over the
+                   * whole table between every keystroke. Rows still fade and
+                   * rise in, and still fade out; what they no longer do is
+                   * slide from where a different row used to be — which nobody
+                   * was watching for, at the price of the thing that made
+                   * searching feel heavy.
+                   */
                   onClick={() => setDrawerEmployee(employee)}
                   className="group cursor-pointer border-b border-hairline/60 transition-[background-color,box-shadow] duration-200 ease-(--ease-out-quint) last:border-0 hover:bg-elevated/50 hover:shadow-[inset_2px_0_0_0_var(--color-accent)]"
                 >

@@ -124,7 +124,12 @@ export function StatsRow({
             // A toggle, not a link: it turns a filter on and off in place.
             aria-pressed={selected}
             disabled={!onSelect}
-            className={`group relative overflow-hidden rounded-2xl border bg-surface/80 p-4 text-left backdrop-blur-sm transition-[border-color,background-color,box-shadow] duration-300 ease-(--ease-out-quint) disabled:cursor-default ${
+            // No backdrop-blur here, deliberately. These four sit directly over
+            // the body's gradient wash, and a backdrop-filter has to
+            // re-rasterise everything behind it — four of them, on the page
+            // people land on. `bg-surface/80` already separates the card from
+            // the ground, which is the job the blur was doing.
+            className={`group relative overflow-hidden rounded-2xl border bg-surface/80 p-4 text-left transition-[border-color,background-color,box-shadow] duration-300 ease-(--ease-out-quint) disabled:cursor-default ${
               onSelect ? "pointer-glow" : ""
             } ${
               selected
