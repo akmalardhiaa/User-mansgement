@@ -63,6 +63,12 @@ jobs:
       # `load: false` keeps the result in the build cache instead of importing
       # it into the runner's daemon: nothing here runs the image, and the import
       # is pure cost.
+      #
+      # Buildx first, and it is not optional: the runner's default docker driver
+      # cannot export a cache, so `cache-to: type=gha` below fails outright
+      # without a builder that supports it.
+      - uses: docker/setup-buildx-action@v3
+
       - name: Docker image builds
         uses: docker/build-push-action@v6
         with:
