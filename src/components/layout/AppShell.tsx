@@ -63,6 +63,18 @@ function isBare(pathname: string): boolean {
 }
 
 /**
+ * Pages that earn the full window rather than the reading width.
+ *
+ * Both of them are a table or a form beside a list, and both lost a column off
+ * the right edge at the reading width — the directory its actions, Edit profil
+ * half its fields. Everything else on the portal is prose and stays narrow,
+ * because a paragraph the width of a monitor is harder to read, not easier.
+ */
+function isWide(pathname: string): boolean {
+  return pathname === "/" || pathname === "/users/edit" || pathname.startsWith("/users/edit/");
+}
+
+/**
  * The static GitHub Pages build exports a single page, so the multi-route nav
  * would only produce dead links. Inlined at build time.
  */
@@ -208,7 +220,18 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-5 py-8 md:flex-row">
+      {/*
+       * Edit profil gets the whole window; every other page keeps the reading
+       * width. That page is now where all three changes to an existing employee
+       * are raised, so it carries a roster beside a form with four sections —
+       * squeezed into a column meant for prose, half of it sits below the fold
+       * and HC scrolls to find a field they already know is there.
+       */}
+      <div
+        className={`mx-auto flex w-full flex-1 flex-col gap-8 px-5 py-8 md:flex-row ${
+          isWide(pathname) ? "max-w-none" : "max-w-7xl"
+        }`}
+      >
         {items.length > 0 ? (
           <aside className="shrink-0 md:w-48">
             {/* Sticky clears the header: 3.5rem of chrome plus the container's

@@ -4,17 +4,42 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { useT } from "@/components/i18n/LocaleProvider";
+import { MovementForm } from "@/components/lifecycle/MovementForm";
 import { RequestSubmitted } from "@/components/lifecycle/RequestSubmitted";
+import { TerminationForm } from "@/components/lifecycle/TerminationForm";
 import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
 import { FormAlert } from "@/components/ui/FormAlert";
 import { Button } from "@/components/ui/Button";
-import { Card, Field, SelectField, TextareaField } from "@/components/ui/Field";
-import { IconBriefcase, IconBuilding, IconNote, IconSearch, IconUser } from "@/components/ui/Icons";
+import { Card, Field, SelectField } from "@/components/ui/Field";
+import {
+  IconBriefcase,
+  IconBuilding,
+  IconPower,
+  IconSearch,
+  IconSwap,
+  IconUser,
+} from "@/components/ui/Icons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { diffProfile, profileOf } from "@/lib/lifecycle/profileUpdate";
-import type { LifecycleRequest, ProfileFields } from "@/lib/lifecycle/types";
+import { EMPLOYMENT_TYPES, isFixedTerm } from "@/lib/lifecycle/employment";
+import { employmentOptionLabel } from "@/lib/i18n/labels";
+import type { EmploymentType, LifecycleRequest, ProfileFields } from "@/lib/lifecycle/types";
 import type { Employee } from "@/lib/types";
 import { DATE_BOUNDS, dateInputBounds } from "@/lib/validation/dates";
+
+/** The three things that can be asked for about somebody already on the roster. */
+export type EditAction = "profile" | "movement" | "termination";
+
+const ACTIONS: ReadonlyArray<{
+  action: EditAction;
+  label: "actionProfile" | "actionMovement" | "actionTermination";
+  /** The same glyph the request type carries everywhere else in the portal. */
+  icon: typeof IconUser;
+}> = [
+  { action: "profile", label: "actionProfile", icon: IconUser },
+  { action: "movement", label: "actionMovement", icon: IconSwap },
+  { action: "termination", label: "actionTermination", icon: IconPower },
+];
 
 /**
  * Edit an employee's profile — by asking for it.
@@ -30,6 +55,8 @@ import { DATE_BOUNDS, dateInputBounds } from "@/lib/validation/dates";
 export function EditUserView({
   employees,
   pendingIds = [],
+  initialAction,
+  initialEmployeeId,
 }: {
   employees: Employee[];
   /**
@@ -39,16 +66,30 @@ export function EditUserView({
    * was raised from.
    */
   pendingIds?: string[];
+  /** Which action to open on, for links that arrive asking for one. */
+  initialAction?: EditAction;
+  /** Who to select on arrival, for the same links. */
+  initialEmployeeId?: string;
 }) {
   const t = useT();
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(employees[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialEmployeeId ?? employees[0]?.id ?? null,
+  );
+  const [action, setAction] = useState<EditAction>(initialAction ?? "profile");
   // The roster itself never changes here: nothing is written until the request
   // is approved and executed. What changes is who now has a request in flight.
   const [pending, setPending] = useState<string[]>(pendingIds);
   const [submitted, setSubmitted] = useState<LifecycleRequest | null>(null);
 
   const selected = employees.find((employee) => employee.id === selectedId);
+  const locked = selected ? pending.includes(selected.id) : false;
+
+  /** One place to record that a request now exists for this person. */
+  const raised = (request: LifecycleRequest) => {
+    if (selected) setPending((current) => [...current, selected.id]);
+    setSubmitted(request);
+  };
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -62,8 +103,9 @@ export function EditUserView({
   }, [employees, query]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
-      <Card className="h-fit p-4">
+    <div className="grid gap-6 lg:grid-cols-[18rem_1fr] 2xl:grid-cols-[20rem_1fr]">
+      {/* Sticky, so the roster stays reachable while a long form scrolls. */}
+      <Card className="h-fit p-4 lg:sticky lg:top-[4.5rem]">
         <Field
           label={t.editProfile.searchEmployee}
           name="employeeSearch"
@@ -74,7 +116,7 @@ export function EditUserView({
           placeholder={t.editProfile.searchPlaceholder}
         />
 
-        <ul className="mt-3 max-h-[28rem] space-y-1 overflow-y-auto pr-1">
+        <ul className="mt-3 max-h-[calc(100vh-16rem)] space-y-1 overflow-y-auto pr-1">
           {matches.map((employee) => {
             const active = employee.id === selectedId;
             return (
@@ -111,15 +153,74 @@ export function EditUserView({
       {submitted ? (
         <RequestSubmitted request={submitted} onRaiseAnother={() => setSubmitted(null)} />
       ) : selected ? (
-        <ProfileForm
-          key={selected.id}
-          employee={selected}
-          locked={pending.includes(selected.id)}
-          onSubmitted={(request) => {
-            setPending((current) => [...current, selected.id]);
-            setSubmitted(request);
-          }}
-        />
+        <div className="space-y-4">
+          {/*
+           * The three things that can be asked for about somebody who already
+           * has a record. They used to live on two different pages — a profile
+           * change here, a Movement and a Termination on the new-request page,
+           * each with its own employee picker — so doing two of them to one
+           * person meant choosing that person twice.
+           */}
+          <div
+            role="tablist"
+            aria-label={t.editProfile.actionsLabel}
+            className="flex flex-wrap gap-2"
+          >
+            {ACTIONS.map((item) => {
+              const current = action === item.action;
+              const Glyph = item.icon;
+              return (
+                <button
+                  key={item.action}
+                  type="button"
+                  role="tab"
+                  aria-selected={current}
+                  onClick={() => setAction(item.action)}
+                  className={`inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors ${
+                    current
+                      ? "border-accent/50 bg-accent/10 text-ink"
+                      : "border-hairline text-ink-muted hover:border-hairline-strong hover:text-ink"
+                  }`}
+                >
+                  <Glyph className={`size-4 ${current ? "text-accent" : "text-ink-faint"}`} />
+                  {t.editProfile[item.label]}
+                </button>
+              );
+            })}
+          </div>
+
+          {locked ? (
+            <p className="rounded-lg border border-warn/40 bg-warn/10 px-3.5 py-2.5 text-xs leading-relaxed text-warn">
+              {t.editProfile.lockedNote}
+            </p>
+          ) : null}
+
+          {action === "profile" ? (
+            <ProfileForm
+              key={`profile-${selected.id}`}
+              employee={selected}
+              locked={locked}
+              onSubmitted={raised}
+            />
+          ) : null}
+          {action === "movement" ? (
+            <MovementForm
+              key={`movement-${selected.id}`}
+              employees={locked ? [] : [selected]}
+              managerCandidates={employees}
+              initialEmployeeId={selected.id}
+              onSubmitted={raised}
+            />
+          ) : null}
+          {action === "termination" ? (
+            <TerminationForm
+              key={`termination-${selected.id}`}
+              employees={locked ? [] : [selected]}
+              initialEmployeeId={selected.id}
+              onSubmitted={raised}
+            />
+          ) : null}
+        </div>
       ) : (
         <Card className="grid place-items-center p-10">
           <p className="text-sm text-ink-muted">{t.editProfile.pickSomeone}</p>
@@ -148,7 +249,7 @@ function toProfile(values: Record<string, string>): ProfileFields {
     jobDescription: trimmed("jobDescription"),
     department: values.department.trim(),
     employmentType,
-    expiredDate: employmentType === "CONTRACT" ? trimmed("expiredDate") : undefined,
+    expiredDate: isFixedTerm(employmentType) ? trimmed("expiredDate") : undefined,
     locationType,
     branchName: locationType === "CABANG" ? trimmed("branchName") : undefined,
     description: trimmed("description"),
@@ -182,6 +283,14 @@ export function ProfileForm({
     lastName: start.lastName,
     displayName: start.displayName,
     jobTitle: start.jobTitle,
+    /*
+     * Carried through the form without being shown.
+     *
+     * Neither of these is edited here any more — HC asked for the two textareas
+     * to go — but both are part of the profile the request proposes. Dropping
+     * them from the values would send an empty one, and the diff would read as
+     * "job description removed" for everybody who has one.
+     */
     jobDescription: start.jobDescription ?? "",
     department: start.department,
     employmentType: start.employmentType ?? "",
@@ -207,7 +316,7 @@ export function ProfileForm({
     });
   }
 
-  const isContract = values.employmentType === "CONTRACT";
+  const isContract = isFixedTerm(values.employmentType as EmploymentType);
   const isBranch = values.locationType === "CABANG";
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -253,7 +362,7 @@ export function ProfileForm({
         ) : null}
 
         <fieldset disabled={locked || saving} className="space-y-6 disabled:opacity-60">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <Field
               label={t.forms.firstName}
               name="firstName"
@@ -283,7 +392,7 @@ export function ProfileForm({
             required
           />
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <Field
               label={t.forms.jobTitle}
               name="jobTitle"
@@ -305,28 +414,21 @@ export function ProfileForm({
             />
           </div>
 
-          <TextareaField
-            label={t.editProfile.jobDescription}
-            name="jobDescription"
-            icon={<IconNote className="size-4" />}
-            rows={3}
-            value={values.jobDescription}
-            onChange={(event) => update("jobDescription", event.target.value)}
-            error={errors.jobDescription}
-            placeholder={t.editProfile.jobDescriptionPlaceholder}
-          />
-
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <SelectField
               label={t.forms.employmentType}
               name="employmentType"
               value={values.employmentType}
               onChange={(event) => update("employmentType", event.target.value)}
               error={errors.employmentType}
+              hint={t.forms.employmentCodeHint}
             >
               <option value="">{t.editProfile.notSet}</option>
-              <option value="PERMANENT">{t.editProfile.permanent}</option>
-              <option value="CONTRACT">{t.forms.contract}</option>
+              {EMPLOYMENT_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {employmentOptionLabel(t, type)}
+                </option>
+              ))}
             </SelectField>
 
             {isContract ? (
@@ -343,7 +445,7 @@ export function ProfileForm({
             ) : null}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <SelectField
               label={t.forms.location}
               name="locationType"
@@ -369,15 +471,6 @@ export function ProfileForm({
             ) : null}
           </div>
 
-          <TextareaField
-            label={t.editProfile.hcNote}
-            name="description"
-            rows={3}
-            value={values.description}
-            onChange={(event) => update("description", event.target.value)}
-            error={errors.description}
-            placeholder={t.editProfile.hcNotePlaceholder}
-          />
         </fieldset>
 
         <div className="space-y-3">

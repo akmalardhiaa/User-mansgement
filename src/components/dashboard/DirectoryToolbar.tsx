@@ -43,6 +43,8 @@ interface DirectoryToolbarProps {
   departments: string[];
   shown: number;
   total: number;
+  /** Disabled accounts the default view is leaving out, if any. */
+  hiddenInactive?: number;
 }
 
 /**
@@ -63,6 +65,7 @@ export function DirectoryToolbar({
   departments,
   shown,
   total,
+  hiddenInactive = 0,
 }: DirectoryToolbarProps) {
   const t = useT();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -95,6 +98,23 @@ export function DirectoryToolbar({
       ...(otherDepartments.length ? [{ label: t.directory.otherDepartment, items: otherDepartments }] : []),
     ];
   }, [departments, t]);
+
+  /*
+   * The sort options as the same shape the department picker takes. The prefix
+   * stays in each label: without it the closed control reads "Nama" beside
+   * "Semua departemen" and looks like a third filter rather than the sort.
+   */
+  const sortGroups = useMemo<ChoiceGroup[]>(
+    () => [
+      {
+        items: SORT_KEYS.map((key) => ({
+          value: key,
+          label: `${t.directory.sortPrefix}: ${sortLabel(t, key)}`,
+        })),
+      },
+    ],
+    [t],
+  );
 
   // "/" jumps to search, the convention every tool with a list in it uses.
   useEffect(() => {
@@ -201,29 +221,23 @@ export function DirectoryToolbar({
           className="w-full sm:w-60 [&>label]:sr-only"
         />
 
-        {/* The direction toggle is welded to the sort select — they are one
-            control, and a gap between them reads as two unrelated ones. */}
+        {/*
+         * Same control as the department filter beside it, for the same reason
+         * it reads as one row: three pickers built two different ways look like
+         * two kinds of thing. The direction toggle stays welded to its right —
+         * a gap between them reads as two unrelated controls.
+         */}
         <div className="flex w-full items-center sm:w-auto">
-          <div className="relative flex-1 sm:flex-none">
-            <IconSort className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-faint" />
-            <SelectField
+          <div className="flex-1 sm:flex-none">
+            <ChoiceField
+              label={t.directory.sortBy}
+              name="directory-sort"
               value={filters.sort}
-              onChange={(event) =>
-                onChange({ sort: event.target.value as DirectoryFilters["sort"] })
-              }
-              aria-label={t.directory.sortBy}
-              className={`${SELECT_CLASSES} rounded-r-none border-r-0`}
-            >
-              {SORT_KEYS.map((key) => (
-                // The prefix stays in the label: without it the closed select
-                // reads "Nama" beside "Semua departemen" and looks like a third
-                // filter rather than the sort.
-                <option key={key} value={key}>
-                  {t.directory.sortPrefix}: {sortLabel(t, key)}
-                </option>
-              ))}
-            </SelectField>
-            
+              onChange={(sort) => onChange({ sort: sort as DirectoryFilters["sort"] })}
+              groups={sortGroups}
+              icon={<IconSort className="size-3.5" />}
+              className="w-full sm:w-56 [&>label]:sr-only [&_[role=combobox]]:rounded-r-none [&_[role=combobox]]:border-r-0"
+            />
           </div>
           <button
             type="button"
@@ -267,6 +281,16 @@ export function DirectoryToolbar({
             <span className="tnum text-ink">{shown}</span> {t.directory.countOf}{" "}
             <span className="tnum">{total}</span>
           </span>
+          {/* Said out loud, because a roster quietly missing half its rows reads
+              as data loss rather than as a default. */}
+          {hiddenInactive > 0 ? (
+            <span
+              title={t.directory.hiddenInactiveHint}
+              className="cursor-help text-xs whitespace-nowrap text-ink-faint underline decoration-dotted decoration-ink-faint/50 underline-offset-2"
+            >
+              {t.directory.hiddenInactive.replace("{count}", String(hiddenInactive))}
+            </span>
+          ) : null}
           <Button
             variant="ghost"
             size="sm"

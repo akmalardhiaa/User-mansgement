@@ -1,4 +1,6 @@
 import type { ProfileField, ProfileFields } from "@/lib/lifecycle/types";
+import { EMPLOYMENT_TYPES, isFixedTerm } from "@/lib/lifecycle/employment";
+import type { EmploymentType } from "@/lib/lifecycle/types";
 import { DATE_BOUNDS, checkDate } from "@/lib/validation/dates";
 
 /**
@@ -42,12 +44,12 @@ export function parseEmployeeProfileInput(payload: unknown, now = new Date()): P
   }
 
   const employmentType = asString(body.employmentType).toUpperCase();
-  if (employmentType && employmentType !== "PERMANENT" && employmentType !== "CONTRACT") {
+  if (employmentType && !EMPLOYMENT_TYPES.includes(employmentType as EmploymentType)) {
     errors.employmentType = "Status kepegawaian harus Tetap atau Kontrak.";
   }
 
   const expiredDate = asString(body.expiredDate);
-  if (employmentType === "CONTRACT") {
+  if (isFixedTerm(employmentType as EmploymentType)) {
     // A contract without an end date is the case this form exists to catch:
     // the record then looks permanent to everyone reading it later.
     if (!expiredDate) {
@@ -89,8 +91,8 @@ export function parseEmployeeProfileInput(payload: unknown, now = new Date()): P
       jobTitle: draft.jobTitle,
       jobDescription: jobDescription || undefined,
       department: draft.department,
-      employmentType: employmentType ? (employmentType as "PERMANENT" | "CONTRACT") : undefined,
-      expiredDate: employmentType === "CONTRACT" ? expiredDate : undefined,
+      employmentType: employmentType ? (employmentType as EmploymentType) : undefined,
+      expiredDate: isFixedTerm(employmentType as EmploymentType) ? expiredDate : undefined,
       locationType: locationType ? (locationType as "PUSAT" | "CABANG") : undefined,
       branchName: locationType === "CABANG" ? branchName : undefined,
       description: description || undefined,

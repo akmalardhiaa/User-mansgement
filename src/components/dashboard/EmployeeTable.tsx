@@ -228,7 +228,7 @@ export function EmployeeTable({
                     </Button>
                     {canRequest && !marker ? (
                       <Link
-                        href={`/pengajuan/baru?type=MOVEMENT&employeeId=${employee.id}`}
+                        href={`/users/edit?action=movement&employeeId=${employee.id}`}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-hairline-strong bg-elevated px-2.5 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent/50"
                       >
                         <IconSwap className="size-3.5" />
@@ -355,7 +355,7 @@ export function EmployeeTable({
                       </Button>
                       {canRequest && !marker ? (
                         <Link
-                          href={`/pengajuan/baru?type=MOVEMENT&employeeId=${employee.id}`}
+                          href={`/users/edit?action=movement&employeeId=${employee.id}`}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-hairline-strong bg-elevated px-2.5 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent/50"
                           title={t.directory.proposeChangeHint}
                         >

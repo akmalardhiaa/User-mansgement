@@ -3,6 +3,8 @@
 import { useT } from "@/components/i18n/LocaleProvider";
 import type { Dictionary } from "@/lib/i18n/dictionaries/id";
 import { accessProfileLabel } from "@/lib/lifecycle/accessProfiles";
+import { isFixedTerm } from "@/lib/lifecycle/employment";
+import { employmentLabel } from "@/lib/i18n/labels";
 import type {
   LifecyclePayload,
   ProfileUpdatePayload,
@@ -43,9 +45,9 @@ export function RequestPayloadSummary({ payload }: { payload: LifecyclePayload }
           [t.summary.department, payload.department],
           [
             t.summary.employmentType,
-            payload.employmentType === "CONTRACT"
-              ? t.summary.contractUntil.replace("{date}", payload.expiredDate ?? "—")
-              : t.summary.permanent,
+            isFixedTerm(payload.employmentType)
+              ? `${employmentLabel(t, payload.employmentType)} · ${t.summary.endsOn.replace("{date}", payload.expiredDate ?? "—")}`
+              : employmentLabel(t, payload.employmentType),
           ],
           [
             t.summary.location,
@@ -66,7 +68,7 @@ export function RequestPayloadSummary({ payload }: { payload: LifecyclePayload }
             [t.summary.toJobTitle, payload.toJobTitle],
             [t.summary.toManager, `${payload.toManagerName} · ${payload.toManagerEmail}`],
             [t.summary.newAccessProfile, accessProfileLabel(payload.accessProfileId)],
-            [t.summary.reason, payload.reason],
+            ...(payload.reason ? [[t.summary.reason, payload.reason] as [string, string]] : []),
             ...(payload.toJobDescription
               ? [[t.summary.jobDescription, payload.toJobDescription] as [string, string]]
               : []),

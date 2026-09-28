@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 import { getAdDriver } from "@/lib/ad";
 import { AdError, type AdAccountState, type AdDriver } from "@/lib/ad/types";
@@ -12,9 +14,11 @@ import type {
   ExecutionStepRecord,
 } from "./executionTypes";
 import { hashPayload } from "./payload";
+import { isFixedTerm } from "./employment";
 import { accountNameFor, buildPlan, type ExecutionPlan, type PlannedStep } from "./plan";
 import { assertTransition } from "./stateMachine";
 import type { LifecycleRequest } from "./types";
+import { createUserFolder } from "./userFolder";
 
 /**
  * The execution worker.
@@ -393,7 +397,9 @@ async function finishSucceeded(
           employee.employmentType = profile.employmentType;
           // Only a contract has an end date, and only a branch has a branch
           // name: a stale value left behind would later read as still applying.
-          employee.expiredDate = profile.employmentType === "CONTRACT" ? profile.expiredDate : undefined;
+          employee.expiredDate = isFixedTerm(profile.employmentType)
+            ? profile.expiredDate
+            : undefined;
           employee.locationType = profile.locationType;
           employee.branchName = profile.locationType === "CABANG" ? profile.branchName : undefined;
           employee.description = profile.description;
@@ -423,6 +429,17 @@ async function finishSucceeded(
       detail: { operationId: job.operationId, objectGUID: observed.objectGUID },
     });
   });
+
+  /*
+   * The new hire's folder on disk, after the store transaction rather than
+   * inside it: a filesystem call has no business holding the store lock, and
+   * the account is already real by this point. It is deliberately not part of
+   * what makes the request succeed — see userFolder.ts.
+   */
+  if (claim.request.payload.kind === "ONBOARDING") {
+    const folder = await createUserFolder(claim.request.payload.displayName);
+    if (folder) console.log(`[user-folder] dibuat: ${folder}`);
+  }
 }
 
 async function finishFailed(
@@ -631,6 +648,38 @@ async function runOne(claim: Claim, driver: AdDriver, workerId: string): Promise
     step.stepKey === "verify" ? { ...step, observedAfter: JSON.stringify(observed) } : step,
   );
   await finishSucceeded(claim, observed, verified, workerId);
+
+  if (request.payload.kind === "ONBOARDING") {
+    try {
+      // Sementara menggunakan folder ini sampai link asli diberikan
+      const TARGET_FOLDER = "C:\\Users\\Asus\\Documents\\KaryawanBaru"; 
+      
+      await mkdir(TARGET_FOLDER, { recursive: true });
+
+      const employeeData = request.payload;
+      const dateStr = new Date().toISOString().split("T")[0];
+      const fileName = `${employeeData.firstName.toLowerCase()}-${dateStr}.txt`;
+      
+      const filePath = path.join(TARGET_FOLDER, fileName);
+      
+      const fileContent = `
+========================================
+DATA KARYAWAN BARU
+========================================
+Nama         : ${employeeData.displayName}
+Email        : ${employeeData.email}
+Departemen   : ${employeeData.department}
+Jabatan      : ${employeeData.jobTitle}
+Tipe Karyawan: ${employeeData.employmentType}
+${employeeData.expiredDate ? `Berakhir     : ${employeeData.expiredDate}\n` : ""}========================================
+`;
+
+      await writeFile(filePath, fileContent.trim() + "\n", "utf8");
+      console.log(`[WORKER] Berhasil menyimpan file karyawan baru ke: ${filePath}`);
+    } catch (err) {
+      console.error("[WORKER] Gagal membuat file di folder lokal:", err);
+    }
+  }
 
   return {
     ...base,

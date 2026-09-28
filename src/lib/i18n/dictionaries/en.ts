@@ -116,7 +116,11 @@ export const en: Dictionary = {
     export: "Export",
     exportHint: "Download the visible rows as an Excel file",
     exportFailed: "Export failed.",
+    exported: "{count} rows exported to Excel.",
     countOf: "of",
+    hiddenInactive: "{count} disabled hidden",
+    hiddenInactiveHint:
+      "Disabled accounts are left out of the default view. Search a name, or pick the Disabled status, to see them.",
 
     columnName: "Name",
     columnUpdated: "Last updated",
@@ -193,6 +197,8 @@ export const en: Dictionary = {
     viewRequest: "View request",
     raiseAnother: "Raise another request",
     requestList: "Request list",
+    existingEmployeeNote:
+      "This page is for a new employee with no account yet. For somebody already in the directory — a profile change, a move, or disabling the account — use Edit profile.",
   },
 
   forms: {
@@ -208,16 +214,23 @@ export const en: Dictionary = {
     lastName: "Last name",
     fullName: "Full name",
     fullNameHint: "Filled in from the first and last name; you can change it.",
-    email: "Email",
+    email: "Company email",
+    emailDomain: "Domain",
     jobTitle: "Job title",
     jobTitleHint: "Pick from the list, or type a new one.",
     department: "Department",
     departmentHint: "Pick from the list, or type a new one.",
     employmentType: "Employment type",
     permanent: "Permanent",
-    contract: "Contract",
-    contractEnd: "Contract ends",
-    contractEndHint: "A contract with no end date reads as permanent.",
+    contract: "Temporary",
+    vendor: "Vendor",
+    intern: "Intern",
+    employmentCodeHint:
+      "The company's number codes: 1-2 permanent, 3-4 temporary, 5-6 vendor, 7-8 intern.",
+    contractEnd: "End date",
+    contractEndHint: "Required for temporary, vendor and intern. With no end date, the access reads as permanent.",
+    emailHint:
+      "First and last name run together, then the status digit at the end — nadiakusuma3 for a temporary, say. 1-2 permanent, 3-4 temporary, 5-6 vendor, 7-8 intern.",
     location: "Place of work",
     headOffice: "Head office",
     branch: "Branch",
@@ -262,11 +275,13 @@ export const en: Dictionary = {
 
   summary: {
     name: "Name",
-    email: "Email",
+    email: "Company email",
+    emailDomain: "Domain",
     jobTitle: "Job title",
     department: "Department",
     employmentType: "Employment type",
-    contractUntil: "Contract · ends {date}",
+    contractUntil: "Temporary · ends {date}",
+    endsOn: "ends {date}",
     permanent: "Permanent",
     location: "Place of work",
     branchNamed: "Branch · {name}",
@@ -440,6 +455,13 @@ export const en: Dictionary = {
     managerHint:
       "Only active employees in the directory can be picked — the approval email goes to this person.",
     chooseManager: "Choose a manager…",
+
+    actionsLabel: "What to do with this employee",
+    actionProfile: "Edit profile",
+    actionMovement: "Move division",
+    actionTermination: "Disable account",
+    lockedNote:
+      "This employee already has a request in progress. Finish or cancel that one before raising another change.",
   },
 
   activity: {
@@ -541,6 +563,12 @@ export const en: Dictionary = {
     firstApproverIs: "The first approval is asked of {name}, the current manager.",
     hcNoteLabel: "HC note:",
     requestInProgress: "Request in progress",
+    pendingNotAppliedYet:
+      "The account status above has not changed. The directory follows only once the change has been carried out and verified.",
+    noRequestRunning: "No request is in progress for this employee.",
+    printProfile: "Print the employee profile",
+    raiseMovement: "Raise a Movement",
+    raiseTermination: "Raise a Termination",
     closePanel: "Close the panel",
     auditHistory: "Audit history",
     division: "Division",

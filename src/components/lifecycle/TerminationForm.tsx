@@ -5,9 +5,9 @@ import { useState } from "react";
 import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
 import { useT } from "@/components/i18n/LocaleProvider";
 import { Button } from "@/components/ui/Button";
-import { Card, Field, SelectField, TextareaField } from "@/components/ui/Field";
+import { Card, Field, SelectField } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
-import { IconAlert, IconClock, IconNote, IconUser, IconUserCheck } from "@/components/ui/Icons";
+import { IconAlert, IconClock, IconNote, IconUser } from "@/components/ui/Icons";
 import type { Dictionary } from "@/lib/i18n/dictionaries/id";
 import { TERMINATION_REASONS, type LifecycleRequest, type TerminationReason } from "@/lib/lifecycle/types";
 import type { Employee } from "@/lib/types";
@@ -209,27 +209,6 @@ export function TerminationForm({
               hint={t.forms.effectiveAtHint}
             />
 
-            <Field
-              label={t.forms.handoverTo}
-              name="handoverTo"
-              icon={<IconUserCheck className="size-4" />}
-              value={values.handoverTo}
-              onChange={(event) => update("handoverTo", event.target.value)}
-              error={fieldErrors.handoverTo}
-              placeholder={t.forms.handoverPlaceholder}
-            />
-
-            <TextareaField
-              label={t.forms.internalNote}
-              name="note"
-              rows={3}
-              icon={<IconNote className="size-4" />}
-              value={values.note}
-              onChange={(event) => update("note", event.target.value)}
-              error={fieldErrors.note}
-              hint={t.forms.internalNoteHint}
-              className="sm:col-span-2"
-            />
           </div>
         </div>
 

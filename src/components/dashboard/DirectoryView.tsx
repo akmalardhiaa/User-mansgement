@@ -14,6 +14,7 @@ import {
   DEFAULT_FILTERS,
   departmentsOf,
   filterEmployees,
+  hiddenInactiveCount,
   isDefaultFilters,
   sortEmployees,
   type DirectoryFilters,
@@ -105,7 +106,7 @@ export function DirectoryView({
         `direktori-karyawan-${new Date().toISOString().slice(0, 10)}.xlsx`;
       link.click();
       URL.revokeObjectURL(url);
-      toast(`${visible.length} baris diekspor ke Excel.`, "info");
+      toast(t.directory.exported.replace("{count}", String(visible.length)), "info");
     } catch (cause) {
       toast((cause as Error).message, "error");
     } finally {
@@ -135,6 +136,7 @@ export function DirectoryView({
             departments={departments}
             shown={visible.length}
             total={employees.length}
+            hiddenInactive={hiddenInactiveCount(employees, filters)}
           />
           <EmployeeTable
             employees={visible}

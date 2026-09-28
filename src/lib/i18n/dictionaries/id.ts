@@ -118,7 +118,13 @@ export const id = {
     export: "Ekspor",
     exportHint: "Unduh baris yang terlihat sebagai file Excel",
     exportFailed: "Ekspor gagal.",
+    /** {count} rows written to the workbook. */
+    exported: "{count} baris diekspor ke Excel.",
     countOf: "dari",
+    /** {count} disabled accounts the default view leaves out. */
+    hiddenInactive: "{count} nonaktif disembunyikan",
+    hiddenInactiveHint:
+      "Akun nonaktif tidak ditampilkan di tampilan awal. Cari namanya, atau pilih status Nonaktif, untuk melihatnya.",
 
     columnName: "Nama",
     columnUpdated: "Terakhir diperbarui",
@@ -200,6 +206,8 @@ export const id = {
     viewRequest: "Lihat pengajuan",
     raiseAnother: "Buat pengajuan lain",
     requestList: "Daftar pengajuan",
+    existingEmployeeNote:
+      "Halaman ini untuk karyawan baru yang belum punya akun. Untuk karyawan yang sudah ada — ubah profil, pindah divisi, atau nonaktifkan akun — buka menu Edit profil.",
   },
 
   forms: {
@@ -215,16 +223,24 @@ export const id = {
     lastName: "Nama belakang",
     fullName: "Nama lengkap",
     fullNameHint: "Terisi otomatis dari nama depan dan belakang; bisa diubah.",
-    email: "Email",
+    email: "Email perusahaan",
+    emailDomain: "Domain",
     jobTitle: "Jabatan",
     jobTitleHint: "Pilih dari daftar, atau ketik jabatan baru.",
     department: "Departemen",
     departmentHint: "Pilih dari daftar, atau ketik divisi baru.",
     employmentType: "Status kepegawaian",
-    permanent: "Karyawan tetap",
-    contract: "Kontrak",
-    contractEnd: "Kontrak berakhir",
-    contractEndHint: "Kontrak tanpa tanggal berakhir terbaca sebagai permanen.",
+    permanent: "Permanent",
+    contract: "Temporary",
+    vendor: "Vendor",
+    intern: "Magang",
+    /** Shown under the employment type field, as the company's own convention. */
+    employmentCodeHint:
+      "Kode angka perusahaan: 1-2 permanent, 3-4 temporary, 5-6 vendor, 7-8 magang.",
+    contractEnd: "Tanggal berakhir",
+    contractEndHint: "Wajib untuk temporary, vendor, dan magang. Tanpa tanggal berakhir, aksesnya terbaca sebagai permanent.",
+    emailHint:
+      "Gabungan nama depan dan belakang, lalu angka status di akhir — misalnya nadiakusuma3 untuk temporary. 1-2 permanent, 3-4 temporary, 5-6 vendor, 7-8 magang.",
     location: "Lokasi penempatan",
     headOffice: "Kantor pusat",
     branch: "Cabang",
@@ -270,13 +286,16 @@ export const id = {
 
   summary: {
     name: "Nama",
-    email: "Email",
+    email: "Email perusahaan",
+    emailDomain: "Domain",
     jobTitle: "Jabatan",
     department: "Departemen",
     employmentType: "Status kepegawaian",
     /** {date} is when the contract ends. */
-    contractUntil: "Kontrak · berakhir {date}",
-    permanent: "Karyawan tetap",
+    contractUntil: "Temporary · berakhir {date}",
+    /** Appended after the kind of employment, for the fixed-term kinds. */
+    endsOn: "berakhir {date}",
+    permanent: "Permanent",
     location: "Lokasi",
     /** {name} is the branch. */
     branchNamed: "Cabang · {name}",
@@ -445,7 +464,7 @@ export const id = {
     jobDescription: "Keterangan jabatan",
     jobDescriptionPlaceholder: "Ruang lingkup pekerjaan, tanggung jawab utama…",
     notSet: "Belum ditentukan",
-    permanent: "Karyawan Tetap",
+    permanent: "Permanent",
     headOffice: "Pusat (Head Office)",
     branch: "Cabang (Branch Office)",
     hcNote: "Catatan HC",
@@ -460,6 +479,13 @@ export const id = {
     managerHint:
       "Hanya karyawan aktif di direktori yang bisa dipilih — email persetujuan dikirim ke orang ini.",
     chooseManager: "Pilih manager…",
+
+    actionsLabel: "Tindakan untuk karyawan ini",
+    actionProfile: "Ubah profil",
+    actionMovement: "Pindah divisi",
+    actionTermination: "Nonaktifkan akun",
+    lockedNote:
+      "Karyawan ini sedang punya pengajuan berjalan. Selesaikan atau batalkan pengajuan itu dulu sebelum mengajukan perubahan lain.",
   },
 
   activity: {
@@ -567,6 +593,12 @@ export const id = {
     firstApproverIs: "Persetujuan tahap pertama diminta ke {name}, manager saat ini.",
     hcNoteLabel: "Catatan HC:",
     requestInProgress: "Pengajuan berjalan",
+    pendingNotAppliedYet:
+      "Status akun di atas belum berubah. Direktori baru mengikuti setelah perubahan benar-benar dijalankan dan diverifikasi.",
+    noRequestRunning: "Tidak ada pengajuan yang sedang berjalan untuk karyawan ini.",
+    printProfile: "Cetak profil karyawan",
+    raiseMovement: "Ajukan Movement",
+    raiseTermination: "Ajukan Termination",
     closePanel: "Tutup panel",
     auditHistory: "Riwayat Audit",
     division: "Divisi",

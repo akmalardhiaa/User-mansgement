@@ -16,6 +16,8 @@
  * verified.
  */
 
+import type { EmploymentType } from "@/lib/lifecycle/types";
+
 export const EMPLOYEE_STATUSES = ["ACTIVE", "DISABLED"] as const;
 
 export type EmployeeStatus = (typeof EMPLOYEE_STATUSES)[number];
@@ -33,9 +35,9 @@ export interface Employee {
   /** Description or details of the job position. */
   jobDescription?: string;
   department: string;
-  /** Employment contract type: Permanent (Karyawan Tetap) or Contract. */
-  employmentType?: "PERMANENT" | "CONTRACT";
-  /** Expiration date for contract employees (ISO string). */
+  /** Permanent, contract, vendor or intern. See lifecycle/employment.ts. */
+  employmentType?: EmploymentType;
+  /** End date, for every kind except permanent (ISO string). */
   expiredDate?: string;
   /** Work location: Pusat (Head Office) or Cabang (Branch Office). */
   locationType?: "PUSAT" | "CABANG";

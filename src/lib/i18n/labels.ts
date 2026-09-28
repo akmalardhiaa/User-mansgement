@@ -1,5 +1,6 @@
 import type { SortKey } from "@/lib/dashboard/directory";
-import type { LifecycleStatus, LifecycleType } from "@/lib/lifecycle/types";
+import { employmentCodeRange } from "@/lib/lifecycle/employment";
+import type { EmploymentType, LifecycleStatus, LifecycleType } from "@/lib/lifecycle/types";
 
 import type { Dictionary } from "./dictionaries/id";
 
@@ -52,4 +53,20 @@ const TYPE_LABEL: Record<LifecycleType, keyof Dictionary["lifecycle"]> = {
 
 export function lifecycleTypeLabel(t: Dictionary, type: LifecycleType): string {
   return t.lifecycle[TYPE_LABEL[type]];
+}
+
+const EMPLOYMENT_LABEL: Record<EmploymentType, keyof Dictionary["forms"]> = {
+  PERMANENT: "permanent",
+  CONTRACT: "contract",
+  VENDOR: "vendor",
+  INTERN: "intern",
+};
+
+export function employmentLabel(t: Dictionary, type: EmploymentType): string {
+  return t.forms[EMPLOYMENT_LABEL[type]];
+}
+
+/** "Kontrak (3-4)" — the name with the company's digit range beside it. */
+export function employmentOptionLabel(t: Dictionary, type: EmploymentType): string {
+  return `${employmentLabel(t, type)} (${employmentCodeRange(type)})`;
 }

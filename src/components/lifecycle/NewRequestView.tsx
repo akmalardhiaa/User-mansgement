@@ -4,66 +4,27 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 
 import { useT } from "@/components/i18n/LocaleProvider";
-import { MovementForm } from "@/components/lifecycle/MovementForm";
 import { OnboardingForm } from "@/components/lifecycle/OnboardingForm";
 import { RequestSubmitted } from "@/components/lifecycle/RequestSubmitted";
-import { TerminationForm } from "@/components/lifecycle/TerminationForm";
-import { IconPower, IconSwap, IconUserPlus } from "@/components/ui/Icons";
-import type { Dictionary } from "@/lib/i18n/dictionaries/id";
-import { TRANSITION, stagger, staggerItem } from "@/lib/motion";
-import type { LifecycleRequest, LifecycleType } from "@/lib/lifecycle/types";
+import type { LifecycleRequest } from "@/lib/lifecycle/types";
+import { TRANSITION } from "@/lib/motion";
 import type { Employee } from "@/lib/types";
 
-const CHOICES: ReadonlyArray<{
-  type: LifecycleType;
-  /** Dictionary keys, so both the name and the line under it follow the language. */
-  label: keyof Dictionary["actions"];
-  description: keyof Dictionary["actions"];
-  icon: typeof IconUserPlus;
-}> = [
-  {
-    type: "ONBOARDING",
-    label: "typeOnboarding",
-    description: "typeOnboardingHint",
-    icon: IconUserPlus,
-  },
-  {
-    type: "MOVEMENT",
-    label: "typeMovement",
-    description: "typeMovementHint",
-    icon: IconSwap,
-  },
-  {
-    type: "TERMINATION",
-    label: "typeTermination",
-    description: "typeTerminationHint",
-    icon: IconPower,
-  },
-];
-
 /**
- * Picking which of the three requests to raise, then raising it.
+ * Asking for a new account, and nothing else.
  *
- * The roster handed to Movement and Termination has already had anyone with a
- * request in flight removed. The server refuses a second active request for the
- * same person anyway — that rule belongs there, not here — but offering a name
- * the submit will reject is a worse way to explain the rule than not offering it.
+ * This used to offer all three requests as a row of cards. It now offers one,
+ * because Movement and Termination are things that happen to somebody who is
+ * already in the directory — and the place you go to change somebody who is
+ * already there is the page where you pick them from a list and see the record
+ * you are changing. Both moved to Edit profil, whole, and this page kept the
+ * one request that has no subject to pick: the person does not exist yet.
+ *
+ * `employees` is still needed. It is the roster the manager picker chooses
+ * from, and a new hire's approving manager is somebody who already works here.
  */
-export function NewRequestView({
-  employees,
-  selectableEmployees,
-  initialType,
-  initialEmployeeId,
-}: {
-  /** Everyone, for the manager pickers. */
-  employees: Employee[];
-  /** Only those without a request in flight, for the subject pickers. */
-  selectableEmployees: Employee[];
-  initialType?: LifecycleType;
-  initialEmployeeId?: string;
-}) {
+export function NewRequestView({ employees }: { employees: Employee[] }) {
   const t = useT();
-  const [type, setType] = useState<LifecycleType>(initialType ?? "ONBOARDING");
   const [submitted, setSubmitted] = useState<LifecycleRequest | null>(null);
 
   if (submitted) {
@@ -71,65 +32,11 @@ export function NewRequestView({
   }
 
   return (
-    <div className="space-y-6">
-      <motion.div
-        variants={stagger(0.05)}
-        initial="hidden"
-        animate="visible"
-        className="grid gap-3 sm:grid-cols-3"
-        role="tablist"
-        aria-label={t.actions.requestKind}
-      >
-        {CHOICES.map((choice) => {
-          const selected = type === choice.type;
-          return (
-            <motion.button
-              key={choice.type}
-              variants={staggerItem}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => setType(choice.type)}
-              className={`group rounded-2xl border p-4 text-left backdrop-blur-sm transition-[border-color,background-color,box-shadow] duration-300 ease-(--ease-out-quint) ${
-                selected
-                  ? "border-accent/50 bg-surface shadow-[0_18px_44px_-30px_var(--color-accent)]"
-                  : "border-hairline bg-surface/80 hover:border-hairline-strong"
-              }`}
-            >
-              <choice.icon
-                className={`size-5 transition-colors ${selected ? "text-accent" : "text-ink-faint"}`}
-              />
-              <p className="mt-2.5 text-sm font-semibold text-ink">{t.actions[choice.label]}</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">{t.actions[choice.description]}</p>
-            </motion.button>
-          );
-        })}
-      </motion.div>
-
-      <motion.div
-        key={type}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={TRANSITION}
-      >
-        {type === "ONBOARDING" ? (
-          <OnboardingForm employees={employees} onSubmitted={setSubmitted} />
-        ) : null}
-        {type === "MOVEMENT" ? (
-          <MovementForm
-            employees={selectableEmployees}
-            initialEmployeeId={initialEmployeeId}
-            onSubmitted={setSubmitted}
-          />
-        ) : null}
-        {type === "TERMINATION" ? (
-          <TerminationForm
-            employees={selectableEmployees}
-            initialEmployeeId={initialEmployeeId}
-            onSubmitted={setSubmitted}
-          />
-        ) : null}
-      </motion.div>
-    </div>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={TRANSITION}>
+      <p className="mb-4 rounded-lg border border-hairline bg-elevated/40 px-3.5 py-2.5 text-xs leading-relaxed text-ink-muted">
+        {t.newRequest.existingEmployeeNote}
+      </p>
+      <OnboardingForm employees={employees} onSubmitted={setSubmitted} />
+    </motion.div>
   );
 }

@@ -5,13 +5,12 @@ import { useState } from "react";
 import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
 import { useT } from "@/components/i18n/LocaleProvider";
 import { Button } from "@/components/ui/Button";
-import { Card, Field, SelectField, TextareaField } from "@/components/ui/Field";
+import { Card, Field, SelectField } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
 import {
   IconBriefcase,
   IconBuilding,
   IconClock,
-  IconNote,
   IconSwap,
   IconUser,
 } from "@/components/ui/Icons";
@@ -36,12 +35,20 @@ const SECTION =
  */
 export function MovementForm({
   employees,
+  managerCandidates,
   initialEmployeeId,
   revise,
   onSubmitted,
 }: {
   /** Already excludes anyone with a request in flight — except when revising. */
   employees: Employee[];
+  /**
+   * Who may be named as the destination manager. Defaults to the same roster,
+   * and is given separately when the subject list is a single person — opened
+   * from Edit profil, the subject is already chosen, but the manager still has
+   * to be picked from everybody.
+   */
+  managerCandidates?: Employee[];
   initialEmployeeId?: string;
   /** The request being revised. Its subject is fixed; everything else starts from it. */
   revise?: LifecycleRequest;
@@ -240,36 +247,13 @@ export function MovementForm({
               ))}
             </SelectField>
 
-            <TextareaField
-              label={t.forms.newJobDescription}
-              name="toJobDescription"
-              rows={2}
-              icon={<IconNote className="size-4" />}
-              value={values.toJobDescription}
-              onChange={(event) => update("toJobDescription", event.target.value)}
-              error={fieldErrors.toJobDescription}
-              className="sm:col-span-2"
-            />
-
-            <TextareaField
-              label={t.forms.movementReason}
-              name="reason"
-              rows={2}
-              icon={<IconNote className="size-4" />}
-              value={values.reason}
-              onChange={(event) => update("reason", event.target.value)}
-              error={fieldErrors.reason}
-              placeholder={t.forms.movementReasonPlaceholder}
-              hint={t.forms.readByApprovers}
-              className="sm:col-span-2"
-            />
           </div>
         </div>
 
         <div>
           <p className={SECTION}>{t.forms.toManager}</p>
           <ManagerPicker
-            employees={employees}
+            employees={managerCandidates ?? employees}
             value={{ managerName: values.toManagerName, managerEmail: values.toManagerEmail }}
             onChange={(next) =>
               setValues((current) => ({
