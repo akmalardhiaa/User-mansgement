@@ -6,7 +6,6 @@ import type { MovementPayload, OnboardingPayload } from "./types";
 function onboarding(overrides: Partial<OnboardingPayload> = {}): OnboardingPayload {
   return {
     kind: "ONBOARDING",
-    nik: "2026001",
     firstName: "Citra",
     lastName: "Wulandari",
     displayName: "Citra Wulandari",
@@ -41,7 +40,6 @@ describe("the fingerprint is stable for equal payloads", () => {
       displayName: "Citra Wulandari",
       lastName: "Wulandari",
       firstName: "Citra",
-      nik: "2026001",
       kind: "ONBOARDING",
     } as OnboardingPayload;
 

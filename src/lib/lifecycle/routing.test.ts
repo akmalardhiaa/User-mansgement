@@ -39,7 +39,6 @@ function employee(overrides: Partial<Employee> = {}): Employee {
 
 const onboarding: OnboardingPayload = {
   kind: "ONBOARDING",
-  nik: "2026001",
   firstName: "Citra",
   lastName: "Wulandari",
   displayName: "Citra Wulandari",

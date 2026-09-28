@@ -12,7 +12,6 @@ import type { LifecycleRequest, LifecycleStatus, OnboardingPayload } from "./typ
 function onboarding(name: string, status: LifecycleStatus, createdAt: string): LifecycleRequest {
   const payload: OnboardingPayload = {
     kind: "ONBOARDING",
-    nik: "2026001",
     firstName: name,
     lastName: "Test",
     displayName: `${name} Test`,

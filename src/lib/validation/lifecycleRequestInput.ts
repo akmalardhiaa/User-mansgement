@@ -33,7 +33,6 @@ export type LifecycleInputResult =
   | { ok: false; errors: LifecycleErrors };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const NIK_PATTERN = /^[A-Za-z0-9._-]{3,32}$/;
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -137,9 +136,6 @@ export function parseLifecycleRequestInput(payload: unknown, now = new Date()): 
   let built: LifecyclePayload | undefined;
 
   if (type === "ONBOARDING") {
-    const nik = requireField(errors, body, "nik", "NIK", 3, 32);
-    if (nik && !NIK_PATTERN.test(nik)) errors.nik = "NIK hanya boleh huruf, angka, titik, strip, dan garis bawah.";
-
     const firstName = requireField(errors, body, "firstName", "Nama depan", 1, 80);
     const lastName = requireField(errors, body, "lastName", "Nama belakang", 1, 80);
     const displayName = requireField(errors, body, "displayName", "Nama lengkap", 2, 160);
@@ -174,7 +170,6 @@ export function parseLifecycleRequestInput(payload: unknown, now = new Date()): 
     if (Object.keys(errors).length === 0) {
       built = {
         kind: "ONBOARDING",
-        nik,
         firstName,
         lastName,
         displayName,

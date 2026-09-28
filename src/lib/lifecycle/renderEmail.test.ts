@@ -57,7 +57,6 @@ describe("what the approver can see", () => {
   it("resolves an access profile to its label rather than its id", () => {
     const onboarding: LifecyclePayload = {
       kind: "ONBOARDING",
-      nik: "12345",
       firstName: "Budi",
       lastName: "Santoso",
       displayName: "Budi Santoso",
