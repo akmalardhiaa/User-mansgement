@@ -6,7 +6,6 @@ import { getDataFilePath } from "@/lib/config/storage";
 import { processLock } from "@/lib/db/processShared";
 import { createStateFileIfAbsent, markStateFileSeen, readStateFile } from "@/lib/db/stateFile";
 import type { ApprovalTokenRecord } from "@/lib/lifecycle/approvalToken";
-import type { Delegation } from "@/lib/lifecycle/delegation";
 import type { ExecutionJob } from "@/lib/lifecycle/executionTypes";
 import type { EmailDelivery, OutboxEvent } from "@/lib/lifecycle/outboxTypes";
 import type { AuditEvent, LifecycleRequest } from "@/lib/lifecycle/types";
@@ -49,12 +48,6 @@ export interface StoreShape {
    */
   approvalTokens: ApprovalTokenRecord[];
   /**
-   * Managers' approvals handed to a substitute while they are away. Kept
-   * forever, ended ones included: who could approve on whose behalf, and when,
-   * is part of the evidence for every decision made under one.
-   */
-  delegations: Delegation[];
-  /**
    * When the legacy workflow was archived, if it has been. Its only job is to
    * make the migration idempotent: running it twice must not re-reconcile
    * accounts an operator has since corrected by hand.
@@ -85,7 +78,6 @@ function emptyStore(): StoreShape {
     outboxEvents: [],
     emailDeliveries: [],
     approvalTokens: [],
-    delegations: [],
     auditEvents: [],
   };
 }
@@ -114,7 +106,6 @@ function parse(raw: string): StoreShape {
     outboxEvents: parsed.outboxEvents ?? [],
     emailDeliveries: parsed.emailDeliveries ?? [],
     approvalTokens: parsed.approvalTokens ?? [],
-    delegations: parsed.delegations ?? [],
     auditEvents: parsed.auditEvents ?? [],
     legacyArchivedAt: parsed.legacyArchivedAt,
   };

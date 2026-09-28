@@ -39,7 +39,6 @@ const AUDIT_LABEL: Record<string, string> = {
   "request.approved": "Disetujui",
   "request.rejected": "Ditolak",
   "request.revised": "Direvisi",
-  "request.rerouted": "Dialihkan ke pengganti manager (delegasi)",
   "request.cancelled": "Dibatalkan",
   "request.queued": "Masuk antrean eksekusi",
   "request.scheduled": "Dijadwalkan",
@@ -201,11 +200,6 @@ export default async function RequestDetailPage({
                     {step.stage === "MANAGER" ? "1. Manager" : "2. CISO"}
                   </p>
                   <p className="text-sm font-medium text-ink">{step.approver.name}</p>
-                  {step.onBehalfOf ? (
-                    <p className="text-xs text-ink-muted">
-                      Pengganti untuk {step.onBehalfOf.name} (delegasi)
-                    </p>
-                  ) : null}
                   {step.pool?.length ? (
                     <ul className="space-y-0.5">
                       {step.pool.map((member) => (

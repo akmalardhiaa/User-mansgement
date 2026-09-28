@@ -34,7 +34,6 @@ async function seedStore(): Promise<void> {
     outboxEvents: [],
     emailDeliveries: [],
     approvalTokens: [],
-    delegations: [],
     auditEvents: [],
   };
 

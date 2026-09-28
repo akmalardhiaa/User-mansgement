@@ -99,14 +99,6 @@ export interface ApprovalStep {
    * answer decides for the stage; every other member's link dies with it.
    */
   pool?: ActorIdentity[];
-  /**
-   * Set when `approver` is answering in place of the manager the request was
-   * routed to, under a delegation. The decision is then theirs, made on this
-   * person's behalf — and the trail says both names.
-   */
-  onBehalfOf?: ActorIdentity;
-  /** Which delegation put `approver` here. */
-  delegationId?: string;
   decision?: ApprovalDecision;
   /** Mandatory when the decision is REJECTED. */
   reason?: string;

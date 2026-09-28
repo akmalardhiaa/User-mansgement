@@ -36,8 +36,6 @@ export interface ApprovalMailPayload {
   approverName: string;
   /** How many people this stage was sent to, when it went to a team. */
   teamSize?: number;
-  /** The manager this approver is standing in for, under a delegation. */
-  onBehalfOf?: string;
   effectiveAt?: string;
   /**
    * The request itself, so an approver can judge it from the message rather
@@ -176,17 +174,11 @@ export function emitApprovalRequest(
       requesterName: request.requester.name,
       approverName: member.name,
       teamSize: members.length > 1 ? members.length : undefined,
-      onBehalfOf: step.onBehalfOf?.name,
       effectiveAt: request.effectiveAt,
       payload: mailSafePayload(request.payload),
       managerDecision:
         managerStep?.decidedAt && managerStep.decidedBy
-          ? {
-              by: managerStep.onBehalfOf
-                ? `${managerStep.decidedBy.name} (atas nama ${managerStep.onBehalfOf.name})`
-                : managerStep.decidedBy.name,
-              at: managerStep.decidedAt,
-            }
+          ? { by: managerStep.decidedBy.name, at: managerStep.decidedAt }
           : undefined,
     };
 

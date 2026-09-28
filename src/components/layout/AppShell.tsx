@@ -14,7 +14,6 @@ import {
   IconDirectory,
   IconIdCard,
   IconSignOut,
-  IconSwap,
   IconUser,
   IconUserPlus,
 } from "@/components/ui/Icons";
@@ -35,7 +34,6 @@ const NAV: ReadonlyArray<{
   { href: "/pengajuan", label: "Pengajuan", icon: IconApprovals, permission: "request.read" },
   { href: "/pengajuan/baru", label: "Pengajuan baru", icon: IconUserPlus, permission: "request.create" },
   { href: "/users/edit", label: "Edit profil", icon: IconUser, permission: "employee.update" },
-  { href: "/delegasi", label: "Delegasi", icon: IconSwap, permission: "delegation.manage" },
   { href: "/aktivitas", label: "Aktivitas", icon: IconClock, permission: "activity.read" },
   { href: "/profile", label: "Profil", icon: IconIdCard },
 ];
