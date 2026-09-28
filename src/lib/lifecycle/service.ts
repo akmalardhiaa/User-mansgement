@@ -125,7 +125,6 @@ function subjectFor(payload: LifecyclePayload, employee: Employee | undefined): 
     return {
       displayName: payload.displayName,
       email: payload.email,
-      nik: payload.nik,
       department: payload.department,
     };
   }

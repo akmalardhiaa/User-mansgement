@@ -125,7 +125,6 @@ export type LocationType = "PUSAT" | "CABANG";
 /** Creating an account for somebody who does not have one yet. */
 export interface OnboardingPayload {
   kind: "ONBOARDING";
-  nik: string;
   firstName: string;
   lastName: string;
   displayName: string;
@@ -257,7 +256,6 @@ export type LifecyclePayload =
 export interface RequestSubject {
   displayName: string;
   email?: string;
-  nik?: string;
   department?: string;
 }
 

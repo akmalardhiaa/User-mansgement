@@ -32,7 +32,6 @@ export function RequestPayloadSummary({ payload }: { payload: LifecyclePayload }
   const rows: Array<[string, string]> =
     payload.kind === "ONBOARDING"
       ? [
-          ["NIK", payload.nik],
           ["Nama", payload.displayName],
           ["Email", payload.email],
           ["Jabatan", payload.jobTitle],

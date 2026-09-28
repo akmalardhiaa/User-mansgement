@@ -22,7 +22,6 @@ function request(
 ): LifecycleRequest {
   const payload: OnboardingPayload = {
     kind: "ONBOARDING",
-    nik: "2026001",
     firstName: name,
     lastName: "Test",
     displayName: `${name} Test`,

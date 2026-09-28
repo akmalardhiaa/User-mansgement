@@ -6,7 +6,6 @@ import type { MovementPayload, OnboardingPayload, TerminationPayload } from "./t
 
 const onboarding: OnboardingPayload = {
   kind: "ONBOARDING",
-  nik: "2026001",
   firstName: "Citra",
   lastName: "Wulandari",
   displayName: "Citra Wulandari",

@@ -19,7 +19,6 @@ const NOW = new Date("2026-09-22T03:00:00.000Z");
 
 const ONBOARDING = {
   type: "ONBOARDING",
-  nik: "HC-2026-0922",
   firstName: "Aad",
   lastName: "Afaafw",
   displayName: "Aad Afaafw",

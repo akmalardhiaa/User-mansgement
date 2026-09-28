@@ -81,7 +81,6 @@ const REASON_LABEL: Record<TerminationReason, string> = {
 function payloadRows(payload: LifecyclePayload): Array<[string, string]> {
   if (payload.kind === "ONBOARDING") {
     return [
-      ["NIK", payload.nik],
       ["Nama", payload.displayName],
       ["Email", payload.email],
       ["Jabatan", payload.jobTitle],

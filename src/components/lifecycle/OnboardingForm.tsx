@@ -28,7 +28,6 @@ const SECTION =
   "mb-4 flex items-center gap-2 text-xs font-medium tracking-[0.14em] text-ink-faint uppercase";
 
 const EMPTY = {
-  nik: "",
   firstName: "",
   lastName: "",
   displayName: "",
@@ -59,7 +58,6 @@ function fromRequest(request: LifecycleRequest | undefined): typeof EMPTY {
   if (request?.payload.kind !== "ONBOARDING") return EMPTY;
   const payload = request.payload;
   return {
-    nik: payload.nik,
     firstName: payload.firstName,
     lastName: payload.lastName,
     displayName: payload.displayName,
@@ -153,26 +151,6 @@ export function OnboardingForm({
           </p>
           <div className="grid gap-5 sm:grid-cols-2">
             <Field
-              label="NIK"
-              name="nik"
-              icon={<IconIdCard className="size-4" />}
-              value={values.nik}
-              onChange={(event) => update("nik", event.target.value)}
-              error={fieldErrors.nik}
-              placeholder="2026001"
-              hint="Nomor induk karyawan, dipakai sebagai kunci identitas."
-            />
-            <Field
-              label="Email"
-              name="email"
-              type="email"
-              icon={<IconMail className="size-4" />}
-              value={values.email}
-              onChange={(event) => update("email", event.target.value)}
-              error={fieldErrors.email}
-              placeholder="nadia.kusuma@example.com"
-            />
-            <Field
               label="Nama depan"
               name="firstName"
               icon={<IconUser className="size-4" />}
@@ -198,6 +176,23 @@ export function OnboardingForm({
               onChange={(event) => update("displayName", event.target.value)}
               error={fieldErrors.displayName}
               hint="Terisi otomatis dari nama depan dan belakang; bisa diubah."
+              className="sm:col-span-2"
+            />
+            {/*
+              Email sendirian di barisnya sejak NIK dihapus. Dibiarkan selebar
+              dua kolom, bukan dipasangkan dengan salah satu nama: alamatnya
+              panjang, dan ini satu-satunya kolom di formulir yang harus cocok
+              persis dengan akun direktori.
+            */}
+            <Field
+              label="Email"
+              name="email"
+              type="email"
+              icon={<IconMail className="size-4" />}
+              value={values.email}
+              onChange={(event) => update("email", event.target.value)}
+              error={fieldErrors.email}
+              placeholder="nadia.kusuma@example.com"
               className="sm:col-span-2"
             />
           </div>
