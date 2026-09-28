@@ -1,6 +1,7 @@
 import type { EmailMessage } from "@/lib/email/types";
 
 import { accessProfileLabel } from "./accessProfiles";
+import { isFixedTerm } from "./employment";
 import type { ApprovalMailPayload } from "./outbox";
 import type { LifecyclePayload, LifecycleType, TerminationReason } from "./types";
 
@@ -58,6 +59,14 @@ ${body}
 </div></body></html>`;
 }
 
+/** The four kinds of employment, in the language the emails are written in. */
+const EMPLOYMENT_LABEL_ID: Record<string, string> = {
+  PERMANENT: "Permanent",
+  CONTRACT: "Temporary",
+  VENDOR: "Vendor",
+  INTERN: "Magang",
+};
+
 /** Same wording as the portal's summary, so the two never say different things. */
 const REASON_LABEL: Record<TerminationReason, string> = {
   RESIGN: "Mengundurkan diri",
@@ -87,9 +96,9 @@ function payloadRows(payload: LifecyclePayload): Array<[string, string]> {
       ["Departemen", payload.department],
       [
         "Status kepegawaian",
-        payload.employmentType === "CONTRACT"
-          ? `Kontrak · berakhir ${payload.expiredDate ?? "—"}`
-          : "Karyawan tetap",
+        isFixedTerm(payload.employmentType)
+          ? `${EMPLOYMENT_LABEL_ID[payload.employmentType]} · berakhir ${payload.expiredDate ?? "—"}`
+          : EMPLOYMENT_LABEL_ID[payload.employmentType],
       ],
       [
         "Lokasi",
@@ -121,7 +130,7 @@ function payloadRows(payload: LifecyclePayload): Array<[string, string]> {
       ["Jabatan tujuan", payload.toJobTitle],
       ["Manager tujuan", `${payload.toManagerName} · ${payload.toManagerEmail}`],
       ["Profil akses baru", accessProfileLabel(payload.accessProfileId)],
-      ["Alasan", payload.reason],
+      ...(payload.reason ? [["Alasan", payload.reason] as [string, string]] : []),
       ...(payload.toJobDescription
         ? [["Keterangan jabatan", payload.toJobDescription] as [string, string]]
         : []),

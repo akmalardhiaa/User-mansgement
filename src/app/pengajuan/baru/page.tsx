@@ -8,8 +8,6 @@ import { requirePageSession } from "@/lib/auth/current";
 import { hasPermission } from "@/lib/auth/roles";
 import { listEmployees } from "@/lib/db/repository";
 import { getTranslations } from "@/lib/i18n/server";
-import { loadPendingEmployeeIds } from "@/lib/lifecycle/pendingStore";
-import { LIFECYCLE_TYPES, type LifecycleType } from "@/lib/lifecycle/types";
 
 export const dynamic = "force-dynamic";
 
@@ -29,16 +27,23 @@ export default async function NewRequestPage({
     return <AccessDenied roles={session.roles} need={t.newRequest.needCreate} />;
   }
 
+  /*
+   * Everything about somebody who already has a record is raised from Edit
+   * profil now — a profile change, a Movement, a Termination — so any link that
+   * still asks this page for one is sent there rather than answered with a form
+   * that no longer exists here. `?employeeId=` goes with it, so the person is
+   * already selected when they arrive.
+   */
   const { type, employeeId } = await searchParams;
   const requested = String(type).toUpperCase();
-  // A profile update is raised from the edit-profile screen, which has the
-  // record to diff against; this page has no form for it.
-  if (requested === "PROFILE_UPDATE") redirect("/users/edit");
-  const initialType = (LIFECYCLE_TYPES as readonly string[]).includes(requested)
-    ? (requested as LifecycleType)
-    : undefined;
+  if (requested === "PROFILE_UPDATE" || requested === "MOVEMENT" || requested === "TERMINATION") {
+    const action = requested === "PROFILE_UPDATE" ? "profile" : requested.toLowerCase();
+    redirect(
+      `/users/edit?action=${action}${employeeId ? `&employeeId=${encodeURIComponent(employeeId)}` : ""}`,
+    );
+  }
 
-  const [employees, pendingIds] = await Promise.all([listEmployees(), loadPendingEmployeeIds()]);
+  const employees = await listEmployees();
 
   return (
     <div className="space-y-6">
@@ -59,14 +64,7 @@ export default async function NewRequestPage({
         </div>
       </div>
 
-      <NewRequestView
-        employees={employees}
-        // One active request per employee, so anyone already in flight is not
-        // offered as a subject.
-        selectableEmployees={employees.filter((employee) => !pendingIds.has(employee.id))}
-        initialType={initialType}
-        initialEmployeeId={employeeId}
-      />
+      <NewRequestView employees={employees} />
     </div>
   );
 }

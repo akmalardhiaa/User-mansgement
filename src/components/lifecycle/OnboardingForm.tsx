@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
 import { useT } from "@/components/i18n/LocaleProvider";
 import { Button } from "@/components/ui/Button";
-import { Card, Field, SelectField, TextareaField } from "@/components/ui/Field";
+import { Card, Field, SelectField } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
 import {
   IconApprovals,
@@ -14,12 +14,19 @@ import {
   IconClock,
   IconIdCard,
   IconMail,
-  IconNote,
   IconUser,
 } from "@/components/ui/Icons";
 import { ManagerPicker } from "@/components/users/ManagerPicker";
+import {
+  COMPANY_EMAIL_DOMAINS,
+  DEFAULT_EMAIL_DOMAIN,
+  companyEmailLocalPart,
+  splitCompanyEmail,
+} from "@/lib/lifecycle/companyEmail";
+import { EMPLOYMENT_TYPES, isFixedTerm } from "@/lib/lifecycle/employment";
+import { employmentOptionLabel } from "@/lib/i18n/labels";
 import { ACCESS_PROFILES } from "@/lib/lifecycle/accessProfiles";
-import type { LifecycleRequest } from "@/lib/lifecycle/types";
+import type { EmploymentType, LifecycleRequest } from "@/lib/lifecycle/types";
 import { ComboField } from "@/components/ui/ComboField";
 import { DEPARTMENT_GROUPS, JOB_TITLE_GROUPS } from "@/lib/db/seed";
 import type { Employee } from "@/lib/types";
@@ -32,9 +39,10 @@ const EMPTY = {
   firstName: "",
   lastName: "",
   displayName: "",
-  email: "",
+  /** The address in the two halves the form shows; joined on submit. */
+  emailLocal: "",
+  emailDomain: DEFAULT_EMAIL_DOMAIN as string,
   jobTitle: "",
-  jobDescription: "",
   department: "",
   employmentType: "PERMANENT",
   expiredDate: "",
@@ -62,9 +70,9 @@ function fromRequest(request: LifecycleRequest | undefined): typeof EMPTY {
     firstName: payload.firstName,
     lastName: payload.lastName,
     displayName: payload.displayName,
-    email: payload.email,
+    emailLocal: splitCompanyEmail(payload.email).local,
+    emailDomain: splitCompanyEmail(payload.email).domain,
     jobTitle: payload.jobTitle,
-    jobDescription: payload.jobDescription ?? "",
     department: payload.department,
     employmentType: payload.employmentType,
     expiredDate: payload.expiredDate?.slice(0, 10) ?? "",
@@ -94,6 +102,8 @@ export function OnboardingForm({
   const [submitting, setSubmitting] = useState(false);
   // When revising, the name was already written by hand — stop it following.
   const nameEdited = useRef(Boolean(revise));
+  // Same rule for the address: a revision starts from one somebody chose.
+  const emailEdited = useRef(Boolean(revise));
 
   function update(field: keyof typeof EMPTY, value: string) {
     setValues((current) => {
@@ -103,6 +113,24 @@ export function OnboardingForm({
         next.displayName = `${next.firstName} ${next.lastName}`.trim();
       }
       if (field === "displayName") nameEdited.current = value.trim().length > 0;
+
+      /*
+       * The address follows the name and the kind of employment, until HC
+       * types one themselves. Changing somebody from permanent to temporary
+       * before the address has been touched moves the digit with it, which is
+       * the whole point of encoding it there.
+       */
+      if (
+        !emailEdited.current &&
+        (field === "firstName" || field === "lastName" || field === "employmentType")
+      ) {
+        next.emailLocal = companyEmailLocalPart(
+          next.firstName,
+          next.lastName,
+          next.employmentType as EmploymentType,
+        );
+      }
+      if (field === "emailLocal") emailEdited.current = value.trim().length > 0;
       return next;
     });
     setFieldErrors((current) => {
@@ -122,11 +150,14 @@ export function OnboardingForm({
     const body = {
       type: "ONBOARDING",
       ...values,
+      // The two halves are a form concern; the request carries one address.
+      email: `${values.emailLocal.trim()}${values.emailDomain}`,
       // Empty strings would fail date validation. There is no effective date for
       // an onboarding: the account is made as soon as both approvals are in.
-      expiredDate: values.employmentType === "CONTRACT" ? values.expiredDate : undefined,
+      expiredDate: isFixedTerm(values.employmentType as EmploymentType)
+        ? values.expiredDate
+        : undefined,
       branchName: values.locationType === "CABANG" ? values.branchName : undefined,
-      jobDescription: values.jobDescription || undefined,
     };
     const result = revise
       ? await reviseAndResubmit(revise.id, revise.version, body)
@@ -181,22 +212,36 @@ export function OnboardingForm({
               className="sm:col-span-2"
             />
             {/*
-              Email sendirian di barisnya sejak NIK dihapus. Dibiarkan selebar
-              dua kolom, bukan dipasangkan dengan salah satu nama: alamatnya
-              panjang, dan ini satu-satunya kolom di formulir yang harus cocok
-              persis dengan akun direktori.
-            */}
-            <Field
-              label={t.forms.email}
-              name="email"
-              type="email"
-              icon={<IconMail className="size-4" />}
-              value={values.email}
-              onChange={(event) => update("email", event.target.value)}
-              error={fieldErrors.email}
-              placeholder="nadia.kusuma@example.com"
-              className="sm:col-span-2"
-            />
+             * The address in two controls: the part HC may adjust, and the
+             * domain they pick. Suggested from the name and the employment
+             * digit — see lifecycle/companyEmail.ts — and editable, because a
+             * second person with the same name needs the other digit of the
+             * range and no rule can guess which.
+             */}
+            <div className="grid gap-3 sm:col-span-2 sm:grid-cols-[1fr_auto]">
+              <Field
+                label={t.forms.email}
+                name="emailLocal"
+                icon={<IconMail className="size-4" />}
+                value={values.emailLocal}
+                onChange={(event) => update("emailLocal", event.target.value)}
+                error={fieldErrors.email}
+                placeholder="nadiakusuma1"
+                hint={t.forms.emailHint}
+              />
+              <SelectField
+                label={t.forms.emailDomain}
+                name="emailDomain"
+                value={values.emailDomain}
+                onChange={(event) => update("emailDomain", event.target.value)}
+              >
+                {COMPANY_EMAIL_DOMAINS.map((domain) => (
+                  <option key={domain} value={domain}>
+                    {domain}
+                  </option>
+                ))}
+              </SelectField>
+            </div>
           </div>
         </div>
 
@@ -234,12 +279,16 @@ export function OnboardingForm({
               value={values.employmentType}
               onChange={(event) => update("employmentType", event.target.value)}
               error={fieldErrors.employmentType}
+              hint={t.forms.employmentCodeHint}
             >
-              <option value="PERMANENT">{t.forms.permanent}</option>
-              <option value="CONTRACT">{t.forms.contract}</option>
+              {EMPLOYMENT_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {employmentOptionLabel(t, type)}
+                </option>
+              ))}
             </SelectField>
 
-            {values.employmentType === "CONTRACT" ? (
+            {isFixedTerm(values.employmentType as EmploymentType) ? (
               <Field
                 label={t.forms.contractEnd}
                 name="expiredDate"
@@ -287,16 +336,6 @@ export function OnboardingForm({
               hint={t.forms.startDateHint}
             />
 
-            <TextareaField
-              label={t.forms.jobDescription}
-              name="jobDescription"
-              rows={2}
-              icon={<IconNote className="size-4" />}
-              value={values.jobDescription}
-              onChange={(event) => update("jobDescription", event.target.value)}
-              error={fieldErrors.jobDescription}
-              className="sm:col-span-2"
-            />
           </div>
         </div>
 

@@ -111,7 +111,12 @@ export interface ApprovalStep {
 /* Payloads                                                                   */
 /* -------------------------------------------------------------------------- */
 
-export type EmploymentType = "PERMANENT" | "CONTRACT";
+/**
+ * Four kinds, because the company's account numbering says there are four:
+ * permanent, contract, vendor and intern. See lifecycle/employment.ts for the
+ * digit each one ends an address with, and for which of them end on a date.
+ */
+export type EmploymentType = "PERMANENT" | "CONTRACT" | "VENDOR" | "INTERN";
 export type LocationType = "PUSAT" | "CABANG";
 
 /** Creating an account for somebody who does not have one yet. */
@@ -145,7 +150,12 @@ export interface MovementPayload {
   toManagerName: string;
   toManagerEmail: string;
   accessProfileId: string;
-  reason: string;
+  /**
+   * Why the move was asked for. Optional since the field was taken off the
+   * form: requests raised before that still carry one, and it is still shown
+   * wherever it exists.
+   */
+  reason?: string;
 }
 
 /**

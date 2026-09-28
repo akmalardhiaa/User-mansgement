@@ -152,13 +152,12 @@ export function EmployeeDetailDrawer({
                   <div className="mt-2">
                     <PendingBadge marker={pending} />
                     <p className="mt-2 text-[11px] leading-relaxed text-ink-muted">
-                      Status akun di atas belum berubah. Direktori baru mengikuti setelah
-                      perubahan benar-benar dijalankan dan diverifikasi.
+                      {t.execution.pendingNotAppliedYet}
                     </p>
                   </div>
                 ) : (
                   <p className="mt-1.5 text-xs text-ink-muted">
-                    Tidak ada pengajuan yang sedang berjalan untuk karyawan ini.
+                    {t.execution.noRequestRunning}
                   </p>
                 )}
               </div>
@@ -171,24 +170,24 @@ export function EmployeeDetailDrawer({
                 className="w-full justify-center"
                 icon={<IconDownload />}
               >
-                Cetak profil karyawan
+                {t.execution.printProfile}
               </Button>
 
               {canRequest && !pending ? (
                 <div className="flex gap-2">
                   <Link
-                    href={`/pengajuan/baru?type=MOVEMENT&employeeId=${employee.id}`}
+                    href={`/users/edit?action=movement&employeeId=${employee.id}`}
                     className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-hairline-strong bg-elevated px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:border-accent/50"
                   >
                     <IconSwap className="size-4" />
-                    Ajukan Movement
+                    {t.execution.raiseMovement}
                   </Link>
                   <Link
-                    href={`/pengajuan/baru?type=TERMINATION&employeeId=${employee.id}`}
+                    href={`/users/edit?action=termination&employeeId=${employee.id}`}
                     className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3.5 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/20"
                   >
                     <IconPower className="size-4" />
-                    Ajukan Termination
+                    {t.execution.raiseTermination}
                   </Link>
                 </div>
               ) : null}

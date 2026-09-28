@@ -1,4 +1,5 @@
 import { isAccessProfileId } from "@/lib/lifecycle/accessProfiles";
+import { EMPLOYMENT_TYPES, isFixedTerm } from "@/lib/lifecycle/employment";
 import { DATE_BOUNDS, checkDate, startOfJakartaDay, type DateBounds } from "@/lib/validation/dates";
 import { parseEmployeeProfileInput } from "@/lib/validation/employeeProfileInput";
 import {
@@ -7,6 +8,7 @@ import {
   type LifecyclePayload,
   type LifecycleType,
   type TerminationReason,
+  type EmploymentType,
 } from "@/lib/lifecycle/types";
 
 /**
@@ -153,13 +155,18 @@ export function parseLifecycleRequestInput(payload: unknown, now = new Date()): 
     const accessProfileId = accessProfile(errors, body);
     const jobDescription = optional(errors, body, "jobDescription", "Keterangan jabatan", 2000);
 
-    const employmentType = asString(body.employmentType).toUpperCase();
-    if (employmentType !== "PERMANENT" && employmentType !== "CONTRACT") {
-      errors.employmentType = "Status kepegawaian harus Tetap atau Kontrak.";
+    const employmentType = asString(body.employmentType).toUpperCase() as EmploymentType;
+    if (!EMPLOYMENT_TYPES.includes(employmentType)) {
+      errors.employmentType = "Status kepegawaian harus Tetap, Kontrak, Vendor, atau Magang.";
     }
-    // A contract with no end date reads as permanent to everyone downstream.
-    const expiredDate =
-      employmentType === "CONTRACT" ? date(errors, body, "expiredDate", "Tanggal berakhir kontrak", true, DATE_BOUNDS.newContractEnd, now) : undefined;
+    /*
+     * Everything except permanent ends on a date, and an end date left empty
+     * reads as permanent to everyone downstream — including the person who has
+     * to notice that a vendor's access should have stopped in March.
+     */
+    const expiredDate = isFixedTerm(employmentType)
+      ? date(errors, body, "expiredDate", "Tanggal berakhir", true, DATE_BOUNDS.newContractEnd, now)
+      : undefined;
 
     const locationType = asString(body.locationType).toUpperCase();
     if (locationType !== "PUSAT" && locationType !== "CABANG") {
@@ -177,7 +184,7 @@ export function parseLifecycleRequestInput(payload: unknown, now = new Date()): 
         jobTitle,
         jobDescription,
         department,
-        employmentType: employmentType as "PERMANENT" | "CONTRACT",
+        employmentType,
         expiredDate,
         locationType: locationType as "PUSAT" | "CABANG",
         branchName,
@@ -201,7 +208,9 @@ export function parseLifecycleRequestInput(payload: unknown, now = new Date()): 
       "Email manager tujuan",
     );
     const accessProfileId = accessProfile(errors, body);
-    const reason = requireField(errors, body, "reason", "Alasan pemindahan", 5, 2000);
+    // No longer asked for on the form, and no longer required — but still
+    // accepted, so an older client or a revision of an older request keeps its.
+    const reason = optional(errors, body, "reason", "Alasan pemindahan", 2000);
     const toJobDescription = optional(errors, body, "toJobDescription", "Keterangan jabatan", 2000);
 
     if (Object.keys(errors).length === 0) {

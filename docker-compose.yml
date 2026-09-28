@@ -58,6 +58,13 @@ services:
       - path: .env.docker
         required: false
 
+    # Where the per-employee folders are made, as the CONTAINER sees it. It
+    # belongs here rather than in .env.docker because it only means anything
+    # together with the mount below: the two have to agree, so they sit
+    # together. Remove both lines to switch the feature off.
+    environment:
+      USER_FOLDER_ROOT: /mnt/user-folders
+
     volumes:
       # The application's own code, so changing it needs no rebuild: the
       # container compiles the same files you edit.
@@ -75,6 +82,14 @@ services:
       - ./src:/app/src
       - ./public:/app/public
       - ./scripts:/app/scripts
+
+      # The folder above this project, where a folder is created for each new
+      # employee — see src/lib/lifecycle/userFolder.ts. Written as `..` rather
+      # than as an absolute path so it follows the project to another machine:
+      # where the project sits in C:\akmalardhia\magang\user management, this is
+      # C:\akmalardhia\magang. Point it somewhere else by changing this line and
+      # nothing else; the container only ever knows /mnt/user-folders.
+      - ..:/mnt/user-folders
 
       # The state the portal actually owns: the employee roster, server-side
       # sessions, the simulated directory, and the file-driver outbox. Bound to

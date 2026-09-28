@@ -34,7 +34,7 @@ export const PROFILE_FIELD_LABEL: Record<ProfileField, string> = {
   jobTitle: "Jabatan",
   jobDescription: "Keterangan jabatan",
   employmentType: "Status kepegawaian",
-  expiredDate: "Kontrak berakhir",
+  expiredDate: "Tanggal berakhir",
   locationType: "Lokasi penempatan",
   branchName: "Nama cabang",
   description: "Catatan HC",
@@ -47,6 +47,17 @@ export const PROFILE_FIELD_LABEL: Record<ProfileField, string> = {
  * silent change would be a change nobody approved — but not what it says.
  */
 export const INTERNAL_PROFILE_FIELDS: readonly ProfileField[] = ["description"];
+
+/**
+ * Indonesian, because a profile diff is read in the approval email as well as
+ * on screen, and the emails stay Indonesian by decision.
+ */
+const EMPLOYMENT_LABEL_ID: Record<string, string> = {
+  PERMANENT: "Permanent",
+  CONTRACT: "Temporary",
+  VENDOR: "Vendor",
+  INTERN: "Magang",
+};
 
 export const REDACTED_VALUE = "(catatan internal — isinya tidak dikirim lewat email)";
 
@@ -79,7 +90,7 @@ export function displayValue(field: ProfileField, value: string | undefined): st
   if (!text) return "—";
 
   if (field === "employmentType") {
-    return text === "CONTRACT" ? "Kontrak" : text === "PERMANENT" ? "Karyawan tetap" : text;
+    return EMPLOYMENT_LABEL_ID[text] ?? text;
   }
   if (field === "locationType") {
     return text === "CABANG" ? "Cabang" : text === "PUSAT" ? "Kantor pusat" : text;

@@ -149,9 +149,30 @@ export function filterEmployees(
       return false;
     }
     if (filters.department !== "ALL" && employee.department !== filters.department) return false;
+
+    /*
+     * Disabled accounts are out of the way until they are asked for.
+     *
+     * Most of the roster ends up disabled over time — people leave, and the
+     * record stays — so a list of everyone is mostly a list of people who no
+     * longer work here, and the person HC is looking for is somewhere below it.
+     * They are never unreachable: a search finds them, and so does choosing
+     * "Nonaktif" in the status filter. Only the default view leaves them out.
+     */
+    if (filters.status === "ALL" && !needle && employee.status !== "ACTIVE") return false;
+
     if (!needle) return true;
     return matchesQuery(employee, needle);
   });
+}
+
+/** How many disabled accounts the default view is currently leaving out. */
+export function hiddenInactiveCount(
+  employees: Employee[],
+  filters: Pick<DirectoryFilters, "query" | "status">,
+): number {
+  if (filters.status !== "ALL" || filters.query.trim() !== "") return 0;
+  return employees.filter((employee) => employee.status !== "ACTIVE").length;
 }
 
 export function sortEmployees(
@@ -164,6 +185,16 @@ export function sortEmployees(
   // A copy: sorting the caller's array in place would mutate the props React
   // just handed us.
   return [...employees].sort((a, b) => {
+    /*
+     * Working accounts first, always, whichever column is sorted and whichever
+     * way round. A disabled account is a record rather than a colleague, and
+     * mixing the two by name puts somebody who left last year between two
+     * people HC is trying to compare. Reversing the direction reverses the
+     * order within each group, not the groups themselves.
+     */
+    const byStatus = STATUS_WEIGHT[a.status] - STATUS_WEIGHT[b.status];
+    if (byStatus !== 0) return byStatus;
+
     let comparison = 0;
 
     switch (sort) {
