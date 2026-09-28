@@ -162,17 +162,6 @@ function teamNotice(payload: ApprovalMailPayload): string {
   return `<p style="margin:0 0 16px;padding:12px;background:#eaf2fb;border-radius:8px;font-size:13px;line-height:1.6">Permintaan ini dikirim ke <strong>${payload.teamSize} anggota tim CISO</strong>, masing-masing dengan tautan pribadi. <strong>Keputusan pertama yang masuk yang berlaku</strong> — bila anggota lain sudah memutuskan, tautan Anda otomatis tidak berlaku dan halaman akan menampilkan siapa yang memutuskan.</p>`;
 }
 
-/**
- * Said up front when the approver is standing in for someone.
- *
- * A substitute who does not realise they are one either ignores a request
- * about a team they do not run, or approves it without the context the absent
- * manager would have had. Either way they should know whose decision this is.
- */
-function delegationNotice(payload: ApprovalMailPayload): string {
-  if (!payload.onBehalfOf) return "";
-  return `<p style="margin:0 0 16px;padding:12px;background:#f3ecfb;border-radius:8px;font-size:13px;line-height:1.6">Anda menerima permintaan ini sebagai <strong>pengganti ${escapeHtml(payload.onBehalfOf)}</strong>, yang sedang berhalangan (delegasi resmi dari Human Capital). Keputusan Anda dicatat atas nama Anda, sebagai pengganti ${escapeHtml(payload.onBehalfOf)}.</p>`;
-}
 
 function rowsToHtml(rows: Array<[string, string]>): string {
   return rows
@@ -290,7 +279,6 @@ export function renderEmail(payload: ApprovalMailPayload, recipient: string): Em
 <p style="margin:0 0 16px;font-size:14px;line-height:1.6">Halo ${escapeHtml(payload.approverName)}, ada pengajuan yang menunggu keputusan Anda sebagai <strong>${payload.stage === "MANAGER" ? "Manager" : "CISO"}</strong>.</p>
 ${revisionNotice(payload)}
 ${teamNotice(payload)}
-${delegationNotice(payload)}
 <table style="width:100%;border-collapse:collapse;margin-bottom:20px">${detailRows(payload)}</table>
 ${
   payload.payload

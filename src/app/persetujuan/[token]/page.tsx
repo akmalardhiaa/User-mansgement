@@ -101,13 +101,6 @@ export default async function ApprovalPage({
               </div>
             </div>
 
-            {result.preview.onBehalfOf ? (
-              <p className="mt-4 rounded-lg border border-accent/30 bg-accent/10 px-3.5 py-2.5 text-xs text-ink">
-                Anda memutuskan sebagai <strong>pengganti {result.preview.onBehalfOf}</strong> yang
-                sedang berhalangan. Keputusan tercatat atas nama Anda, sebagai pengganti.
-              </p>
-            ) : null}
-
             {result.preview.teamSize ? (
               <p className="mt-4 rounded-lg border border-info/30 bg-info/10 px-3.5 py-2.5 text-xs text-info">
                 Dikirim ke {result.preview.teamSize} anggota tim CISO. Keputusan pertama yang masuk

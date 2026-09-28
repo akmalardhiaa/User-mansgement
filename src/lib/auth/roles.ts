@@ -84,12 +84,6 @@ export const PERMISSIONS = [
    * authenticated by a link issued to one approver's address, not by a portal
    * session — so no role here can approve anything, SYSTEM_ADMIN included.
    */
-  /**
-   * Registering and ending delegations: who answers for a manager who is away.
-   * HC's alone — it changes who is asked to approve, so it belongs with the
-   * people who raise requests and never with those who configure the portal.
-   */
-  "delegation.manage",
   /** One-off maintenance, such as retiring the legacy workflow. */
   "system.migrate",
   /** Running the execution worker, and retrying what it could not finish. */
@@ -116,7 +110,6 @@ const ROLE_PERMISSIONS: Record<PortalRole, readonly Permission[]> = {
     "request.read",
     "request.create",
     "request.cancel",
-    "delegation.manage",
   ],
   SYSTEM_ADMIN: [
     "directory.read",

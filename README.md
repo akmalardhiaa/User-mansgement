@@ -71,6 +71,37 @@ Akun yang dinonaktifkan tidak bisa masuk — itulah yang membuat Termination
 terlihat utuh: login berhenti bekerja sebagai *akibat* pengajuan, bukan sebagai
 langkah terpisah yang harus diingat seseorang. **Ditolak di production.**
 
+## Menjalankan tanpa Docker
+
+Docker Desktop **berbayar** untuk perusahaan besar — di atas 250 karyawan atau
+pendapatan di atas $10 juta — dan mendaftar dengan email kantor masuk hitungan
+lisensi itu. Aplikasi ini tidak membutuhkannya: isinya aplikasi Next.js biasa,
+dan Docker hanya pembungkus yang memudahkan.
+
+Klik dua kali `jalankan.bat`, atau dari terminal:
+
+```bash
+npm install     # sekali saja
+npm run dev
+```
+
+Lalu buka `http://localhost:3000`. Hasilnya identik dengan container, karena
+`.env.development` — ikut di-commit, tanpa rahasia — memuat bawaan yang sama
+dengan `.env.docker.example`, dan `.env.local` Anda tetap menimpanya.
+
+**Bila komputernya tidak boleh memasang apa pun,** unduh Node.js versi
+*Windows Binary (.zip)* dari nodejs.org, ekstrak ke folder `node` di dalam
+folder proyek, lalu jalankan `jalankan.bat` — skrip itu memakai Node portabel
+tersebut tanpa pemasangan dan tanpa hak admin.
+
+**Bila jaringannya memblokir npm,** salin folder `node_modules` (sekitar 550 MB)
+dari komputer yang sudah menjalankan `npm install`. Salinan antar-Windows
+kompatibel, dan `npm install` lalu tidak diperlukan sama sekali.
+
+Alternatif lain bila memang harus memakai container: Rancher Desktop atau
+Podman Desktop (keduanya gratis), atau Docker Engine di dalam WSL2 — yang
+berbayar adalah Docker **Desktop**, bukan mesin Dockernya.
+
 ## Menjalankan dengan Docker
 
 ```bash
@@ -116,8 +147,11 @@ kegagalan — dan memulihkannya diam-diam adalah kejutan tersendiri.
 
 ### Pindah ke komputer lain
 
-Yang perlu dipasang di komputer tujuan hanya **Docker Desktop**. Tidak perlu
-Node, tidak perlu `npm install`, tidak ada langkah seeding.
+Dua jalur, dan keduanya tidak butuh langkah seeding apa pun. Tanpa Docker:
+salin folder proyek beserta `node_modules`, lalu `jalankan.bat` — lihat
+**Menjalankan tanpa Docker** di atas, yang juga jalan tanpa hak admin dan tanpa
+koneksi. Dengan Docker, yang perlu dipasang hanya **Docker Desktop** dan tidak
+perlu Node maupun `npm install`.
 
 **Mulai bersih** — salin repositori ini (tanpa `node_modules` dan `.next`), lalu:
 
@@ -223,7 +257,7 @@ termasuk `SYSTEM_ADMIN`.
 
 | Peran | Wewenang |
 | --- | --- |
-| `HC_REQUESTER` | Direktori, aktivitas, **buat, revisi & batalkan pengajuan** (termasuk perubahan profil), **kelola delegasi** |
+| `HC_REQUESTER` | Direktori, aktivitas, **buat, revisi & batalkan pengajuan** (termasuk perubahan profil) |
 | `SYSTEM_ADMIN` | Baca direktori, aktivitas, pengajuan; konfigurasi portal |
 | `OPS_OPERATOR` | Baca direktori, aktivitas, pengajuan; **menjalankan worker** |
 | `AUDITOR` | Baca dan ekspor direktori, baca aktivitas dan pengajuan |
@@ -274,7 +308,6 @@ Kontrol yang sebenarnya ada di dua tempat, dan keduanya membaca catatan sesi:
 | `/pengajuan/[id]/revisi` | Revisi oleh pemohon — dikirim ulang otomatis ke manager | `request.create` |
 | `/persetujuan/[token]` | Halaman konfirmasi keputusan dari tautan email — **tanpa sesi**, satu-satunya tempat approver memutuskan | token |
 | `/users/edit` | Ajukan perubahan profil karyawan (pengajuan `PROFILE_UPDATE`) | `employee.update` + `request.create` |
-| `/delegasi` | Daftarkan dan akhiri delegasi manager yang berhalangan | `delegation.manage` |
 | `/aktivitas` | Jejak aktivitas | `activity.read` |
 | `/profile` | Akun sendiri | — |
 | `/login` | Masuk | — |
@@ -302,9 +335,6 @@ Kontrol yang sebenarnya ada di dua tempat, dan keduanya membaca catatan sesi:
 | `POST` | `/api/admin/seed-mock-ad` | `system.migrate` |
 | `POST` | `/api/outbox/dispatch` | `execution.run` |
 | `POST` | `/api/approval-actions` | token sekali pakai |
-| `GET` | `/api/delegations` | `delegation.manage` |
-| `POST` | `/api/delegations` — `reroutePending` opsional | `delegation.manage` |
-| `POST` | `/api/delegations/:id/end` | `delegation.manage` |
 
 ## Pengajuan lifecycle
 
@@ -359,17 +389,6 @@ Beberapa aturan yang ditegakkan kode, bukan sekadar konvensi:
   Server menolak alamat yang bukan karyawan **aktif** dan mengganti nama yang
   diketik dengan nama dari direktori. Pengajuan yang sudah berjalan tidak
   terpengaruh; approver-nya dibekukan saat submit.
-- **Delegasi.** Saat manager berhalangan, HC mendaftarkan pengganti di
-  `/delegasi` untuk periode tertentu (maks. 90 hari). Pengajuan baru untuk
-  manager itu dirutekan ke pengganti dan tercatat "Nama (atas nama Manager)" di
-  email, detail, dan jejak audit. Pengajuan yang **sudah** menunggu hanya
-  dialihkan bila HC mencentang opsinya — tautan di email manager lalu mati dan
-  pengganti menerima tautan baru. Aturan yang ditegakkan: pengganti harus
-  karyawan aktif; HC tidak boleh menunjuk dirinya sendiri; tidak boleh
-  berantai; pemisahan tugas diperiksa terhadap manager **dan** penggantinya,
-  sehingga pemohon yang sedang "berhalangan" tetap tidak bisa menyetujui
-  pengajuannya sendiri lewat pengganti. Tahap CISO tidak perlu delegasi karena
-  sudah dikirim ke seluruh tim.
 - **Tim CISO: keputusan pertama yang berlaku.** Setiap anggota mendapat email
   dan tautan pribadinya sendiri — bukan satu tautan ke distribution list, yang
   tidak bisa mencatat siapa yang menyetujui. Anggota pertama yang menyetujui

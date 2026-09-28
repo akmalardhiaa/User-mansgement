@@ -214,7 +214,7 @@ export function assertSeparationOfDuties(
     throw new SeparationOfDutiesError(
       team.some(isRequester)
         ? "Pemohon tidak boleh menjadi approver CISO untuk pengajuannya sendiri."
-        : "Manager dan CISO harus dua orang berbeda. Gunakan delegasi resmi bila keduanya bertabrakan.",
+        : "Manager dan CISO harus dua orang berbeda. Pilih manager lain untuk pengajuan ini.",
     );
   }
   return eligible;

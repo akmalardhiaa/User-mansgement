@@ -8,7 +8,6 @@ import { checkToken, hashEquals, hashToken, type ApprovalTokenRecord } from "./a
 import { emitApprovalRequest, emitResult, revokeRequestTokens } from "./outbox";
 import { hashPayload, payloadMatches } from "./payload";
 import { resolveCisoTeamForSubmit } from "./cisoTeam";
-import { activeDelegationFor, type Delegation } from "./delegation";
 import { diffProfile, profileOf } from "./profileUpdate";
 import {
   answererMatching,
@@ -436,35 +435,13 @@ function submitInDraft(
   request.payload = withDirectoryManager(draft, withProfileChanges(request.payload, employee));
 
   const routing = resolveRouting(request.payload, employee, cisoTeamOverride);
-  let cisoTeam = assertSeparationOfDuties(request.requester, routing);
-
-  /*
-   * A manager who is away may have handed their approvals to a substitute.
-   *
-   * Separation of duties is checked against BOTH people. Against the manager
-   * of record first (above), so that a requester who is the manager cannot
-   * route around the rule by being "away"; then against the substitute, who
-   * must not be the requester either and is taken off the CISO team for this
-   * request, exactly as the manager would have been.
-   */
-  const delegation = activeDelegationFor(draft.delegations, routing.manager.email, new Date());
-  if (delegation) {
-    cisoTeam = assertSeparationOfDuties(request.requester, { manager: delegation.to, ciso: cisoTeam });
-  }
+  const cisoTeam = assertSeparationOfDuties(request.requester, routing);
 
   // Both steps are created now, not one at a time: the identity asked to
   // approve each stage is part of what was decided at submit, and resolving
   // the CISO team later would let a routing change slip in mid-flight.
   request.approvals = [
-    delegation
-      ? {
-          stage: "MANAGER",
-          version: request.version,
-          approver: delegation.to,
-          onBehalfOf: routing.manager,
-          delegationId: delegation.id,
-        }
-      : { stage: "MANAGER", version: request.version, approver: routing.manager },
+    { stage: "MANAGER", version: request.version, approver: routing.manager },
     cisoStep(request.version, cisoTeam),
   ];
   request.payloadHash = hashPayload(request.payload);
@@ -483,8 +460,7 @@ function submitInDraft(
     detail: {
       version: request.version,
       payloadHash: request.payloadHash,
-      manager: (delegation?.to ?? routing.manager).email,
-      ...(delegation ? { onBehalfOf: routing.manager.email, delegationId: delegation.id } : {}),
+      manager: routing.manager.email,
       ciso: cisoTeam.map((member) => member.email).join(", "),
     },
   });
@@ -629,8 +605,7 @@ function applyDecision(
 
   audit(draft, {
     actorId: actor.userId ?? actor.email,
-    // Never recorded as though the absent manager had decided.
-    actorName: step.onBehalfOf ? `${actor.name} (atas nama ${step.onBehalfOf.name})` : actor.name,
+    actorName: actor.name,
     source,
     action: input.decision === "APPROVED" ? "request.approved" : "request.rejected",
     target: request.id,
@@ -639,7 +614,6 @@ function applyDecision(
       stage: input.stage,
       version: request.version,
       status: request.status,
-      ...(step.onBehalfOf ? { onBehalfOf: step.onBehalfOf.email } : {}),
     },
   });
 
@@ -740,7 +714,7 @@ export async function decideByToken(
       const settled = settledFor(request, record);
       throw new LifecycleError(
         "CONFLICT",
-        settled ? settledMessage(settled) : rejectionFor(check.reason, record),
+        settled ? settledMessage(settled) : rejectionFor(check.reason),
       );
     }
 
@@ -799,17 +773,8 @@ export async function decideByToken(
   });
 }
 
-/**
- * The message for a link that cannot be used, as specific as the record allows.
- *
- * A manager whose waiting requests were handed to their substitute will open
- * the old email when they come back. "No longer valid" would read as a fault;
- * saying where the request went does not.
- */
-function rejectionFor(reason: string, record: ApprovalTokenRecord): string {
-  if (reason === "REVOKED" && record.revokedReason === "request-rerouted") {
-    return "Permintaan ini sudah dialihkan ke pengganti Anda selama Anda berhalangan (delegasi dari Human Capital). Tidak perlu tindakan dari Anda.";
-  }
+/** The message for a link that cannot be used, as specific as the record allows. */
+function rejectionFor(reason: string): string {
   return REJECTION_MESSAGE[reason] ?? "Tautan tidak valid.";
 }
 
@@ -867,8 +832,6 @@ export interface TokenPreview {
   managerDecision?: { by: string; at: string };
   /** How many people this stage went to, when it went to a team. */
   teamSize?: number;
-  /** The absent manager this approver is standing in for. */
-  onBehalfOf?: string;
 }
 
 /**
@@ -903,7 +866,7 @@ export async function previewByToken(
     // and the page says who and when rather than reporting a broken link.
     const settled = settledFor(request, record);
     if (settled) return { ok: false, reason: settledMessage(settled), settled: true };
-    return { ok: false, reason: rejectionFor(check.reason, record) };
+    return { ok: false, reason: rejectionFor(check.reason) };
   }
 
   const step = request.approvals.find(
@@ -924,18 +887,12 @@ export async function previewByToken(
       requesterName: request.requester.name,
       approverName: step ? (memberForToken(step, record)?.name ?? step.approver.name) : "",
       teamSize: step?.pool && step.pool.length > 1 ? step.pool.length : undefined,
-      onBehalfOf: step?.onBehalfOf?.name,
       status: request.status,
       payload: request.payload,
       effectiveAt: request.effectiveAt,
       managerDecision:
         record.stage === "CISO" && managerStep?.decidedAt && managerStep.decidedBy
-          ? {
-              by: managerStep.onBehalfOf
-                ? `${managerStep.decidedBy.name} (atas nama ${managerStep.onBehalfOf.name})`
-                : managerStep.decidedBy.name,
-              at: managerStep.decidedAt,
-            }
+          ? { by: managerStep.decidedBy.name, at: managerStep.decidedAt }
           : undefined,
     },
   };
@@ -1264,98 +1221,3 @@ function reviseInDraft(
     },
   });
 }
-
-/* -------------------------------------------------------------------------- */
-/* Delegation: handing waiting requests to a substitute                       */
-/* -------------------------------------------------------------------------- */
-
-export interface RerouteReport {
-  rerouted: string[];
-  skipped: Array<{ requestId: string; reason: string }>;
-}
-
-/**
- * Moves requests already waiting on an absent manager to their substitute.
- *
- * Only ever done because HC asked for it explicitly when registering the
- * delegation — never as a side effect. Each moved request gets a fresh link
- * sent to the substitute, and every link in the absent manager's inbox dies;
- * nothing else about the request changes, so its version and fingerprint stay
- * exactly as they were approved against.
- *
- * Separation of duties is re-checked per request. A substitute who raised one
- * of them, or who would leave its CISO stage with nobody to answer, is not
- * given that one: it is reported as skipped rather than quietly rerouted.
- */
-export function rerouteWaitingInDraft(
-  draft: StoreShape,
-  delegation: Delegation,
-  actor: ActorIdentity,
-): RerouteReport {
-  const report: RerouteReport = { rerouted: [], skipped: [] };
-  const absent = delegation.from.email.trim().toLowerCase();
-
-  for (const request of draft.lifecycleRequests) {
-    if (request.status !== "PENDING_MANAGER") continue;
-
-    const step = request.approvals.find(
-      (candidate) => candidate.stage === "MANAGER" && candidate.version === request.version,
-    );
-    // Already covered by a delegation, or not this manager's: leave it alone.
-    if (!step || step.decision || step.onBehalfOf) continue;
-    if (step.approver.email.trim().toLowerCase() !== absent) continue;
-
-    const ciso = request.approvals.find(
-      (candidate) => candidate.stage === "CISO" && candidate.version === request.version,
-    );
-
-    let remaining: ActorIdentity[];
-    try {
-      remaining = assertSeparationOfDuties(request.requester, {
-        manager: delegation.to,
-        ciso: ciso ? answerersOf(ciso) : [],
-      });
-    } catch (error) {
-      report.skipped.push({
-        requestId: request.id,
-        reason: error instanceof Error ? error.message : String(error),
-      });
-      continue;
-    }
-
-    // The absent manager's link dies before the substitute's is issued.
-    revokeRequestTokens(draft, request.id, "request-rerouted");
-
-    step.onBehalfOf = step.approver;
-    step.approver = delegation.to;
-    step.delegationId = delegation.id;
-
-    // The substitute cannot also answer the CISO stage of the same request.
-    if (ciso?.pool && remaining.length !== ciso.pool.length) {
-      Object.assign(ciso, cisoStep(request.version, remaining));
-    }
-
-    request.updatedAt = now();
-
-    audit(draft, {
-      actorId: actor.userId ?? actor.email,
-      actorName: actor.name,
-      source: "PORTAL",
-      action: "request.rerouted",
-      target: request.id,
-      correlationId: request.id,
-      detail: {
-        version: request.version,
-        from: delegation.from.email,
-        to: delegation.to.email,
-        delegationId: delegation.id,
-      },
-    });
-
-    emitApprovalRequest(draft, request, "MANAGER");
-    report.rerouted.push(request.id);
-  }
-
-  return report;
-}
-

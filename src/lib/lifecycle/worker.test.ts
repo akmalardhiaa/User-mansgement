@@ -110,7 +110,6 @@ async function seed(store: Partial<StoreShape>, ad: AdAccountState[] = []): Prom
     outboxEvents: [],
     emailDeliveries: [],
     approvalTokens: [],
-    delegations: [],
     auditEvents: [],
     ...store,
   };
