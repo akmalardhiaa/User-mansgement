@@ -10,8 +10,9 @@ import { Card, SelectField } from "@/components/ui/Field";
 import { IconApprovals, IconUserPlus } from "@/components/ui/Icons";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requirePageSession } from "@/lib/auth/current";
+import { lifecycleStatusLabel, lifecycleTypeLabel as typeLabel } from "@/lib/i18n/labels";
+import { getTranslations } from "@/lib/i18n/server";
 import { hasPermission } from "@/lib/auth/roles";
-import { lifecycleTypeLabel } from "@/lib/lifecycle/pending";
 import { isSamePerson } from "@/lib/lifecycle/routing";
 import { identityOf, listRequests } from "@/lib/lifecycle/service";
 import { stageAwaiting } from "@/lib/lifecycle/stateMachine";
@@ -24,7 +25,10 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Pengajuan · HC User Management" };
+export async function generateMetadata() {
+  const { t } = await getTranslations();
+  return { title: t.requests.metaTitle };
+}
 
 const PAGE_SIZE = 25;
 
@@ -51,9 +55,10 @@ export default async function RequestListPage({
 }: {
   searchParams: Promise<{ type?: string; status?: string; offset?: string }>;
 }) {
+  const { t } = await getTranslations();
   const session = await requirePageSession("/pengajuan");
   if (!hasPermission(session.roles, "request.read")) {
-    return <AccessDenied roles={session.roles} need="Izin membaca pengajuan" />;
+    return <AccessDenied roles={session.roles} need={t.requests.needRead} />;
   }
 
   const params = await searchParams;
@@ -79,14 +84,14 @@ export default async function RequestListPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Pengajuan"
-        title="Daftar pengajuan"
-        description="Onboarding, Movement, dan Termination. Status di sini adalah status pengajuannya — bukan keadaan akun, yang hanya berubah setelah perubahan benar-benar dijalankan."
+        eyebrow={t.requests.eyebrow}
+        title={t.requests.title}
+        description={t.requests.description}
         actions={
           canCreate ? (
             <Link href="/pengajuan/baru" className={buttonClasses()}>
               <IconUserPlus className="size-4" />
-              Pengajuan baru
+              {t.requests.newRequest}
             </Link>
           ) : null
         }
@@ -95,49 +100,49 @@ export default async function RequestListPage({
       <Card className="overflow-hidden">
         <form method="get" className="flex flex-wrap items-end gap-3 border-b border-hairline p-4">
           <label className="flex flex-col gap-1.5 text-xs text-ink-muted">
-            Jenis
+            {t.requests.filterType}
             <SelectField
               name="type"
               defaultValue={type ?? ""}
               className="rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
             >
-              <option value="">Semua jenis</option>
+              <option value="">{t.requests.allTypes}</option>
               {LIFECYCLE_TYPES.map((value) => (
                 <option key={value} value={value}>
-                  {lifecycleTypeLabel(value)}
+                  {typeLabel(t, value)}
                 </option>
               ))}
             </SelectField>
           </label>
 
           <label className="flex flex-col gap-1.5 text-xs text-ink-muted">
-            Status
+            {t.requests.filterStatus}
             <SelectField
               name="status"
               defaultValue={params.status ?? ""}
               className="rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
             >
-              <option value="">Semua status</option>
+              <option value="">{t.requests.allStatuses}</option>
               {LIFECYCLE_STATUSES.map((value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {lifecycleStatusLabel(t, value)}
                 </option>
               ))}
             </SelectField>
           </label>
 
           <button type="submit" className={buttonClasses("secondary", "sm")}>
-            Terapkan
+            {t.requests.apply}
           </button>
           <Link
             href="/pengajuan"
             className="self-center text-xs text-ink-muted transition-colors hover:text-ink"
           >
-            Reset
+            {t.requests.reset}
           </Link>
 
           <span className="ml-auto text-xs text-ink-faint">
-            <span className="tnum text-ink">{requests.length}</span> dari{" "}
+            <span className="tnum text-ink">{requests.length}</span> {t.directory.countOf}{" "}
             <span className="tnum">{total}</span>
           </span>
         </form>
@@ -147,7 +152,7 @@ export default async function RequestListPage({
             <span className="grid size-12 place-items-center rounded-full border border-hairline bg-elevated/60 text-ink-faint">
               <IconApprovals className="size-5" />
             </span>
-            <p className="text-sm text-ink-muted">Belum ada pengajuan yang cocok.</p>
+            <p className="text-sm text-ink-muted">{t.requests.empty}</p>
           </div>
         ) : (
           <ul className="divide-y divide-hairline/60">
@@ -174,14 +179,17 @@ export default async function RequestListPage({
                         {request.subject.displayName}
                       </span>
                       <span className="block truncate text-xs text-ink-faint">
-                        Diajukan {request.requester.name} · {formatDate(request.createdAt)}
-                        {request.version > 1 ? ` · versi ${request.version}` : ""}
+                        {t.requests.raisedBy.replace("{name}", request.requester.name)} ·{" "}
+                        {formatDate(request.createdAt)}
+                        {request.version > 1
+                          ? ` · ${t.requests.version.replace("{version}", String(request.version))}`
+                          : ""}
                       </span>
                     </span>
 
                     {waitingOnMe ? (
                       <span className="rounded-md border border-accent/40 bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent">
-                        Menunggu keputusan Anda
+                        {t.requests.waitingOnYou}
                       </span>
                     ) : null}
 
@@ -200,7 +208,7 @@ export default async function RequestListPage({
                 href={`/pengajuan?offset=${Math.max(0, offset - PAGE_SIZE)}`}
                 className="text-ink-muted transition-colors hover:text-ink"
               >
-                ← Sebelumnya
+                {t.requests.previous}
               </Link>
             ) : (
               <span />
@@ -210,7 +218,7 @@ export default async function RequestListPage({
                 href={`/pengajuan?offset=${offset + PAGE_SIZE}`}
                 className="text-ink-muted transition-colors hover:text-ink"
               >
-                Berikutnya →
+                {t.requests.next}
               </Link>
             ) : (
               <span />

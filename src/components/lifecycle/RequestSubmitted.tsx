@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 
 import { LifecycleStatusBadge } from "@/components/lifecycle/LifecycleStatusBadge";
+import { useT } from "@/components/i18n/LocaleProvider";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Field";
 import { IconCheck, IconUserCheck } from "@/components/ui/Icons";
@@ -26,12 +27,16 @@ export function RequestSubmitted({
   request: LifecycleRequest;
   onRaiseAnother: () => void;
 }) {
+  const t = useT();
   const manager = request.approvals.find((step) => step.stage === "MANAGER")?.approver;
   const cisoStep = request.approvals.find((step) => step.stage === "CISO");
   // A team is shown as the team, with its size where an address would be: each
   // member gets their own email, and the first answer decides.
   const ciso = cisoStep?.pool?.length
-    ? { name: cisoStep.approver.name, email: `${cisoStep.pool.length} email terpisah · keputusan pertama berlaku` }
+    ? {
+        name: cisoStep.approver.name,
+        email: t.newRequest.cisoTeamNote.replace("{count}", String(cisoStep.pool.length)),
+      }
     : cisoStep?.approver;
 
   return (
@@ -47,10 +52,11 @@ export function RequestSubmitted({
             <IconCheck className="size-4" />
           </motion.span>
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-ink">Pengajuan terkirim</h2>
+            <h2 className="text-lg font-semibold text-ink">{t.newRequest.submittedTitle}</h2>
             <p className="mt-1 text-sm text-ink-muted">
-              Pengajuan untuk <strong className="text-ink">{request.subject.displayName}</strong>{" "}
-              sudah dikunci dan diteruskan ke approver pertama.
+              {t.newRequest.submittedBody.split("{name}")[0]}
+              <strong className="text-ink">{request.subject.displayName}</strong>
+              {t.newRequest.submittedBody.split("{name}")[1]}
             </p>
           </div>
           <div className="ml-auto shrink-0">
@@ -60,11 +66,11 @@ export function RequestSubmitted({
 
         <div className="mt-5 space-y-2.5 rounded-xl border border-hairline bg-elevated/40 p-4">
           <p className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
-            Yang harus menyetujui
+            {t.newRequest.whoApproves}
           </p>
           {[
-            ["1. Manager", manager],
-            ["2. CISO", ciso],
+            [t.newRequest.stepManager, manager],
+            [t.newRequest.stepCiso, ciso],
           ].map(([label, approver]) => (
             <div key={label as string} className="flex items-center gap-2.5 text-sm">
               <IconUserCheck className="size-4 shrink-0 text-accent" />
@@ -82,22 +88,21 @@ export function RequestSubmitted({
         </div>
 
         <p className="mt-4 rounded-lg border border-warn/30 bg-warn/10 px-3.5 py-2.5 text-xs leading-relaxed text-warn">
-          Belum ada yang berubah pada akun. Direktori tetap menampilkan keadaan sekarang sampai
-          kedua approval masuk dan perubahannya benar-benar dijalankan.
+          {t.newRequest.nothingChangedYet}
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href={`/pengajuan/${request.id}`} className={buttonClasses()}>
-            Lihat pengajuan
+            {t.newRequest.viewRequest}
           </Link>
           <Button variant="secondary" onClick={onRaiseAnother}>
-            Buat pengajuan lain
+            {t.newRequest.raiseAnother}
           </Button>
           <Link
             href="/pengajuan"
             className="self-center text-sm text-ink-muted transition-colors hover:text-ink"
           >
-            Daftar pengajuan
+            {t.newRequest.requestList}
           </Link>
         </div>
       </Card>

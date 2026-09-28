@@ -1,3 +1,7 @@
+"use client";
+
+import { useT } from "@/components/i18n/LocaleProvider";
+import { lifecycleStatusLabel, lifecycleTypeLabel } from "@/lib/i18n/labels";
 import type { LifecycleStatus, LifecycleType } from "@/lib/lifecycle/types";
 
 /**
@@ -8,27 +12,25 @@ import type { LifecycleStatus, LifecycleType } from "@/lib/lifecycle/types";
  * authorised and has not happened yet. Only COMPLETED — a change executed and
  * read back — earns green.
  */
-const PRESENTATION: Record<LifecycleStatus, { label: string; className: string }> = {
-  DRAFT: { label: "Draf", className: "border-hairline-strong bg-elevated text-ink-muted" },
-  PENDING_MANAGER: { label: "Menunggu manager", className: "border-warn/30 bg-warn/10 text-warn" },
-  PENDING_CISO: { label: "Menunggu CISO", className: "border-warn/30 bg-warn/10 text-warn" },
-  APPROVED: { label: "Disetujui", className: "border-info/30 bg-info/10 text-info" },
-  SCHEDULED: { label: "Terjadwal", className: "border-info/30 bg-info/10 text-info" },
-  QUEUED: { label: "Antre eksekusi", className: "border-info/30 bg-info/10 text-info" },
-  EXECUTING: { label: "Sedang dijalankan", className: "border-info/30 bg-info/10 text-info" },
-  COMPLETED: { label: "Selesai", className: "border-ok/30 bg-ok/10 text-ok" },
-  FAILED: { label: "Gagal", className: "border-danger/30 bg-danger/10 text-danger" },
-  REJECTED: { label: "Ditolak", className: "border-danger/30 bg-danger/10 text-danger" },
-  CANCELLED: { label: "Dibatalkan", className: "border-hairline-strong bg-elevated text-ink-muted" },
-  EXPIRED: { label: "Kedaluwarsa", className: "border-hairline-strong bg-elevated text-ink-muted" },
+const PRESENTATION: Record<LifecycleStatus, string> = {
+  DRAFT: "border-hairline-strong bg-elevated text-ink-muted",
+  PENDING_MANAGER: "border-warn/30 bg-warn/10 text-warn",
+  PENDING_CISO: "border-warn/30 bg-warn/10 text-warn",
+  APPROVED: "border-info/30 bg-info/10 text-info",
+  SCHEDULED: "border-info/30 bg-info/10 text-info",
+  QUEUED: "border-info/30 bg-info/10 text-info",
+  EXECUTING: "border-info/30 bg-info/10 text-info",
+  COMPLETED: "border-ok/30 bg-ok/10 text-ok",
+  FAILED: "border-danger/30 bg-danger/10 text-danger",
+  REJECTED: "border-danger/30 bg-danger/10 text-danger",
+  CANCELLED: "border-hairline-strong bg-elevated text-ink-muted",
+  EXPIRED: "border-hairline-strong bg-elevated text-ink-muted",
 };
 
-export function lifecycleStatusLabel(status: LifecycleStatus): string {
-  return PRESENTATION[status].label;
-}
-
 export function LifecycleStatusBadge({ status }: { status: LifecycleStatus }) {
-  const { label, className } = PRESENTATION[status];
+  const t = useT();
+  const className = PRESENTATION[status];
+  const label = lifecycleStatusLabel(t, status);
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap ${className}`}
@@ -38,18 +40,17 @@ export function LifecycleStatusBadge({ status }: { status: LifecycleStatus }) {
   );
 }
 
-const TYPE_PRESENTATION: Record<LifecycleType, { label: string; className: string }> = {
-  ONBOARDING: { label: "Onboarding", className: "border-ok/30 bg-ok/10 text-ok" },
-  MOVEMENT: { label: "Movement", className: "border-info/30 bg-info/10 text-info" },
-  TERMINATION: { label: "Termination", className: "border-danger/30 bg-danger/10 text-danger" },
-  PROFILE_UPDATE: {
-    label: "Perubahan Profil",
-    className: "border-accent/30 bg-accent/10 text-accent",
-  },
+const TYPE_PRESENTATION: Record<LifecycleType, string> = {
+  ONBOARDING: "border-ok/30 bg-ok/10 text-ok",
+  MOVEMENT: "border-info/30 bg-info/10 text-info",
+  TERMINATION: "border-danger/30 bg-danger/10 text-danger",
+  PROFILE_UPDATE: "border-accent/30 bg-accent/10 text-accent",
 };
 
 export function LifecycleTypeBadge({ type }: { type: LifecycleType }) {
-  const { label, className } = TYPE_PRESENTATION[type];
+  const t = useT();
+  const className = TYPE_PRESENTATION[type];
+  const label = lifecycleTypeLabel(t, type);
   return (
     <span
       className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap ${className}`}

@@ -63,6 +63,14 @@ const securityHeaders = [
  */
 const distDir = process.env.NEXT_DIST_DIR?.trim() || ".next";
 
+/**
+ * `next dev` writes AGENTS.md into the project root on every run, and rewrites
+ * it after anybody deletes it. That file is gone by request, so the generator
+ * is off rather than fighting it: `agentRules: false` is what the guide in
+ * node_modules/next/dist/docs/01-app/02-guides/ai-agents.md names for this.
+ */
+const agentRules = false;
+
 const nextConfig: NextConfig = isStaticExport
   ? {
       output: "export",
@@ -70,9 +78,11 @@ const nextConfig: NextConfig = isStaticExport
       trailingSlash: true,
       distDir,
       images: { unoptimized: true },
+      agentRules,
     }
   : {
       distDir,
+      agentRules,
       /*
        * The floating development badge, off.
        *
