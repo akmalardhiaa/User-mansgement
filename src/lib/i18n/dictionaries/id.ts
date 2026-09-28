@@ -156,6 +156,72 @@ export const id = {
     pipelineRunWorker: "Jalankan worker",
   },
 
+  requests: {
+    metaTitle: "Pengajuan · HC User Management",
+    needRead: "Izin membaca pengajuan",
+    eyebrow: "Pengajuan",
+    title: "Daftar pengajuan",
+    description:
+      "Onboarding, Movement, dan Termination. Status di sini adalah status pengajuannya — bukan keadaan akun, yang hanya berubah setelah perubahan benar-benar dijalankan.",
+    newRequest: "Pengajuan baru",
+    filterType: "Jenis",
+    filterStatus: "Status",
+    allTypes: "Semua jenis",
+    allStatuses: "Semua status",
+    apply: "Terapkan",
+    reset: "Reset",
+    empty: "Belum ada pengajuan yang cocok.",
+    /** {name} raised it, {date} is when. */
+    raisedBy: "Diajukan {name}",
+    version: "versi {version}",
+    waitingOnYou: "Menunggu keputusan Anda",
+    previous: "← Sebelumnya",
+    next: "Berikutnya →",
+  },
+
+  newRequest: {
+    metaTitle: "Pengajuan baru · HC User Management",
+    needCreate: "Izin membuat pengajuan",
+    backToList: "Kembali ke daftar pengajuan",
+    eyebrow: "Pengajuan",
+    title: "Pengajuan baru",
+    description:
+      "Setiap pengajuan melewati persetujuan manager lalu CISO. Tidak ada perubahan pada akun sampai keduanya menyetujui dan perubahannya dijalankan.",
+    submittedTitle: "Pengajuan terkirim",
+    /** {name} is who the request is about. */
+    submittedBody: "Pengajuan untuk {name} sudah dikunci dan diteruskan ke approver pertama.",
+    whoApproves: "Yang harus menyetujui",
+    stepManager: "1. Manager",
+    stepCiso: "2. CISO",
+    /** {count} members of the CISO team, each with their own link. */
+    cisoTeamNote: "{count} email terpisah · keputusan pertama berlaku",
+    nothingChangedYet:
+      "Belum ada yang berubah pada akun. Direktori tetap menampilkan keadaan sekarang sampai kedua approval masuk dan perubahannya benar-benar dijalankan.",
+    viewRequest: "Lihat pengajuan",
+    raiseAnother: "Buat pengajuan lain",
+    requestList: "Daftar pengajuan",
+  },
+
+  lifecycle: {
+    statusDraft: "Draf",
+    statusPendingManager: "Menunggu manager",
+    statusPendingCiso: "Menunggu CISO",
+    statusApproved: "Disetujui",
+    statusScheduled: "Terjadwal",
+    statusQueued: "Antre eksekusi",
+    statusExecuting: "Sedang dijalankan",
+    statusCompleted: "Selesai",
+    statusFailed: "Gagal",
+    statusRejected: "Ditolak",
+    statusCancelled: "Dibatalkan",
+    statusExpired: "Kedaluwarsa",
+
+    typeOnboarding: "Onboarding",
+    typeMovement: "Movement",
+    typeTermination: "Termination",
+    typeProfileUpdate: "Perubahan Profil",
+  },
+
   common: {
     footer: "Human Capital · direktori karyawan dengan login Active Directory",
     loading: "Memuat…",
