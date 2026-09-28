@@ -3,9 +3,11 @@
 import Link from "next/link";
 
 import { RunWorkerButton } from "@/components/lifecycle/RunWorkerButton";
+import { useT } from "@/components/i18n/LocaleProvider";
 import { Card } from "@/components/ui/Field";
 import { IconUserPlus } from "@/components/ui/Icons";
 import type { OnboardingInFlight } from "@/lib/lifecycle/pending";
+import type { Dictionary } from "@/lib/i18n/dictionaries/id";
 import type { LifecycleStatus } from "@/lib/lifecycle/types";
 
 /**
@@ -17,24 +19,37 @@ import type { LifecycleStatus } from "@/lib/lifecycle/types";
  * when the worker has created the account and read it back.
  */
 
-const STEPS = ["Diajukan", "Manager", "CISO", "Dibuat di AD"] as const;
+/** Step names come from the dictionary; the order is the flow itself. */
+const STEP_KEYS = [
+  "pipelineSubmitted",
+  "pipelineManager",
+  "pipelineCiso",
+  "pipelineCreated",
+] as const;
 
 /** Which step a request is on, and what to say about it. */
-function describe(item: OnboardingInFlight): { step: number; label: string; tone: string } {
+function describe(
+  item: OnboardingInFlight,
+  t: Dictionary,
+): { step: number; label: string; tone: string } {
   const status: LifecycleStatus = item.status;
   switch (status) {
     case "DRAFT":
-      return { step: 0, label: "Draf — belum dikirim ke approver", tone: "text-ink-muted" };
+      return { step: 0, label: t.directory.pipelineDraft, tone: "text-ink-muted" };
     case "PENDING_MANAGER":
-      return { step: 1, label: `Menunggu persetujuan ${item.managerName}`, tone: "text-warn" };
+      return {
+        step: 1,
+        label: t.directory.pipelineWaitingManager.replace("{name}", item.managerName),
+        tone: "text-warn",
+      };
     case "PENDING_CISO":
-      return { step: 2, label: "Menunggu persetujuan tim CISO", tone: "text-warn" };
+      return { step: 2, label: t.directory.pipelineWaitingCiso, tone: "text-warn" };
     case "EXECUTING":
-      return { step: 3, label: "Sedang dibuat di AD…", tone: "text-info" };
+      return { step: 3, label: t.directory.pipelineExecuting, tone: "text-info" };
     case "FAILED":
-      return { step: 3, label: "Gagal dibuat di AD — buka detail untuk dicek", tone: "text-danger" };
+      return { step: 3, label: t.directory.pipelineFailed, tone: "text-danger" };
     default:
-      return { step: 3, label: "Disetujui — siap dibuat di AD", tone: "text-ok" };
+      return { step: 3, label: t.directory.pipelineReady, tone: "text-ok" };
   }
 }
 
@@ -46,6 +61,8 @@ export function OnboardingPipeline({
   /** Whether this viewer may run the worker that creates the accounts. */
   canRun: boolean;
 }) {
+  const t = useT();
+
   if (items.length === 0) return null;
 
   // An onboarding is never held for a date, so a scheduled one is as ready as a
@@ -60,19 +77,20 @@ export function OnboardingPipeline({
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
             <IconUserPlus className="size-4 text-accent" />
-            Karyawan baru dalam proses
+            {t.directory.pipelineTitle}
             <span className="rounded-full border border-hairline px-2 py-0.5 text-[11px] text-ink-muted">
               {items.length}
             </span>
           </h2>
           <p className="mt-1 text-xs text-ink-muted">
-            Tampil begitu diajukan. Akunnya belum ada — masuk ke tabel direktori setelah kedua
-            persetujuan selesai dan akun dibuat di AD.
+            {t.directory.pipelineHint}
           </p>
         </div>
         {canRun && ready > 0 ? (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-ok">{ready} siap dibuat</span>
+            <span className="text-xs text-ok">
+              {t.directory.pipelineReadyCount.replace("{count}", String(ready))}
+            </span>
             <RunWorkerButton />
           </div>
         ) : null}
@@ -80,7 +98,7 @@ export function OnboardingPipeline({
 
       <ul className="mt-4 divide-y divide-hairline/60">
         {items.map((item) => {
-          const { step, label, tone } = describe(item);
+          const { step, label, tone } = describe(item, t);
           return (
             <li key={item.requestId} className="grid gap-3 py-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
               <div className="min-w-0">
@@ -92,9 +110,9 @@ export function OnboardingPipeline({
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <ol className="flex items-center gap-1" aria-label={`Tahap: ${STEPS[step]}`}>
-                  {STEPS.map((name, index) => (
-                    <li key={name} className="flex items-center gap-1">
+                <ol className="flex items-center gap-1" aria-label={`${t.directory.pipelineStep}: ${t.directory[STEP_KEYS[step]]}`}>
+                  {STEP_KEYS.map((stepKey, index) => (
+                    <li key={stepKey} className="flex items-center gap-1">
                       <span
                         className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap ${
                           index < step
@@ -104,9 +122,9 @@ export function OnboardingPipeline({
                               : "border-hairline text-ink-faint"
                         }`}
                       >
-                        {name}
+                        {t.directory[stepKey]}
                       </span>
-                      {index < STEPS.length - 1 ? (
+                      {index < STEP_KEYS.length - 1 ? (
                         <span className="text-[10px] text-ink-faint" aria-hidden>
                           ›
                         </span>
@@ -118,7 +136,7 @@ export function OnboardingPipeline({
                   href={`/pengajuan/${item.requestId}`}
                   className="text-xs whitespace-nowrap text-accent hover:underline"
                 >
-                  Lihat pengajuan
+                  {t.directory.pipelineViewRequest}
                 </Link>
               </div>
             </li>

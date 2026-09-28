@@ -1,3 +1,6 @@
+"use client";
+
+import { useT } from "@/components/i18n/LocaleProvider";
 import type { EmployeeStatus } from "@/lib/types";
 
 /**
@@ -29,7 +32,9 @@ export function employeeStatusLabel(status: EmployeeStatus): string {
 }
 
 export function StatusBadge({ status }: { status: EmployeeStatus }) {
-  const { label, className, dot } = EMPLOYEE_STATUS_PRESENTATION[status];
+  const t = useT();
+  const { className, dot } = EMPLOYEE_STATUS_PRESENTATION[status];
+  const label = status === "ACTIVE" ? t.directory.statusActive : t.directory.statusDisabled;
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap ${className}`}

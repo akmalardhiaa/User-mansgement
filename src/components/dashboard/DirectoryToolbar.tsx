@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef } from "react";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { Button } from "@/components/ui/Button";
 import { ChoiceField, type ChoiceGroup } from "@/components/ui/ChoiceField";
 import { SelectField } from "@/components/ui/Field";
@@ -15,14 +16,13 @@ import {
   IconSearch,
   IconSort,
 } from "@/components/ui/Icons";
-import { employeeStatusLabel } from "@/components/ui/StatusBadge";
 import {
   SORT_KEYS,
-  SORT_LABELS,
   isDefaultFilters,
   type DirectoryFilters,
 } from "@/lib/dashboard/directory";
 import { DEPARTMENT_GROUPS } from "@/lib/db/seed";
+import { sortLabel } from "@/lib/i18n/labels";
 import { TRANSITION_FAST } from "@/lib/motion";
 import { EMPLOYEE_STATUSES, type EmployeeStatus } from "@/lib/types";
 
@@ -64,6 +64,7 @@ export function DirectoryToolbar({
   shown,
   total,
 }: DirectoryToolbarProps) {
+  const t = useT();
   const searchRef = useRef<HTMLInputElement>(null);
   const dirty = !isDefaultFilters(filters);
   const departmentGroups = useMemo<ChoiceGroup[]>(() => {
@@ -89,11 +90,11 @@ export function DirectoryToolbar({
       .map((department) => ({ value: department, label: department }));
 
     return [
-      { items: [{ value: "ALL", label: "Semua departemen" }] },
+      { items: [{ value: "ALL", label: t.directory.allDepartments }] },
       ...groups,
-      ...(otherDepartments.length ? [{ label: "Lainnya", items: otherDepartments }] : []),
+      ...(otherDepartments.length ? [{ label: t.directory.otherDepartment, items: otherDepartments }] : []),
     ];
-  }, [departments]);
+  }, [departments, t]);
 
   // "/" jumps to search, the convention every tool with a list in it uses.
   useEffect(() => {
@@ -129,8 +130,8 @@ export function DirectoryToolbar({
             type="search"
             value={filters.query}
             onChange={(event) => onChange({ query: event.target.value })}
-            placeholder="Cari nama, email, jabatan…"
-            aria-label="Cari karyawan"
+            placeholder={t.directory.searchPlaceholder}
+            aria-label={t.directory.searchLabel}
             className="w-full rounded-lg border border-hairline-strong bg-canvas/60 py-2 pr-16 pl-9 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none [&::-webkit-search-cancel-button]:hidden"
           />
           <AnimatePresence initial={false}>
@@ -146,7 +147,7 @@ export function DirectoryToolbar({
                   onChange({ query: "" });
                   searchRef.current?.focus();
                 }}
-                aria-label="Hapus pencarian"
+                aria-label={t.directory.clearSearch}
                 className="absolute top-1/2 right-3 -translate-y-1/2 rounded p-0.5 text-ink-faint transition-colors hover:text-ink"
               >
                 <IconClose className="size-3.5" />
@@ -175,14 +176,14 @@ export function DirectoryToolbar({
             onChange={(event) =>
               onChange({ status: event.target.value as DirectoryFilters["status"] })
             }
-            aria-label="Saring berdasarkan status"
+            aria-label={t.directory.filterStatus}
             className={SELECT_CLASSES}
           >
-            <option value="ALL">Semua status</option>
-            <option value="PENDING">Dalam persetujuan</option>
+            <option value="ALL">{t.directory.allStatus}</option>
+            <option value="PENDING">{t.directory.inApproval}</option>
             {EMPLOYEE_STATUSES.map((status: EmployeeStatus) => (
               <option key={status} value={status}>
-                {employeeStatusLabel(status)}
+                {status === "ACTIVE" ? t.directory.statusActive : t.directory.statusDisabled}
               </option>
             ))}
           </SelectField>
@@ -195,7 +196,7 @@ export function DirectoryToolbar({
           value={filters.department}
           onChange={(department) => onChange({ department })}
           groups={departmentGroups}
-          placeholder="Semua departemen"
+          placeholder={t.directory.allDepartments}
           icon={<IconFilter className="size-3.5" />}
           className="w-full sm:w-60 [&>label]:sr-only"
         />
@@ -210,7 +211,7 @@ export function DirectoryToolbar({
               onChange={(event) =>
                 onChange({ sort: event.target.value as DirectoryFilters["sort"] })
               }
-              aria-label="Urutkan berdasarkan"
+              aria-label={t.directory.sortBy}
               className={`${SELECT_CLASSES} rounded-r-none border-r-0`}
             >
               {SORT_KEYS.map((key) => (
@@ -218,7 +219,7 @@ export function DirectoryToolbar({
                 // reads "Nama" beside "Semua departemen" and looks like a third
                 // filter rather than the sort.
                 <option key={key} value={key}>
-                  Urut: {SORT_LABELS[key]}
+                  {t.directory.sortPrefix}: {sortLabel(t, key)}
                 </option>
               ))}
             </SelectField>
@@ -229,10 +230,10 @@ export function DirectoryToolbar({
             onClick={() => onChange({ direction: filters.direction === "asc" ? "desc" : "asc" })}
             aria-label={
               filters.direction === "asc"
-                ? "Urutan menaik — klik untuk membalik"
-                : "Urutan menurun — klik untuk membalik"
+                ? t.directory.ascending
+                : t.directory.descending
             }
-            title={filters.direction === "asc" ? "Menaik (A→Z)" : "Menurun (Z→A)"}
+            title={filters.direction === "asc" ? t.directory.ascendingShort : t.directory.descendingShort}
             className="rounded-r-lg border border-hairline-strong px-2.5 py-2 text-ink-muted transition-colors hover:border-accent/50 hover:text-ink"
           >
             <motion.span
@@ -263,7 +264,7 @@ export function DirectoryToolbar({
 
         <div className="ml-auto flex items-center gap-3">
           <span className="text-xs whitespace-nowrap text-ink-faint">
-            <span className="tnum text-ink">{shown}</span> dari{" "}
+            <span className="tnum text-ink">{shown}</span> {t.directory.countOf}{" "}
             <span className="tnum">{total}</span>
           </span>
           <Button
@@ -273,9 +274,9 @@ export function DirectoryToolbar({
             disabled={shown === 0 || exporting}
             loading={exporting}
             icon={<IconDownload />}
-            title="Unduh baris yang terlihat sebagai file Excel"
+            title={t.directory.exportHint}
           >
-            Ekspor
+            {t.directory.export}
           </Button>
         </div>
       </div>

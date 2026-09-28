@@ -30,8 +30,10 @@ const EmployeeReportModal = dynamic(
 );
 import { Button } from "@/components/ui/Button";
 import { IconArrowUp, IconSearch, IconSwap } from "@/components/ui/Icons";
+import { useT } from "@/components/i18n/LocaleProvider";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { SORT_LABELS, isNewEmployee, type SortDirection, type SortKey } from "@/lib/dashboard/directory";
+import { isNewEmployee, type SortDirection, type SortKey } from "@/lib/dashboard/directory";
+import { sortLabel } from "@/lib/i18n/labels";
 import type { PendingByEmployee } from "@/lib/lifecycle/pending";
 import { TRANSITION, TRANSITION_FAST } from "@/lib/motion";
 import type { Employee } from "@/lib/types";
@@ -82,9 +84,11 @@ function initials(name: string): string {
 
 /** Marks somebody whose account was created in the last day. */
 function NewBadge() {
+  const t = useT();
+
   return (
     <span className="shrink-0 rounded-md border border-ok/30 bg-ok/10 px-1.5 py-0.5 text-[10px] font-semibold text-ok">
-      Baru
+      {t.directory.newBadge}
     </span>
   );
 }
@@ -105,6 +109,8 @@ const COLUMNS: ReadonlyArray<{ key: SortKey; className?: string }> = [
  * blank space — the one moment the reader most needs to be told something.
  */
 function EmptyState({ filtered, onReset }: { filtered: boolean; onReset: () => void }) {
+  const t = useT();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -122,8 +128,8 @@ function EmptyState({ filtered, onReset }: { filtered: boolean; onReset: () => v
       </motion.span>
       <p className="text-sm text-ink-muted">
         {filtered
-          ? "Tidak ada karyawan yang cocok dengan filter ini."
-          : "Direktori masih kosong."}
+          ? t.directory.emptyFiltered
+          : t.directory.emptyDirectory}
       </p>
       {filtered ? (
         <Button variant="ghost" size="sm" onClick={onReset}>
@@ -144,6 +150,7 @@ export function EmployeeTable({
   filtered,
   canRequest = false,
 }: EmployeeTableProps) {
+  const t = useT();
   const [drawerEmployee, setDrawerEmployee] = useState<Employee | null>(null);
   const [reportEmployee, setReportEmployee] = useState<Employee | null>(null);
 
@@ -215,9 +222,9 @@ export function EmployeeTable({
                       variant="ghost"
                       size="sm"
                       onClick={() => setDrawerEmployee(employee)}
-                      title="Lihat profil detail karyawan"
+                      title={t.directory.detailHint}
                     >
-                      Detail
+                      {t.directory.detail}
                     </Button>
                     {canRequest && !marker ? (
                       <Link
@@ -225,7 +232,7 @@ export function EmployeeTable({
                         className="inline-flex items-center gap-1.5 rounded-lg border border-hairline-strong bg-elevated px-2.5 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent/50"
                       >
                         <IconSwap className="size-3.5" />
-                        Ajukan perubahan
+                        {t.directory.proposeChange}
                       </Link>
                     ) : null}
                   </div>
@@ -256,7 +263,7 @@ export function EmployeeTable({
                       isSorted ? "text-ink" : ""
                     }`}
                   >
-                    {SORT_LABELS[column.key]}
+                    {sortLabel(t, column.key)}
                     <motion.span
                       animate={{
                         opacity: isSorted ? 1 : 0,
@@ -272,10 +279,10 @@ export function EmployeeTable({
               );
             })}
             <th scope="col" className="px-4 py-3 font-medium">
-              Pengajuan berjalan
+              {t.directory.columnPending}
             </th>
             <th scope="col" className="px-4 py-3 text-right font-medium">
-              Tindakan
+              {t.directory.columnActions}
             </th>
           </tr>
         </thead>
@@ -342,18 +349,18 @@ export function EmployeeTable({
                         variant="ghost"
                         size="sm"
                         onClick={() => setDrawerEmployee(employee)}
-                        title="Lihat profil detail karyawan"
+                        title={t.directory.detailHint}
                       >
-                        Detail
+                        {t.directory.detail}
                       </Button>
                       {canRequest && !marker ? (
                         <Link
                           href={`/pengajuan/baru?type=MOVEMENT&employeeId=${employee.id}`}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-hairline-strong bg-elevated px-2.5 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent/50"
-                          title="Ajukan perpindahan divisi — melewati persetujuan manager dan CISO"
+                          title={t.directory.proposeChangeHint}
                         >
                           <IconSwap className="size-3.5" />
-                          Ajukan perubahan
+                          {t.directory.proposeChange}
                         </Link>
                       ) : null}
                     </div>

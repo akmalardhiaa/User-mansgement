@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { DirectoryToolbar } from "@/components/dashboard/DirectoryToolbar";
 import { EmployeeTable } from "@/components/dashboard/EmployeeTable";
 import { OnboardingPipeline } from "@/components/dashboard/OnboardingPipeline";
@@ -48,6 +49,7 @@ export function DirectoryView({
   /** Whether this viewer may run the worker. */
   canRun?: boolean;
 }) {
+  const t = useT();
   const { toast } = useToast();
   const [filters, setFilters] = useState<DirectoryFilters>(DEFAULT_FILTERS);
   const [exporting, setExporting] = useState(false);
@@ -92,7 +94,7 @@ export function DirectoryView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filters }),
       });
-      if (!response.ok) throw new Error("Ekspor gagal.");
+      if (!response.ok) throw new Error(t.directory.exportFailed);
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);

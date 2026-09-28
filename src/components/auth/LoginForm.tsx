@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { FormAlert } from "@/components/ui/FormAlert";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
@@ -11,6 +12,7 @@ import { postJson } from "@/lib/client/accountsApi";
 
 /** Active Directory login for the HC directory. */
 export function LoginForm({ next }: { next: string }) {
+  const t = useT();
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -43,16 +45,16 @@ export function LoginForm({ next }: { next: string }) {
       <FormAlert tone="error">{error}</FormAlert>
 
       <Field
-        label="Username"
+        label={t.login.username}
         name="username"
         icon={<IconUser className="size-4" />}
         value={username}
         onChange={(event) => setUsername(event.target.value)}
-        placeholder="nama.pengguna atau email"
+        placeholder={t.login.usernamePlaceholder}
         autoComplete="username"
       />
       <Field
-        label="Kata sandi"
+        label={t.login.password}
         name="password"
         type="password"
         icon={<IconLock className="size-4" />}
@@ -63,7 +65,7 @@ export function LoginForm({ next }: { next: string }) {
       />
 
       <Button type="submit" loading={submitting} className="w-full">
-        {submitting ? "Masuk…" : "Masuk"}
+        {submitting ? t.login.submitting : t.login.submit}
       </Button>
     </form>
   );

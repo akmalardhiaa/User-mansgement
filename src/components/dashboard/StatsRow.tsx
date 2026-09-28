@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { AnimatedNumber } from "@/components/motion/AnimatedNumber";
 import { IconApprovals, IconCheck, IconDirectory, IconPower } from "@/components/ui/Icons";
 import {
@@ -56,44 +57,45 @@ export function StatsRow({
   // node the pointer is actually over, so there is nothing per-card to hold.
   const glow = usePointerGlow<HTMLButtonElement>();
 
+  const t = useT();
   const count = (predicate: (employee: Employee) => boolean) => employees.filter(predicate).length;
 
   const stats: StatDefinition[] = [
     {
       key: "ALL",
-      label: "Total karyawan",
+      label: t.directory.statTotal,
       value: employees.length,
       tone: "text-ink",
       ring: "hover:border-hairline-strong",
       icon: IconDirectory,
-      caption: "Seluruh direktori",
+      caption: t.directory.statTotalCaption,
     },
     {
       key: "ACTIVE",
-      label: "Aktif",
+      label: t.directory.statusActive,
       value: count((employee) => employee.status === "ACTIVE"),
       tone: "text-ok",
       ring: "hover:border-ok/40",
       icon: IconCheck,
-      caption: "Akses berjalan normal",
+      caption: t.directory.statActiveCaption,
     },
     {
       key: "PENDING",
-      label: "Ada pengajuan",
+      label: t.directory.statPending,
       value: pendingCount,
       tone: "text-warn",
       ring: "hover:border-warn/40",
       icon: IconApprovals,
-      caption: "Perubahan yang belum dijalankan",
+      caption: t.directory.statPendingCaption,
     },
     {
       key: "DISABLED",
-      label: "Nonaktif",
+      label: t.directory.statusDisabled,
       value: count((employee) => employee.status === "DISABLED"),
       tone: "text-ink-muted",
       ring: "hover:border-hairline-strong",
       icon: IconPower,
-      caption: "Akun tidak berjalan",
+      caption: t.directory.statDisabledCaption,
     },
   ];
 

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ComponentType, type ReactNode } from "react";
 
+import { LanguageSwitch } from "@/components/i18n/LanguageSwitch";
+import { useT } from "@/components/i18n/LocaleProvider";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { BrandMark } from "@/components/ui/BrandMark";
@@ -18,11 +20,13 @@ import {
   IconUserPlus,
 } from "@/components/ui/Icons";
 import { hasPermission, type Permission, type PortalRole } from "@/lib/auth/roles";
+import type { Dictionary } from "@/lib/i18n/dictionaries/id";
 import { TRANSITION, TRANSITION_LAYOUT } from "@/lib/motion";
 
 const NAV: ReadonlyArray<{
   href: string;
-  label: string;
+  /** Key into the nav dictionary, so the label follows the chosen language. */
+  label: keyof Dictionary["nav"];
   icon: ComponentType<{ className?: string }>;
   /**
    * Hidden from anyone whose roles do not carry it. Omitted means everyone with
@@ -30,12 +34,12 @@ const NAV: ReadonlyArray<{
    */
   permission?: Permission;
 }> = [
-  { href: "/", label: "Direktori", icon: IconDirectory, permission: "directory.read" },
-  { href: "/pengajuan", label: "Pengajuan", icon: IconApprovals, permission: "request.read" },
-  { href: "/pengajuan/baru", label: "Pengajuan baru", icon: IconUserPlus, permission: "request.create" },
-  { href: "/users/edit", label: "Edit profil", icon: IconUser, permission: "employee.update" },
-  { href: "/aktivitas", label: "Aktivitas", icon: IconClock, permission: "activity.read" },
-  { href: "/profile", label: "Profil", icon: IconIdCard },
+  { href: "/", label: "directory", icon: IconDirectory, permission: "directory.read" },
+  { href: "/pengajuan", label: "requests", icon: IconApprovals, permission: "request.read" },
+  { href: "/pengajuan/baru", label: "newRequest", icon: IconUserPlus, permission: "request.create" },
+  { href: "/users/edit", label: "editProfile", icon: IconUser, permission: "employee.update" },
+  { href: "/aktivitas", label: "activity", icon: IconClock, permission: "activity.read" },
+  { href: "/profile", label: "profile", icon: IconIdCard },
 ];
 
 function isActive(pathname: string, href: string): boolean {
@@ -92,6 +96,7 @@ function initials(name: string): string {
  * fixed-width rail would cost more than it earns.
  */
 export function AppShell({ children, user }: { children: ReactNode; user?: SessionUser }) {
+  const t = useT();
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
@@ -133,6 +138,9 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
     return (
       <div className="mx-auto w-full max-w-2xl px-5 py-10">
         <ThemeToggle />
+        {/* An approver arriving from an email gets the switch too: the message
+            they were sent is in Indonesian, but the page is not obliged to be. */}
+        <LanguageSwitch />
         {children}
       </div>
     );
@@ -159,6 +167,7 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
             {/* Outside the session branch: the login screen gets the switch too,
                 since that is the first thing anyone sees. */}
             <ThemeToggle />
+            <LanguageSwitch />
 
             {IS_STATIC_DEMO ? (
               <span className="hidden items-center gap-2 sm:flex">
@@ -191,7 +200,7 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
                   className="inline-flex items-center gap-1.5 rounded-lg border border-hairline px-3 py-1.5 text-ink-muted transition-colors hover:border-danger/40 hover:text-danger disabled:opacity-50"
                 >
                   <IconSignOut className="size-3.5" />
-                  {signingOut ? "Keluar…" : "Keluar"}
+                  {signingOut ? t.nav.signingOut : t.nav.signOut}
                 </button>
               </>
             ) : null}
@@ -206,7 +215,7 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
                 own top padding, so the first item lands where it started. */}
             <nav
               className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1 pb-1 md:sticky md:top-[4.5rem] md:mx-0 md:flex-col md:overflow-visible md:px-0 md:pb-0"
-              aria-label="Navigasi utama"
+              aria-label={t.nav.mainNavigation}
             >
               {items.map((item) => {
                 const active = isActive(pathname, item.href);
@@ -236,7 +245,7 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
                         active ? "text-accent" : "text-ink-faint group-hover:text-ink-muted"
                       }`}
                     />
-                    <span className="relative">{item.label}</span>
+                    <span className="relative">{t.nav[item.label]}</span>
                   </Link>
                 );
               })}
@@ -266,7 +275,7 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
       </div>
 
       <footer className="border-t border-hairline px-5 py-5 text-center text-xs text-ink-faint">
-        Human Capital · direktori karyawan dengan login Active Directory
+        {t.common.footer}
       </footer>
     </div>
   );

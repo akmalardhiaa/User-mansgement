@@ -8,16 +8,25 @@ import { Card } from "@/components/ui/Field";
 import { IconAlert } from "@/components/ui/Icons";
 import { isAuthConfigured, isLdapConfigured } from "@/lib/auth/ad";
 import { getSession } from "@/lib/auth/current";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Masuk · HC User Management" };
+/**
+ * The tab title follows the chosen language too. `generateMetadata` rather
+ * than a static object, because the dictionary is only known per request.
+ */
+export async function generateMetadata() {
+  const { t } = await getTranslations();
+  return { title: t.login.metaTitle };
+}
 
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string }>;
 }) {
+  const { t } = await getTranslations();
   const { next } = await searchParams;
   /*
    * Only same-site paths, so `?next=` can never bounce someone to another host.
@@ -61,12 +70,8 @@ export default async function LoginPage({
             <span className="size-1.5 rounded-full bg-accent animate-pulse" />
             <span className="font-semibold text-shimmer-brand">User Management</span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-ink">
-            Masuk Portal
-          </h1>
-          <p className="text-sm text-ink-muted">
-            Silakan masukkan kredensial akun Human Capital Anda.
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-ink">{t.login.title}</h1>
+          <p className="text-sm text-ink-muted">{t.login.subtitle}</p>
         </div>
 
         <Card className="relative overflow-hidden p-6 sm:p-7 backdrop-blur-xl border-hairline-strong/70 shadow-[0_12px_40px_-15px_rgba(7,19,33,0.6)]">
@@ -82,22 +87,14 @@ export default async function LoginPage({
                 <div className="mt-5 space-y-1 rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-sm">
                   <p className="flex items-center gap-2 font-medium text-warn">
                     <IconAlert className="size-4" />
-                    Mode demo — Active Directory belum tersambung
+                    {t.login.demoTitle}
                   </p>
-                  <p className="text-ink-muted">
-                    Alur lengkap butuh tiga identitas berbeda:{" "}
-                    <code className="font-mono text-ink">admin</code> mengajukan,{" "}
-                    <code className="font-mono text-ink">dimas</code> menyetujui sebagai manager,
-                    lalu <code className="font-mono text-ink">bagus</code> sebagai CISO. Kata
-                    sandinya masing-masing username diikuti{" "}
-                    <code className="font-mono text-ink">12345</code>. Daftar lengkap akun demo ada
-                    di README. Isi <code className="font-mono text-ink">LDAP_URL</code> di{" "}
-                    <code className="font-mono text-ink">.env.local</code> untuk mengaktifkan login AD.
-                  </p>
+                  <p className="text-ink-muted">{t.login.demoBody}</p>
+                  <p className="text-ink-muted">{t.login.demoEnvHint}</p>
                 </div>
               ) : (
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-4 text-sm">
-                  <span className="text-ink-muted">Masuk dengan akun Active Directory Anda.</span>
+                  <span className="text-ink-muted">{t.login.withAd}</span>
                 </div>
               )}
             </>
@@ -105,13 +102,9 @@ export default async function LoginPage({
             <div className="text-sm">
               <p className="flex items-center gap-2 font-medium text-warn">
                 <IconAlert className="size-4" />
-                Login belum dikonfigurasi
+                {t.login.notConfiguredTitle}
               </p>
-              <p className="mt-2 text-ink-muted">
-                Setel <code className="font-mono text-ink">LDAP_URL</code> di environment, lalu
-                jalankan ulang aplikasinya. Contohnya ada di{" "}
-                <code className="font-mono text-ink">.env.example</code>.
-              </p>
+              <p className="mt-2 text-ink-muted">{t.login.notConfiguredBody}</p>
             </div>
           )}
         </Card>
