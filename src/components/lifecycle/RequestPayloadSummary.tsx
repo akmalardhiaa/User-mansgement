@@ -1,5 +1,9 @@
 import { accessProfileLabel } from "@/lib/lifecycle/accessProfiles";
-import type { LifecyclePayload, TerminationReason } from "@/lib/lifecycle/types";
+import type {
+  LifecyclePayload,
+  ProfileUpdatePayload,
+  TerminationReason,
+} from "@/lib/lifecycle/types";
 
 const REASON_LABEL: Record<TerminationReason, string> = {
   RESIGN: "Mengundurkan diri",
@@ -23,6 +27,8 @@ const REASON_LABEL: Record<TerminationReason, string> = {
  * than they must.
  */
 export function RequestPayloadSummary({ payload }: { payload: LifecyclePayload }) {
+  if (payload.kind === "PROFILE_UPDATE") return <ProfileChanges payload={payload} />;
+
   const rows: Array<[string, string]> =
     payload.kind === "ONBOARDING"
       ? [
@@ -75,5 +81,50 @@ export function RequestPayloadSummary({ payload }: { payload: LifecyclePayload }
         </div>
       ))}
     </dl>
+  );
+}
+
+/**
+ * A profile update, as a before-and-after table.
+ *
+ * Only the changed fields, because that is what is being decided. The "before"
+ * column is the server's reading of the record at submit, not the browser's.
+ */
+function ProfileChanges({ payload }: { payload: ProfileUpdatePayload }) {
+  return (
+    <div className="space-y-3">
+      <div className="overflow-x-auto rounded-xl border border-hairline">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-hairline bg-elevated/40 text-xs tracking-wide text-ink-faint uppercase">
+              <th className="px-3 py-2.5 font-medium sm:px-4">Isian</th>
+              <th className="px-3 py-2.5 font-medium sm:px-4">Sebelum</th>
+              <th className="px-3 py-2.5 font-medium sm:px-4">Sesudah</th>
+            </tr>
+          </thead>
+          <tbody>
+            {payload.changes.map((change) => (
+              <tr key={change.field} className="border-b border-hairline/60 last:border-0">
+                <td className="px-3 py-2.5 text-ink-muted sm:px-4">{change.label}</td>
+                <td className="px-3 py-2.5 break-words text-ink-muted line-through decoration-ink-faint/60 sm:px-4">
+                  {change.from}
+                </td>
+                <td className="px-3 py-2.5 font-medium break-words text-accent sm:px-4">{change.to}</td>
+              </tr>
+            ))}
+            {payload.changes.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="px-3 py-4 text-center text-ink-muted sm:px-4">
+                  Perubahan dihitung saat pengajuan dikirim.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-ink-faint">
+        Email, manager, dan hak akses (group) tidak berubah lewat pengajuan ini.
+      </p>
+    </div>
   );
 }

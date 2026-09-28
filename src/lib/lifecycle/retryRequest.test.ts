@@ -88,6 +88,7 @@ async function seed(requests: LifecycleRequest[], jobs: ExecutionJob[]): Promise
     outboxEvents: [],
     emailDeliveries: [],
     approvalTokens: [],
+    delegations: [],
     auditEvents: [],
   };
   await writeFile(storePath, JSON.stringify(store, null, 2), "utf8");

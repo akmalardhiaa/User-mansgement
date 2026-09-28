@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { SelectField } from "@/components/ui/Field";
 import { Card } from "@/components/ui/Field";
 import {
   IconAlert,
@@ -141,7 +142,7 @@ export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
           aria-label="Cari aktivitas"
           className="w-full rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none sm:max-w-xs"
         />
-        <select
+        <SelectField
           value={action}
           onChange={(event) => setAction(event.target.value as ActivityAction | "ALL")}
           aria-label="Saring berdasarkan jenis aktivitas"
@@ -153,7 +154,7 @@ export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
               {ACTION_PRESENTATION[value].label}
             </option>
           ))}
-        </select>
+        </SelectField>
         <div className="flex items-center gap-3 text-xs text-ink-faint sm:ml-auto">
           {filtering ? (
             <Button

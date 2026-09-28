@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ComponentType, type ReactNode } from "react";
 
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { BrandMark } from "@/components/ui/BrandMark";
 import {
@@ -13,6 +14,7 @@ import {
   IconDirectory,
   IconIdCard,
   IconSignOut,
+  IconSwap,
   IconUser,
   IconUserPlus,
 } from "@/components/ui/Icons";
@@ -33,6 +35,7 @@ const NAV: ReadonlyArray<{
   { href: "/pengajuan", label: "Pengajuan", icon: IconApprovals, permission: "request.read" },
   { href: "/pengajuan/baru", label: "Pengajuan baru", icon: IconUserPlus, permission: "request.create" },
   { href: "/users/edit", label: "Edit profil", icon: IconUser, permission: "employee.update" },
+  { href: "/delegasi", label: "Delegasi", icon: IconSwap, permission: "delegation.manage" },
   { href: "/aktivitas", label: "Aktivitas", icon: IconClock, permission: "activity.read" },
   { href: "/profile", label: "Profil", icon: IconIdCard },
 ];
@@ -169,6 +172,9 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
               </span>
             ) : user ? (
               <>
+                {/* Notification bell — only shown when a real session exists */}
+                <NotificationBell />
+
                 <span className="hidden items-center gap-2.5 sm:flex">
                   <span
                     className="grid size-8 place-items-center rounded-full border border-accent/30 bg-accent/10 text-[11px] font-semibold text-accent-soft"

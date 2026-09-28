@@ -14,17 +14,21 @@ Tanpa `LDAP_URL`, portal memakai akun demo lokal di `src/lib/auth/devUsers.ts`:
 
 | Username | Kata sandi | Peran portal | Catatan |
 | --- | --- | --- | --- |
-| `admin` | `admin12345` | Administrator sistem + Human Capital | Mengajukan |
-| `dimas` | `dimas12345` | Manager | Manager sebagian besar karyawan seed |
-| `sarah` | `sarah12345` | Manager | Manager divisi IT — Engineering |
-| `bagus` | `bagus12345` | CISO / IT Security | Approver tahap kedua |
-| `budi` | `budi12345` | Manager | Punya peran, tidak memanajeri siapa pun — sengaja, untuk menguji penolakan |
-| `rina` | `rina12345` | *(tidak ada)* | Akun AD valid tanpa wewenang portal |
+| `admin` | `admin12345` | Administrator sistem + Human Capital | **Satu-satunya yang bisa masuk** |
+| `dimas` | `dimas12345` | *(tidak ada)* | Manager sebagian besar karyawan seed — login **ditolak** |
+| `sarah` | `sarah12345` | *(tidak ada)* | Manager divisi IT — Engineering — login **ditolak** |
+| `bagus` | `bagus12345` | *(tidak ada)* | Approver CISO demo — login **ditolak** |
+| `budi` | `budi12345` | *(tidak ada)* | Login **ditolak** |
+| `rina` | `rina12345` | *(tidak ada)* | Akun AD valid tanpa wewenang portal — login **ditolak** |
 
-`dimas` dan `sarah` ada karena alasan yang spesifik: routing menyelesaikan
-approver ke alamat manager yang benar-benar tercatat di direktori, jadi tanpa
-akun yang memakai alamat itu demo bisa mengajukan tetapi tidak pernah bisa
-menyetujui.
+**Portal hanya untuk HC.** Manager dan tim CISO tidak masuk ke portal sama
+sekali: mereka menyetujui dari email yang mereka terima, lewat tautan sekali
+pakai yang terikat ke alamat mereka sendiri. Akun di atas tetap ada sebagai akun
+direktori yang sah tanpa peran portal, sehingga mencoba masuk dengan salah
+satunya menunjukkan persis apa yang dilihat manager di production — penolakan
+yang menyuruhnya memakai email. `dimas` dan `sarah` tetap penting karena alamat
+merekalah yang tercatat sebagai manager di direktori seed, jadi ke sanalah email
+persetujuan demo dirutekan.
 
 Akun demo ditolak di production: di sana `LDAP_URL` yang belum diisi adalah
 kesalahan konfigurasi, bukan alasan untuk meloloskan siapa pun.
@@ -51,13 +55,14 @@ hanya melihat profilnya sendiri — benar, bukan rusak:
 ```bash
 npm run mock-ad:roles          # beri group peran ke tiga akun
 npm run mock-ad:roles -- --undo  # kembalikan tepat yang ditambahkannya
+npm run mock-ad:roles -- --super # satu akun memegang seluruh peran portal
 ```
 
 | Akun | Peran yang didapat |
 | --- | --- |
 | `ayu.prameswari` | `HC_REQUESTER` + `SYSTEM_ADMIN` |
-| `sarah.wijaya` | `MANAGER` |
-| `bagus.nugroho` | `CISO_APPROVER` |
+| `sarah.wijaya` | *(tidak ada — group manager tidak lagi memberi peran portal)* |
+| `bagus.nugroho` | *(tidak ada — group CISO tidak lagi memberi peran portal)* |
 
 DN yang ditulis dibaca dari `AD_GROUP_*`, jadi direktori dan konfigurasi cocok
 secara konstruksi. Nama yang tidak dikenal direktori simulasi **jatuh ke daftar
@@ -69,11 +74,75 @@ langkah terpisah yang harus diingat seseorang. **Ditolak di production.**
 ## Menjalankan dengan Docker
 
 ```bash
-cp .env.docker.example .env.docker   # isi dua placeholder di dalamnya
-docker compose up --build
+docker compose up
 ```
 
-Lalu buka `http://localhost:3000`.
+Lalu buka `http://localhost:3000`. Satu perintah itu memang seluruh ceritanya,
+dan dua hal menjaganya tetap begitu.
+
+**Konfigurasi bertumpuk dua lapis.** `env_file` membaca
+`.env.docker.example` — yang ikut di-commit, berisi bawaan demo, tanpa rahasia —
+lalu `.env.docker` yang **opsional** dan menimpa nilai apa pun yang diisinya.
+Hasilnya: hasil `git clone` yang belum punya `.env.docker` tetap menyala dengan
+direktori simulasi dan email ditulis ke berkas, sedangkan mesin yang sudah
+mengisi SMTP tetap memakai SMTP. Untuk mengisi rahasianya:
+`cp .env.docker.example .env.docker`, lalu isi dua placeholder di dalamnya.
+
+**Kode di-mount, jadi mengubah berkas tidak perlu `--build`.** Yang tidak
+di-mount hanya `node_modules` dan `.next`: yang pertama dipasang `npm ci` di
+dalam image dan harus tetap versi Linux, yang kedua milik siapa pun yang sedang
+menjalankan. Pemantau berkas Next **tidak** menerima notifikasi perubahan dari
+folder Windows lewat bind mount, jadi hot reload tidak menyala di Windows —
+hentikan (`Ctrl+C`) lalu `docker compose up` lagi, dan kode baru langsung
+terpakai. `docker compose up` pada container yang masih hidup tidak melakukan
+apa-apa, jadi menghentikannya dulu bukan langkah opsional.
+
+`--build` hanya perlu ketika `package.json` atau lockfile berubah, karena
+dependency dipasang ke dalam image, bukan di-mount.
+
+**Run pertama mengisi dirinya sendiri.** Direktori karyawan sudah punya data
+awal, tetapi direktori simulasi dulu mulai kosong — dan setiap Movement atau
+Termination untuk karyawan bawaan gagal pada akun yang tidak pernah dibuat.
+Perbaikannya sebelumnya adalah memanggil `POST /api/admin/seed-mock-ad` sendiri,
+yang wajar bila Anda tahu itu ada dan jadi jebakan bila Anda baru menyalin
+repositori ini. Kini `src/lib/ad/bootstrapMockAd.ts` melakukannya saat boot
+pertama: satu akun per karyawan, tertaut lewat `objectGUID`, aktif mengikuti
+status karyawan — lalu satu group role (`AD_GROUP_HC`) diberikan ke akun
+Human Capital, sehingga halaman login yang mengundang akun Active Directory
+tidak menolak semuanya. Dua syarat, dan keduanya penting: driver harus yang
+simulasi, dan berkas direktorinya belum ada. Berkas yang ada tapi kosong adalah
+keadaan demo milik seseorang — mungkin akun sengaja dihapus untuk menunjukkan
+kegagalan — dan memulihkannya diam-diam adalah kejutan tersendiri.
+
+### Pindah ke komputer lain
+
+Yang perlu dipasang di komputer tujuan hanya **Docker Desktop**. Tidak perlu
+Node, tidak perlu `npm install`, tidak ada langkah seeding.
+
+**Mulai bersih** — salin repositori ini (tanpa `node_modules` dan `.next`), lalu:
+
+```bash
+docker compose up
+```
+
+Data terbentuk sendiri: enam karyawan, satu akun direktori simulasi untuk
+masing-masing, dan login lewat akun Active Directory simulasi
+(`ayu.prameswari` / `mock12345`). Akun manager seperti `sarah.wijaya` ditolak,
+karena portal ini memang hanya untuk Human Capital.
+
+**Membawa data yang sudah ada** — matikan dulu portal di komputer lama
+(`docker compose down`) supaya tidak ada yang sedang menulis, salin folder
+`data/` apa adanya, lalu jalankan perintah yang sama. Berkas `*.tmp` dan
+`*.bak-*` di dalamnya sisa lama dan tidak perlu ikut. Jangan menyalakan
+keduanya bersamaan: dua penjadwal outbox pada data yang sama berarti satu email
+persetujuan terkirim dua kali.
+
+`.env.docker` **opsional**. Tanpa berkas itu email ditulis sebagai berkas ke
+`data/outbox-mail/` dan tidak ada yang keluar dari mesin — cukup untuk
+mendemokan seluruh alur. Untuk mengirim email sungguhan, salin `.env.docker`
+lewat jalur pribadi: di dalamnya ada App Password, dan repositori bukan tempat
+untuk itu. Bila portal dibuka dari perangkat lain lewat alamat IP, sesuaikan
+`APP_BASE_URL` — setiap tautan persetujuan di email dibangun dari nilai itu.
 
 **Container ini sengaja berjalan dalam mode development**, dan itu bukan
 kemalasan. Aplikasi ini memuat sembilan penjagaan produksi, dan konfigurasi demo
@@ -103,10 +172,30 @@ di bawah `data/`. Mengikatnya ke host juga yang membuat container melihat akun
 yang sudah di-seed `npm run mock-ad:roles`, bukan direktori kosong yang tidak
 bisa dimasuki siapa pun.
 
+**Berkas data yang "hilang" tidak pernah dianggap kosong.** Pada 22 September 2026
+store sempat tak terlihat sesaat dari dalam container (folder `data/` dibagi dari
+Windows), sebuah penjadwal membacanya di saat itu, menganggapnya instalasi baru,
+dan menulis data seed di atas 28 pengajuan. Kini berkas yang pernah terbaca lalu
+lenyap dibaca ulang beberapa kali, dan bila tetap tidak ada, operasinya **gagal
+tanpa menulis apa pun**; data awal hanya dibuat pada run pertama, dan tidak pernah
+di atas berkas yang ada (`src/lib/db/stateFile.ts`). Tetap simpan cadangan
+`data/` sebelum percobaan besar.
+
 Container dan `npm run dev` **tidak boleh jalan bersamaan**. Keduanya menulis
 `data/` yang sama, sedangkan kunci di `store.ts` hanyalah antrean per-proses dan
 tidak bisa menengahi dua proses — dan dua penjadwal outbox yang menyapu antrean
 yang sama berarti satu email persetujuan bisa terkirim dua kali.
+
+**Satu proses pun punya beberapa salinan modul.** Next mengompilasi `store.ts`
+terpisah untuk route handler, halaman, dan `instrumentation.ts` (penjadwal
+outbox & worker), sehingga kunci yang disimpan di variabel modul sebenarnya
+tiga kunci. Pada 22 September 2026 uji ujung-ke-ujung menangkap akibatnya:
+persetujuan manager dijawab 200, lalu penjadwal outbox — yang sudah membaca
+store beberapa milidetik sebelumnya — menyimpan "email terkirim" di atasnya,
+dan persetujuannya hilang. Kunci ketiga store (data, sesi, mock AD) kini
+disimpan di `globalThis` (`src/lib/db/processShared.ts`) sehingga semua salinan
+mengantre di kunci yang sama; `processShared.test.ts` mereproduksi kasusnya
+dengan dua salinan modul.
 
 ## Identitas dan wewenang
 
@@ -115,8 +204,11 @@ Keduanya sengaja dipisah:
 - **Ada di Active Directory** berarti Anda karyawan. Itu saja tidak memberi
   wewenang apa pun di portal ini.
 - **Punya peran portal** berarti HC/IT memasukkan Anda ke group AD yang
-  dipetakan ke salah satu peran. Yang masuk tanpa group terpetakan tetap
-  mendapat sesi dan halaman profilnya sendiri — tidak lebih.
+  dipetakan ke salah satu peran. Yang tidak punya peran **tidak bisa masuk sama
+  sekali** — login ditolak sebelum sesi dibuat, dan sesi lama yang hanya
+  membawa peran yang sudah dihapus langsung berhenti berlaku.
+- **Approver bukan peran portal.** Manager dan tim CISO memutuskan dari email.
+  `AD_GROUP_MANAGER` dan `AD_GROUP_CISO`, bila masih diisi, diabaikan.
 
 Pemetaan group diatur lewat `AD_GROUP_*` (lihat `.env.example`). Satu orang
 boleh memegang beberapa peran sekaligus.
@@ -131,17 +223,14 @@ termasuk `SYSTEM_ADMIN`.
 
 | Peran | Wewenang |
 | --- | --- |
-| `HC_REQUESTER` | Direktori, ubah profil, aktivitas, **buat & batalkan pengajuan** |
-| `MANAGER` | Baca direktori dan pengajuan, **approval tahap pertama** |
-| `CISO_APPROVER` | Baca direktori, aktivitas, pengajuan, **approval tahap kedua** |
+| `HC_REQUESTER` | Direktori, aktivitas, **buat, revisi & batalkan pengajuan** (termasuk perubahan profil), **kelola delegasi** |
 | `SYSTEM_ADMIN` | Baca direktori, aktivitas, pengajuan; konfigurasi portal |
 | `OPS_OPERATOR` | Baca direktori, aktivitas, pengajuan; **menjalankan worker** |
 | `AUDITOR` | Baca dan ekspor direktori, baca aktivitas dan pengajuan |
 
-Perhatikan yang **tidak** ada di tabel itu: `SYSTEM_ADMIN` tidak bisa membuat
-pengajuan maupun menyetujui, dan tidak ada satu peran pun yang memegang kedua
-approval. Satu akun yang bisa memenuhi keduanya membuat tanda tangan kedua tak
-ada artinya.
+Perhatikan yang **tidak** ada di tabel itu: tidak ada peran yang bisa
+menyetujui apa pun dari portal, `SYSTEM_ADMIN` sekalipun. Kedua approval hanya
+bisa diberikan dari email, oleh orang yang dituju.
 
 Matriks lengkapnya ada di satu tempat — `src/lib/auth/roles.ts` — dan setiap
 handler meminta *permission*, bukan peran. Menambah peran tidak pernah berarti
@@ -181,9 +270,11 @@ Kontrol yang sebenarnya ada di dua tempat, dan keduanya membaca catatan sesi:
 | `/` | Direktori karyawan — keadaan akun, bukan status pengajuan | `directory.read` |
 | `/pengajuan` | Daftar pengajuan, tersaring sesuai lingkup | `request.read` |
 | `/pengajuan/baru` | Tiga form: Onboarding, Movement, Termination | `request.create` |
-| `/pengajuan/[id]` | Detail, kedua approval, jejak audit, dan tombol keputusan | `request.read` |
-| `/persetujuan/[token]` | Halaman keputusan dari tautan email — **tanpa sesi** | token |
-| `/users/edit` | Ubah profil karyawan | `employee.update` |
+| `/pengajuan/[id]` | Detail, siapa yang diminta dan siapa yang memutuskan, jejak audit | `request.read` |
+| `/pengajuan/[id]/revisi` | Revisi oleh pemohon — dikirim ulang otomatis ke manager | `request.create` |
+| `/persetujuan/[token]` | Halaman konfirmasi keputusan dari tautan email — **tanpa sesi**, satu-satunya tempat approver memutuskan | token |
+| `/users/edit` | Ajukan perubahan profil karyawan (pengajuan `PROFILE_UPDATE`) | `employee.update` + `request.create` |
+| `/delegasi` | Daftarkan dan akhiri delegasi manager yang berhalangan | `delegation.manage` |
 | `/aktivitas` | Jejak aktivitas | `activity.read` |
 | `/profile` | Akun sendiri | — |
 | `/login` | Masuk | — |
@@ -197,15 +288,13 @@ Kontrol yang sebenarnya ada di dua tempat, dan keduanya membaca catatan sesi:
 | `GET` | `/api/auth/me` | sesi saja |
 | `GET` | `/api/users` | `directory.read` |
 | `GET` | `/api/users/:id` | `directory.read` |
-| `PUT` | `/api/users/:id` | `employee.update` |
 | `GET` | `/api/activity` | `activity.read` |
 | `POST` | `/api/directory/export` | `directory.export` |
 | `GET` | `/api/lifecycle-requests` | `request.read` |
 | `POST` | `/api/lifecycle-requests` | `request.create` |
 | `GET` | `/api/lifecycle-requests/:id` | `request.read` |
 | `POST` | `/api/lifecycle-requests/:id/submit` | `request.create` |
-| `POST` | `/api/lifecycle-requests/:id/decision` | `approval.manager` / `approval.ciso` |
-| `POST` | `/api/lifecycle-requests/:id/revise` | `request.create` |
+| `POST` | `/api/lifecycle-requests/:id/revise` — revisi + kirim ulang, wajib `version` | `request.create` |
 | `POST` | `/api/lifecycle-requests/:id/cancel` | `request.cancel` |
 | `POST` | `/api/lifecycle-requests/:id/retry` | `execution.run` |
 | `POST` | `/api/admin/migrate-legacy` | `system.migrate` |
@@ -213,10 +302,14 @@ Kontrol yang sebenarnya ada di dua tempat, dan keduanya membaca catatan sesi:
 | `POST` | `/api/admin/seed-mock-ad` | `system.migrate` |
 | `POST` | `/api/outbox/dispatch` | `execution.run` |
 | `POST` | `/api/approval-actions` | token sekali pakai |
+| `GET` | `/api/delegations` | `delegation.manage` |
+| `POST` | `/api/delegations` — `reroutePending` opsional | `delegation.manage` |
+| `POST` | `/api/delegations/:id/end` | `delegation.manage` |
 
 ## Pengajuan lifecycle
 
-Satu entitas menangani ketiganya — Onboarding, Movement, dan Termination.
+Satu entitas menangani keempatnya — Onboarding, Movement, Termination, dan
+Perubahan Profil (`PROFILE_UPDATE`).
 Alurnya: `DRAFT → PENDING_MANAGER → PENDING_CISO → APPROVED → QUEUED →
 EXECUTING → COMPLETED`, dengan `REJECTED`, `CANCELLED`, dan `EXPIRED` sebagai
 ujung lain. Seluruh transisi yang sah ada di satu tabel di
@@ -233,12 +326,62 @@ Beberapa aturan yang ditegakkan kode, bukan sekadar konvensi:
   keputusan dicatat terhadap `version` dan `payloadHash` tertentu.
 - **Revisi bukan penyuntingan.** Isi baru menjadi versi baru, approval lama
   dibuang, dan kedua approver ditanya ulang — karena mereka menyetujui teks
-  yang sudah tidak ada.
+  yang sudah tidak ada. Revisi dan pengiriman ulang terjadi dalam **satu
+  transaksi**: email persetujuan versi baru langsung masuk outbox untuk
+  manager, dan bila pengiriman ulang ditolak (misalnya bentrok pemisahan
+  tugas) tidak ada yang berubah sama sekali. Revisi wajib membawa `version`
+  yang sedang dilihat, dan tidak boleh mengganti karyawan yang diajukan.
+- **Edit profil juga pengajuan.** Menyimpan di `/users/edit` membuat
+  `PROFILE_UPDATE` yang dirutekan ke manager **saat ini** lalu CISO. Tabel
+  "sebelum → sesudah" dihitung server dari catatan, bukan dari browser; catatan
+  internal HC tidak pernah masuk antrean email. Worker hanya menulis nama,
+  departemen, dan jabatan ke AD, lalu memverifikasi status aktif, OU, dan group
+  tidak ikut berubah. `PUT /api/users/:id` dihapus — dulu ia bisa memindahkan
+  departemen tanpa persetujuan siapa pun.
+- **Onboarding dibuat begitu disetujui, apa pun tanggalnya.** Form Onboarding
+  tidak punya "Waktu efektif"; tanggal mulai bekerja hanya dicatat. Setelah
+  CISO menyetujui, akun langsung dibuat oleh worker otomatis — bahkan onboarding
+  lama yang sempat dijadwalkan ikut diproses. Movement dan Termination tetap
+  menghormati waktu efektifnya: menonaktifkan seseorang lebih awal bukan hal
+  yang boleh terjadi karena aturan ini. Karyawan yang sedang diproses langsung
+  tampil di panel "Karyawan baru dalam proses" di dashboard, lalu pindah ke
+  tabel direktori setelah akunnya diverifikasi.
+- **Tanggal harus masuk akal.** Tahun wajib 4 digit, dan tiap tanggal punya
+  rentang (misalnya waktu efektif maksimal 1 tahun ke depan) — dulu tahun 132144
+  diterima dan pengajuannya menunggu selamanya.
 - **Routing ditentukan server.** HC tidak pernah mengetik alamat approver.
   Onboarding dan Movement dirutekan ke manager divisi **tujuan**; Termination ke
-  manager **saat ini**; CISO berasal dari `CISO_APPROVER_EMAIL`.
+  manager **saat ini**; CISO ke **tim CISO** (group AD `CISO_APPROVER_GROUP`,
+  atau daftar `CISO_APPROVER_EMAILS`).
+- **Manager yang dipilih harus ada di direktori.** Form Onboarding/Movement
+  tidak lagi punya isian email manager bebas — dulu pemohon bisa mengarahkan
+  persetujuan tahap pertama ke mailbox mana pun, termasuk miliknya sendiri.
+  Server menolak alamat yang bukan karyawan **aktif** dan mengganti nama yang
+  diketik dengan nama dari direktori. Pengajuan yang sudah berjalan tidak
+  terpengaruh; approver-nya dibekukan saat submit.
+- **Delegasi.** Saat manager berhalangan, HC mendaftarkan pengganti di
+  `/delegasi` untuk periode tertentu (maks. 90 hari). Pengajuan baru untuk
+  manager itu dirutekan ke pengganti dan tercatat "Nama (atas nama Manager)" di
+  email, detail, dan jejak audit. Pengajuan yang **sudah** menunggu hanya
+  dialihkan bila HC mencentang opsinya — tautan di email manager lalu mati dan
+  pengganti menerima tautan baru. Aturan yang ditegakkan: pengganti harus
+  karyawan aktif; HC tidak boleh menunjuk dirinya sendiri; tidak boleh
+  berantai; pemisahan tugas diperiksa terhadap manager **dan** penggantinya,
+  sehingga pemohon yang sedang "berhalangan" tetap tidak bisa menyetujui
+  pengajuannya sendiri lewat pengganti. Tahap CISO tidak perlu delegasi karena
+  sudah dikirim ke seluruh tim.
+- **Tim CISO: keputusan pertama yang berlaku.** Setiap anggota mendapat email
+  dan tautan pribadinya sendiri — bukan satu tautan ke distribution list, yang
+  tidak bisa mencatat siapa yang menyetujui. Anggota pertama yang menyetujui
+  atau menolak menentukan tahap itu; tautan anggota lain mati dalam transaksi
+  yang sama, dan bila dibuka menampilkan "Sudah disetujui oleh X pada …". Email
+  yang sudah masuk inbox tidak bisa ditarik, tetapi tautannya tidak bisa
+  dipakai lagi. Daftar anggota dibekukan saat submit. Kepala CISO tidak
+  dimasukkan ke daftar dan tidak menerima tautan apa pun.
 - **Pemisahan tugas diperiksa saat submit**, bukan saat keputusan: pemohon tidak
-  boleh menjadi approver, dan Manager tidak boleh sama dengan CISO.
+  boleh menjadi approver, dan Manager tidak boleh sama dengan CISO. Anggota tim
+  CISO yang merupakan pemohon atau manager pada pengajuan itu dikeluarkan dari
+  daftar; pengajuan baru ditolak bila tidak ada anggota yang tersisa.
 - **Satu pengajuan aktif per karyawan.** Dua payload disetujui yang berebut satu
   akun adalah cara akun berakhir dalam keadaan yang tidak diminta keduanya.
 - **Klik ganda bukan dua keputusan.** Keputusan identik yang diulang
@@ -332,7 +475,8 @@ bila driver-nya bukan simulasi.
 
 ## Email persetujuan
 
-Keputusan tidak lagi hanya lewat sesi portal. Saat pengajuan dikirim, kewajiban
+Keputusan **hanya** lewat email — portal tidak lagi punya jalur keputusan sama
+sekali (`POST /api/lifecycle-requests/:id/decision` dihapus). Saat pengajuan dikirim, kewajiban
 mengirim email **ditulis dalam transaksi yang sama** dengan perubahan statusnya —
 itulah seluruh alasan outbox ada. Mengirim di dalam transaksi membuat provider
 yang lambat menahan kunci database; mengirim setelah commit membuat crash di
@@ -355,18 +499,20 @@ Aturan yang ditegakkan kode:
 - **Tautan terikat satu tahap dan satu versi.** Tautan manager tidak bisa
   menjawab pertanyaan CISO, dan tautan untuk versi 1 tidak bisa menyetujui
   versi 2. Revisi mencabut seluruh tautan yang masih hidup.
-- **Mengambil tautan tidak memutuskan apa pun; membukanya di browser bisa.**
-  Endpoint keputusan hanya menerima POST, jadi pemindai email dan pratinjau
-  tautan yang sekadar mengikuti URL tidak menyetujui apa pun. Tetapi tombol
+- **Setujui satu klik dari email — pilihan sadar, dengan risikonya.** Tombol
   **Setujui** membawa `?putusan=setuju`, dan halamannya mengirim keputusan itu
-  sendiri begitu dimuat — sehingga apa pun yang membuka tautan **dan
-  menjalankan JavaScript-nya** akan menyetujui: gateway keamanan email yang
-  merender halaman di sandbox, pesan yang diteruskan lalu dibuka orang lain,
-  atau tab lama yang dimuat ulang. Ini harga yang dipilih sadar demi keputusan
-  satu klik dari inbox, dan ia lebih sempit daripada GET yang mengubah data —
-  tetapi bukan nol. Perlu diketahui juga bahwa keputusan dicatat atas nama
-  **approver yang dituju**, bukan yang mengklik, jadi persetujuan yang terpicu
-  pemindai akan tercatat sebagai persetujuan orang itu.
+  sendiri begitu dimuat. Endpoint keputusan hanya menerima POST, jadi pemindai
+  yang sekadar mengambil URL tidak menyetujui apa pun; tetapi apa pun yang
+  membuka tautan **dan menjalankan JavaScript-nya** akan menyetujui — gateway
+  keamanan email yang menguji tautan di sandbox, atau pesan yang diteruskan lalu
+  dibuka orang lain. Karena tahap CISO dikirim ke seluruh tim, risiko itu
+  berlipat sebanyak anggota tim, dan satu persetujuan semacam itu juga
+  mematikan tautan anggota lain. Halaman konfirmasi sempat dipasang pada
+  21 September 2026 lalu dilepas lagi atas permintaan pemilik produk demi
+  keputusan satu klik. **Tolak** tetap meminta alasan. Keputusan dicatat atas
+  nama **pemilik tautan** (untuk tim: anggota yang tautannya dipakai), yang
+  membuktikan kepemilikan mailbox, bukan identitas pengklik — itu yang kelak
+  ditutup oleh Actionable Message dengan identitas Entra.
 - Retry mengikuti tangga 1, 5, 15, 30, 60 menit dengan jitter, menghormati
   `Retry-After`, lalu dead-letter. Event yang diulang selamanya adalah event yang
   tidak pernah dibaca siapa pun.
@@ -440,6 +586,16 @@ diautentikasi token sekali pakai dan diposting server Outlook yang bukan browser
 dan tidak mengirim `Origin`. Pencocokannya berhenti di batas segmen —
 `/api/approval-actions-fake` **tidak** ikut terkecuali.
 
+**Asal "diri sendiri" dibaca dari header `Host`**, bukan dari alamat yang dikira
+Next.js. Next selalu menganggap dirinya `localhost` (atau `0.0.0.0` di bawah
+`next dev -H 0.0.0.0` di Docker), apa pun alamat di browser — sehingga dulu setiap
+form yang dikirim dari `127.0.0.1`, dari IP jaringan, atau dari container ditolak
+"berasal dari asal yang tidak dikenal", dan di Docker **semuanya** ditolak.
+Membaca `Host` tetap aman: request palsu dari situs lain dikirim browser dengan
+`Host` situs ini dan `Origin` situs penyerang, jadi tetap tidak cocok. Yang juga
+diterima: `APP_BASE_URL`, dan `X-Forwarded-Proto` dari proxy HTTPS (hanya
+mengganti skema untuk host yang sama). Lihat `selfOrigins` di `csrf.ts`.
+
 **Pembatasan laju.** Endpoint persetujuan mendapat ember sendiri yang lebih
 ketat (20 per 5 menit) karena ia satu-satunya mutasi yang dapat dicapai tanpa
 sesi; mutasi API lain 120 per menit. Dihitung di memori proses — perlindungan
@@ -454,10 +610,13 @@ implementation plan. Yang **belum** dikerjakan, dan tidak boleh dianggap ada:
 
 - **Driver AD sungguhan.** `AD_DRIVER=ldap` sengaja melempar error, bukan diam-diam
   jatuh ke mock. Login membaca AD; belum ada yang menulis ke AD nyata.
-- **Worker terjadwal.** Eksekusi dipicu manual lewat `POST /api/worker/run`.
-  Topologi production — worker terpisah di jaringan perusahaan yang mengambil job
-  lewat API dengan mTLS — belum ada; yang sudah dilatih adalah bagian yang membawa
-  risikonya, bukan transportnya.
+- **Worker production.** Di luar production worker kini berjalan otomatis: dipicu
+  tepat setelah persetujuan terakhir (lewat `after()` di `/api/approval-actions`)
+  dan menyapu antrean tiap `WORKER_POLL_SECONDS` (default 30, `0` mematikan).
+  Keduanya berbagi satu run sehingga tidak tumpang tindih. Di production mati
+  kecuali diisi, karena kuncinya per-proses. Topologi production — worker
+  terpisah di jaringan perusahaan yang mengambil job lewat API dengan mTLS —
+  belum ada.
 - **Pengiriman email sungguhan.** Driver Graph (`src/lib/email/graphDriver.ts`)
   dan validasi identitas Entra (`src/lib/auth/entraToken.ts`) sudah ditulis
   tetapi **belum pernah diuji ke tenant nyata** — belum ada registrasi Entra,
@@ -472,7 +631,6 @@ implementation plan. Yang **belum** dikerjakan, dan tidak boleh dianggap ada:
   token: sekali pakai, terikat satu tahap dan satu versi. Itu membuktikan
   kepemilikan tautan yang dikirim ke satu mailbox — **bukan identitas
   pengkliknya**.
-- Revisi pengajuan: endpoint `/revise` ada dan teruji, belum ada layarnya.
 - PostgreSQL, antrean job, dan worker. Penyimpanan masih berkas JSON satu host,
   sehingga sesi dan pengajuan tidak dibagi antar instance.
 - **Pembatasan laju lintas instance.** Yang ada dihitung per proses, jadi batas

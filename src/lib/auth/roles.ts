@@ -18,13 +18,18 @@
  * person holds two hats before it can refuse to let them wear both at once.
  */
 
+/*
+ * Approvers are deliberately NOT portal roles.
+ *
+ * Managers and the CISO team used to sign in here as MANAGER and CISO_APPROVER
+ * to decide from a dashboard. They no longer do: the portal is HC's working
+ * tool, and nobody else signs in to it. An approver is a mailbox the request was
+ * routed to — they decide from the email, through a single-use link bound to
+ * their own address — and needs no account, role or session here at all.
+ */
 export const PORTAL_ROLES = [
   /** HC raises lifecycle requests and tracks them. Cannot approve or touch AD. */
   "HC_REQUESTER",
-  /** Approves or rejects the first stage for requests routed to them. */
-  "MANAGER",
-  /** Approves or rejects the second stage — the access decision. */
-  "CISO_APPROVER",
   /** Configures integrations and portal access. Cannot bypass the two approvals. */
   "SYSTEM_ADMIN",
   /** Sees failures, retries what is allowed. Cannot alter an approved payload. */
@@ -40,6 +45,17 @@ export function isPortalRole(value: unknown): value is PortalRole {
 }
 
 /**
+ * The roles in a list that still exist.
+ *
+ * A session or a stored record can carry a role that has since been retired —
+ * MANAGER and CISO_APPROVER were — and a retired role must grant nothing,
+ * including the right to be signed in at all.
+ */
+export function portalRolesOf(roles: readonly unknown[]): PortalRole[] {
+  return roles.filter(isPortalRole);
+}
+
+/**
  * Every guarded capability in the app.
  *
  * Handlers ask for a permission rather than a role, so the mapping below is the
@@ -51,10 +67,11 @@ export const PERMISSIONS = [
   "directory.read",
   "directory.export",
   /*
-   * Editing the fields that carry no access consequence — a corrected spelling,
-   * a filled-in job description. Creating and disabling accounts used to live
-   * beside this as `employee.create` and `employee.access.toggle`; both are gone,
-   * because both are now requests that carry two approvals.
+   * Opening the edit-profile screen. It no longer writes anything by itself:
+   * saving raises a PROFILE_UPDATE request, which also needs `request.create`
+   * and carries two approvals. Creating and disabling accounts used to live
+   * beside this as `employee.create` and `employee.access.toggle`; both are gone
+   * for the same reason.
    */
   "employee.update",
   "activity.read",
@@ -62,12 +79,17 @@ export const PERMISSIONS = [
   "request.read",
   "request.create",
   "request.cancel",
-  /**
-   * The two approvals. Held by different roles on purpose — one account able to
-   * satisfy both would make the second signature worthless.
+  /*
+   * There is no approval permission. Both approvals are given from the email,
+   * authenticated by a link issued to one approver's address, not by a portal
+   * session — so no role here can approve anything, SYSTEM_ADMIN included.
    */
-  "approval.manager",
-  "approval.ciso",
+  /**
+   * Registering and ending delegations: who answers for a manager who is away.
+   * HC's alone — it changes who is asked to approve, so it belongs with the
+   * people who raise requests and never with those who configure the portal.
+   */
+  "delegation.manage",
   /** One-off maintenance, such as retiring the legacy workflow. */
   "system.migrate",
   /** Running the execution worker, and retrying what it could not finish. */
@@ -94,12 +116,8 @@ const ROLE_PERMISSIONS: Record<PortalRole, readonly Permission[]> = {
     "request.read",
     "request.create",
     "request.cancel",
+    "delegation.manage",
   ],
-  // An approver reads requests and answers their own stage. Note what is
-  // absent: neither can raise a request, and neither carries the other's
-  // approval.
-  MANAGER: ["directory.read", "request.read", "approval.manager"],
-  CISO_APPROVER: ["directory.read", "activity.read", "request.read", "approval.ciso"],
   SYSTEM_ADMIN: [
     "directory.read",
     "activity.read",

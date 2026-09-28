@@ -12,8 +12,14 @@ export const metadata = { title: "Edit User · HC User Management" };
 
 export default async function EditUserPage() {
   const session = await requirePageSession("/users/edit");
-  if (!hasPermission(session.roles, "employee.update")) {
-    return <AccessDenied roles={session.roles} need="Izin mengubah profil karyawan" />;
+  // Saving raises a request, so both are needed. The API enforces
+  // `request.create` on its own; this only avoids offering a form whose submit
+  // would be refused.
+  if (
+    !hasPermission(session.roles, "employee.update") ||
+    !hasPermission(session.roles, "request.create")
+  ) {
+    return <AccessDenied roles={session.roles} need="Izin mengajukan perubahan profil karyawan" />;
   }
 
   const [employees, pendingIds] = await Promise.all([listEmployees(), loadPendingEmployeeIds()]);
@@ -23,7 +29,7 @@ export default async function EditUserPage() {
       <PageHeader
         eyebrow="Manajemen Akun"
         title="Edit User & Profil Karyawan"
-        description="Perbarui informasi profil, keterangan jabatan, status karyawan (Permanent/Kontrak), dan lokasi penempatan kerja."
+        description="Ajukan perubahan profil, keterangan jabatan, status karyawan (Permanent/Kontrak), dan lokasi penempatan kerja. Perubahan dikirim ke manager lalu CISO lewat email, dan baru berlaku setelah keduanya menyetujui."
       />
 
       <EditUserView employees={employees} pendingIds={[...pendingIds]} />

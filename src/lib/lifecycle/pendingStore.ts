@@ -1,6 +1,11 @@
 import { readStore } from "@/lib/db/store";
 
-import { pendingByEmployee, type PendingByEmployee } from "./pending";
+import {
+  onboardingsInFlight,
+  pendingByEmployee,
+  type OnboardingInFlight,
+  type PendingByEmployee,
+} from "./pending";
 
 /**
  * The open-request index, read from the store.
@@ -21,4 +26,9 @@ export async function loadPendingByEmployee(): Promise<PendingByEmployee> {
 
 export async function loadPendingEmployeeIds(): Promise<Set<string>> {
   return new Set(Object.keys(await loadPendingByEmployee()));
+}
+
+export async function loadOnboardingsInFlight(): Promise<OnboardingInFlight[]> {
+  const { lifecycleRequests } = await readStore();
+  return onboardingsInFlight(lifecycleRequests);
 }

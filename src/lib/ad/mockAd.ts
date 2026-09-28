@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+import { processLock } from "@/lib/db/processShared";
+import { markStateFileSeen, readStateFile } from "@/lib/db/stateFile";
 
 import {
   AdError,
@@ -42,6 +45,18 @@ interface MockFile {
   accounts: AdAccountState[];
 }
 
+/**
+ * A DN in comparable form: components trimmed and lower-cased, compared whole.
+ * `CN=IT Security Approvers` must not match `CN=Former IT Security Approvers`.
+ */
+function normaliseDn(dn: string): string {
+  return dn
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean)
+    .join(",");
+}
+
 function resolvePath(): string {
   const configured = process.env.AD_MOCK_FILE?.trim() || "data/mock-ad.json";
   return path.isAbsolute(configured)
@@ -49,15 +64,23 @@ function resolvePath(): string {
     : path.join(/* turbopackIgnore: true */ process.cwd(), configured);
 }
 
+/**
+ * Where the simulated directory is kept. Exported for the first-run bootstrap,
+ * which has to tell "no directory yet" apart from "a directory with nothing in
+ * it" — the first is a fresh machine, the second is somebody's demo state.
+ */
+export function mockAdFilePath(): string {
+  return resolvePath();
+}
+
 async function load(): Promise<MockFile> {
-  try {
-    const raw = await readFile(resolvePath(), "utf8");
-    const parsed = JSON.parse(raw) as Partial<MockFile>;
-    return { accounts: parsed.accounts ?? [] };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { accounts: [] };
-    throw error;
-  }
+  // A missing directory file is only "empty" on a first run. One that vanished
+  // after being read throws instead — otherwise a create would persist a
+  // directory holding nothing but the new account. See lib/db/stateFile.ts.
+  const raw = await readStateFile(resolvePath());
+  if (raw === undefined) return { accounts: [] };
+  const parsed = JSON.parse(raw) as Partial<MockFile>;
+  return { accounts: parsed.accounts ?? [] };
 }
 
 async function persist(file: MockFile): Promise<void> {
@@ -66,19 +89,15 @@ async function persist(file: MockFile): Promise<void> {
   const tmp = `${target}.${randomUUID()}.tmp`;
   await writeFile(tmp, `${JSON.stringify(file, null, 2)}\n`, "utf8");
   await rename(tmp, target);
+  markStateFileSeen(target);
 }
 
-/** Serialises access the way the other stores do. */
-let queue: Promise<unknown> = Promise.resolve();
-
-function withLock<T>(task: () => Promise<T>): Promise<T> {
-  const result = queue.then(task, task);
-  queue = result.then(
-    () => undefined,
-    () => undefined,
-  );
-  return result;
-}
+/**
+ * Serialises access the way the other stores do, and like them across every
+ * module copy: the worker runs both from a route handler and from the sweep in
+ * instrumentation.ts. See lib/db/processShared.ts.
+ */
+const withLock = processLock("mock-ad");
 
 function sortGroups(groups: readonly string[]): string[] {
   return [...new Set(groups.map((group) => group.trim()).filter(Boolean))].sort();
@@ -154,6 +173,13 @@ export class MockAdDriver implements AdDriver {
     this.failIfFaulty();
     const { accounts } = await withLock(load);
     return accounts.find((account) => account.objectGUID === objectGUID);
+  }
+
+  async listGroupMembers(groupDn: string): Promise<AdAccountState[]> {
+    this.failIfFaulty();
+    const { accounts } = await withLock(load);
+    const wanted = normaliseDn(groupDn);
+    return accounts.filter((account) => account.groups.some((group) => normaliseDn(group) === wanted));
   }
 
   async createAccount(spec: AdCreateSpec): Promise<AdAccountState> {

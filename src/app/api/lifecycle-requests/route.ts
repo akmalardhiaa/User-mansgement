@@ -1,7 +1,12 @@
 import { requirePermission } from "@/lib/auth/guard";
 import { lifecycleFailure } from "@/lib/lifecycle/apiError";
 import { createDraft, listRequests } from "@/lib/lifecycle/service";
-import { LIFECYCLE_STATUSES, type LifecycleStatus, type LifecycleType } from "@/lib/lifecycle/types";
+import {
+  LIFECYCLE_STATUSES,
+  LIFECYCLE_TYPES,
+  type LifecycleStatus,
+  type LifecycleType,
+} from "@/lib/lifecycle/types";
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
 import { parseLifecycleRequestInput } from "@/lib/validation/lifecycleRequestInput";
 
@@ -20,10 +25,9 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
 
   const rawType = url.searchParams.get("type")?.toUpperCase();
-  const type =
-    rawType === "ONBOARDING" || rawType === "MOVEMENT" || rawType === "TERMINATION"
-      ? (rawType as LifecycleType)
-      : undefined;
+  const type = (LIFECYCLE_TYPES as readonly string[]).includes(rawType ?? "")
+    ? (rawType as LifecycleType)
+    : undefined;
 
   // Unknown status names are dropped rather than rejected: a stale bookmark
   // should narrow the list, not produce an error page.

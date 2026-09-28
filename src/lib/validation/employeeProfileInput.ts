@@ -1,16 +1,19 @@
-import type { EmployeeProfilePatch } from "@/lib/db/repository";
+import type { ProfileField, ProfileFields } from "@/lib/lifecycle/types";
+import { DATE_BOUNDS, checkDate } from "@/lib/validation/dates";
 
 /**
- * Validation for the edit-profile form, in the same shape as userInput.ts:
- * per-field errors the form renders inline, in the language of the UI.
+ * Validation for the edit-profile form: per-field errors the form renders
+ * inline, in the language of the UI.
+ *
+ * The profile is no longer written from here directly — it becomes the
+ * `profile` of a PROFILE_UPDATE request — but the rules for what a valid
+ * profile looks like are the same either way, so they live in one place.
  */
-
-export type ProfileField = keyof EmployeeProfilePatch;
 
 export type ProfileErrors = Partial<Record<ProfileField, string>>;
 
 export type ProfileResult =
-  | { ok: true; value: EmployeeProfilePatch }
+  | { ok: true; value: ProfileFields }
   | { ok: false; errors: ProfileErrors };
 
 const REQUIRED: ReadonlyArray<readonly [ProfileField, string, number, number]> = [
@@ -25,7 +28,7 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-export function parseEmployeeProfileInput(payload: unknown): ProfileResult {
+export function parseEmployeeProfileInput(payload: unknown, now = new Date()): ProfileResult {
   const body = (payload ?? {}) as Record<string, unknown>;
   const errors: ProfileErrors = {};
   const draft: Record<string, string> = {};
@@ -49,8 +52,9 @@ export function parseEmployeeProfileInput(payload: unknown): ProfileResult {
     // the record then looks permanent to everyone reading it later.
     if (!expiredDate) {
       errors.expiredDate = "Tanggal berakhir kontrak wajib diisi untuk karyawan kontrak.";
-    } else if (Number.isNaN(Date.parse(expiredDate))) {
-      errors.expiredDate = "Tanggal berakhir kontrak tidak valid.";
+    } else {
+      const check = checkDate(expiredDate, "Tanggal berakhir kontrak", DATE_BOUNDS.contractEnd, now);
+      if (!check.ok) errors.expiredDate = check.message;
     }
   }
 

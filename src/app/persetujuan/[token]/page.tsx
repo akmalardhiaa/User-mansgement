@@ -5,7 +5,7 @@ import {
 import { TokenDecisionForm } from "@/components/lifecycle/TokenDecisionForm";
 import { BrandMark } from "@/components/ui/BrandMark";
 import { Card } from "@/components/ui/Field";
-import { IconAlert } from "@/components/ui/Icons";
+import { IconAlert, IconCheck } from "@/components/ui/Icons";
 import { previewByToken } from "@/lib/lifecycle/service";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +59,19 @@ export default async function ApprovalPage({
     <div className="mx-auto w-full max-w-2xl space-y-6 py-4">
       <BrandMark />
 
-      {!result.ok ? (
+      {!result.ok && result.settled ? (
+        <Card className="p-8">
+          <p className="flex items-center gap-2 font-medium text-ok">
+            <IconCheck className="size-4" />
+            Sudah diputuskan
+          </p>
+          <p className="mt-2 max-w-prose text-sm text-ink-muted">{result.reason}</p>
+          <p className="mt-4 max-w-prose text-xs text-ink-faint">
+            Permintaan ini dikirim ke beberapa orang sekaligus, dan keputusan pertama yang masuk yang
+            berlaku. Tautan Anda otomatis tidak berlaku begitu keputusan itu tercatat.
+          </p>
+        </Card>
+      ) : !result.ok ? (
         <Card className="p-8">
           <p className="flex items-center gap-2 font-medium text-warn">
             <IconAlert className="size-4" />
@@ -88,6 +100,20 @@ export default async function ApprovalPage({
                 </p>
               </div>
             </div>
+
+            {result.preview.onBehalfOf ? (
+              <p className="mt-4 rounded-lg border border-accent/30 bg-accent/10 px-3.5 py-2.5 text-xs text-ink">
+                Anda memutuskan sebagai <strong>pengganti {result.preview.onBehalfOf}</strong> yang
+                sedang berhalangan. Keputusan tercatat atas nama Anda, sebagai pengganti.
+              </p>
+            ) : null}
+
+            {result.preview.teamSize ? (
+              <p className="mt-4 rounded-lg border border-info/30 bg-info/10 px-3.5 py-2.5 text-xs text-info">
+                Dikirim ke {result.preview.teamSize} anggota tim CISO. Keputusan pertama yang masuk
+                yang berlaku; tautan anggota lain otomatis tidak berlaku setelahnya.
+              </p>
+            ) : null}
 
             {result.preview.managerDecision ? (
               <p className="mt-4 rounded-lg border border-ok/30 bg-ok/10 px-3.5 py-2.5 text-xs text-ok">

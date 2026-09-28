@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { createAndSubmit } from "@/components/lifecycle/submitRequest";
+import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
 import { Button } from "@/components/ui/Button";
 import { Card, Field, SelectField, TextareaField } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
@@ -17,8 +17,10 @@ import {
 import { ManagerPicker } from "@/components/users/ManagerPicker";
 import { ACCESS_PROFILES } from "@/lib/lifecycle/accessProfiles";
 import type { LifecycleRequest } from "@/lib/lifecycle/types";
-import { DEPARTMENTS } from "@/lib/db/seed";
+import { ComboField } from "@/components/ui/ComboField";
+import { DEPARTMENT_GROUPS, JOB_TITLE_GROUPS } from "@/lib/db/seed";
 import type { Employee } from "@/lib/types";
+import { DATE_BOUNDS, dateInputBounds } from "@/lib/validation/dates";
 
 const SECTION =
   "mb-4 flex items-center gap-2 text-xs font-medium tracking-[0.14em] text-ink-faint uppercase";
@@ -34,23 +36,27 @@ const SECTION =
 export function MovementForm({
   employees,
   initialEmployeeId,
+  revise,
   onSubmitted,
 }: {
-  /** Already excludes anyone with a request in flight. */
+  /** Already excludes anyone with a request in flight — except when revising. */
   employees: Employee[];
   initialEmployeeId?: string;
+  /** The request being revised. Its subject is fixed; everything else starts from it. */
+  revise?: LifecycleRequest;
   onSubmitted: (request: LifecycleRequest) => void;
 }) {
-  const [employeeId, setEmployeeId] = useState(initialEmployeeId ?? "");
+  const previous = revise?.payload.kind === "MOVEMENT" ? revise.payload : undefined;
+  const [employeeId, setEmployeeId] = useState(previous?.employeeId ?? initialEmployeeId ?? "");
   const [values, setValues] = useState({
-    toDepartment: "",
-    toJobTitle: "",
-    toJobDescription: "",
-    toManagerName: "",
-    toManagerEmail: "",
-    accessProfileId: "standard",
-    reason: "",
-    effectiveAt: "",
+    toDepartment: previous?.toDepartment ?? "",
+    toJobTitle: previous?.toJobTitle ?? "",
+    toJobDescription: previous?.toJobDescription ?? "",
+    toManagerName: previous?.toManagerName ?? "",
+    toManagerEmail: previous?.toManagerEmail ?? "",
+    accessProfileId: previous?.accessProfileId ?? "standard",
+    reason: previous?.reason ?? "",
+    effectiveAt: revise?.effectiveAt?.slice(0, 10) ?? "",
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -74,13 +80,16 @@ export function MovementForm({
     setFormError(null);
     setFieldErrors({});
 
-    const result = await createAndSubmit({
+    const body = {
       type: "MOVEMENT",
       employeeId,
       ...values,
       toJobDescription: values.toJobDescription || undefined,
       effectiveAt: values.effectiveAt || undefined,
-    });
+    };
+    const result = revise
+      ? await reviseAndResubmit(revise.id, revise.version, body)
+      : await createAndSubmit(body);
 
     if (result.ok) {
       onSubmitted(result.request);
@@ -116,7 +125,12 @@ export function MovementForm({
             value={employeeId}
             onChange={(event) => setEmployeeId(event.target.value)}
             error={fieldErrors.employeeId}
-            hint="Karyawan yang sedang memiliki pengajuan berjalan tidak muncul di sini."
+            disabled={Boolean(revise)}
+            hint={
+              revise
+                ? "Karyawan tidak bisa diganti lewat revisi. Batalkan dan buat pengajuan baru bila salah orang."
+                : "Karyawan yang sedang memiliki pengajuan berjalan tidak muncul di sini."
+            }
           >
             <option value="">Pilih karyawan…</option>
             {employees.map((candidate) => (
@@ -137,9 +151,9 @@ export function MovementForm({
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-hairline bg-elevated/40 text-xs tracking-wide text-ink-faint uppercase">
-                    <th className="px-4 py-2.5 font-medium">Atribut</th>
-                    <th className="px-4 py-2.5 font-medium">Sekarang</th>
-                    <th className="px-4 py-2.5 font-medium">Menjadi</th>
+                    <th className="px-3 py-2.5 sm:px-4 font-medium">Atribut</th>
+                    <th className="px-3 py-2.5 sm:px-4 font-medium">Sekarang</th>
+                    <th className="px-3 py-2.5 sm:px-4 font-medium">Menjadi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -147,12 +161,12 @@ export function MovementForm({
                     const changed = after !== "—" && before !== after;
                     return (
                       <tr key={label} className="border-b border-hairline/60 last:border-0">
-                        <td className="px-4 py-2.5 text-ink-muted">{label}</td>
-                        <td className="px-4 py-2.5 text-ink-muted line-through decoration-ink-faint/60">
+                        <td className="px-3 py-2.5 sm:px-4 text-ink-muted">{label}</td>
+                        <td className="px-3 py-2.5 sm:px-4 text-ink-muted line-through decoration-ink-faint/60">
                           {before}
                         </td>
                         <td
-                          className={`px-4 py-2.5 font-medium ${changed ? "text-accent" : "text-ink-faint"}`}
+                          className={`px-3 py-2.5 sm:px-4 font-medium ${changed ? "text-accent" : "text-ink-faint"}`}
                         >
                           {after}
                         </td>
@@ -171,35 +185,34 @@ export function MovementForm({
             Posisi tujuan
           </p>
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field
+            <ComboField
               label="Departemen tujuan"
               name="toDepartment"
-              list="movement-departments"
+              groups={DEPARTMENT_GROUPS}
               icon={<IconBuilding className="size-4" />}
               value={values.toDepartment}
-              onChange={(event) => update("toDepartment", event.target.value)}
+              onChange={(next) => update("toDepartment", next)}
               error={fieldErrors.toDepartment}
+              hint="Pilih dari daftar, atau ketik divisi baru."
             />
-            <datalist id="movement-departments">
-              {DEPARTMENTS.map((department) => (
-                <option key={department} value={department} />
-              ))}
-            </datalist>
 
-            <Field
+            <ComboField
               label="Jabatan tujuan"
               name="toJobTitle"
+              groups={JOB_TITLE_GROUPS}
               icon={<IconBriefcase className="size-4" />}
               value={values.toJobTitle}
-              onChange={(event) => update("toJobTitle", event.target.value)}
+              onChange={(next) => update("toJobTitle", next)}
               error={fieldErrors.toJobTitle}
               placeholder="Security Engineer"
+              hint="Pilih dari daftar, atau ketik jabatan baru."
             />
 
             <Field
               label="Waktu efektif (opsional)"
               name="effectiveAt"
               type="date"
+              {...dateInputBounds(DATE_BOUNDS.effectiveAt)}
               icon={<IconClock className="size-4" />}
               value={values.effectiveAt}
               onChange={(event) => update("effectiveAt", event.target.value)}
@@ -274,7 +287,7 @@ export function MovementForm({
 
         <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
           <Button type="submit" loading={submitting} disabled={!employeeId}>
-            {submitting ? "Mengirim…" : "Kirim ke approver"}
+            {submitting ? "Mengirim…" : revise ? "Kirim revisi ke approver" : "Kirim ke approver"}
           </Button>
           <p className="text-xs text-ink-faint">
             Posisi belum berubah. Direktori tetap menampilkan posisi sekarang sampai perubahan

@@ -66,6 +66,7 @@ async function seed(events: OutboxEvent[]): Promise<void> {
     outboxEvents: events,
     emailDeliveries: [],
     approvalTokens: [],
+    delegations: [],
     auditEvents: [],
   };
   await writeFile(storePath, JSON.stringify(store, null, 2), "utf8");

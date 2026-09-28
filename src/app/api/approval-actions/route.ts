@@ -1,5 +1,8 @@
+import { after } from "next/server";
+
 import { lifecycleFailure } from "@/lib/lifecycle/apiError";
 import { decideByToken } from "@/lib/lifecycle/service";
+import { kickWorkerAfterApproval } from "@/lib/lifecycle/workerScheduler";
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +41,11 @@ export async function POST(request: Request) {
       decision,
       reason: typeof body?.reason === "string" ? body.reason : undefined,
     });
+
+    // The approval that queues a request also starts carrying it out, after the
+    // response has gone: the approver is not kept waiting on the directory, and
+    // a new hire's account exists seconds after the CISO answers.
+    if (updated.status === "QUEUED") after(kickWorkerAfterApproval);
 
     // Deliberately thin: the response to an emailed action says what happened
     // and nothing else. No payload, no approver list, no token echoed back.

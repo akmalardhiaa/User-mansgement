@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 
 import { AccessDenied } from "@/components/auth/AccessDenied";
 import { CancelRequestButton } from "@/components/lifecycle/CancelRequestButton";
-import { DecisionPanel } from "@/components/lifecycle/DecisionPanel";
 import {
   LifecycleStatusBadge,
   LifecycleTypeBadge,
@@ -13,13 +12,14 @@ import { ExecutionTimeline } from "@/components/lifecycle/ExecutionTimeline";
 import { RequestPayloadSummary } from "@/components/lifecycle/RequestPayloadSummary";
 import { RetryButton } from "@/components/lifecycle/RetryButton";
 import { RunWorkerButton } from "@/components/lifecycle/RunWorkerButton";
+import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requirePageSession } from "@/lib/auth/current";
 import { hasPermission } from "@/lib/auth/roles";
 import { isSamePerson } from "@/lib/lifecycle/routing";
 import { LifecycleError, auditTrailFor, getRequest, identityOf } from "@/lib/lifecycle/service";
-import { canTransition, stageAwaiting } from "@/lib/lifecycle/stateMachine";
+import { canTransition } from "@/lib/lifecycle/stateMachine";
 import { deliveriesForRequest } from "@/lib/lifecycle/dispatcher";
 import { jobsForRequest } from "@/lib/lifecycle/worker";
 
@@ -39,6 +39,7 @@ const AUDIT_LABEL: Record<string, string> = {
   "request.approved": "Disetujui",
   "request.rejected": "Ditolak",
   "request.revised": "Direvisi",
+  "request.rerouted": "Dialihkan ke pengganti manager (delegasi)",
   "request.cancelled": "Dibatalkan",
   "request.queued": "Masuk antrean eksekusi",
   "request.scheduled": "Dijadwalkan",
@@ -84,20 +85,19 @@ export default async function RequestDetailPage({
   const me = identityOf(session);
   const canRun = hasPermission(session.roles, "execution.run");
 
-  const awaiting = stageAwaiting(request.status);
-  const myStep = awaiting
-    ? request.approvals.find(
-        (step) => step.stage === awaiting && step.version === request.version,
-      )
-    : undefined;
-  const canDecide =
-    Boolean(myStep && isSamePerson(myStep.approver, me)) &&
-    hasPermission(session.roles, awaiting === "MANAGER" ? "approval.manager" : "approval.ciso");
+  // Nobody decides from here. Both approvals come from the email, and this page
+  // only shows who was asked and who answered.
 
   const canCancel =
     isSamePerson(request.requester, me) &&
     hasPermission(session.roles, "request.cancel") &&
     canTransition(request.status, "CANCELLED");
+
+  // Offered, not granted: the revise endpoint re-checks all three.
+  const canRevise =
+    isSamePerson(request.requester, me) &&
+    hasPermission(session.roles, "request.create") &&
+    (request.status === "DRAFT" || canTransition(request.status, "DRAFT"));
 
   return (
     <div className="space-y-6">
@@ -152,8 +152,6 @@ export default async function RequestDetailPage({
         </div>
       ) : null}
 
-      {canDecide && awaiting ? <DecisionPanel request={request} stage={awaiting} /> : null}
-
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-6">
           <Card className="p-6">
@@ -203,19 +201,40 @@ export default async function RequestDetailPage({
                     {step.stage === "MANAGER" ? "1. Manager" : "2. CISO"}
                   </p>
                   <p className="text-sm font-medium text-ink">{step.approver.name}</p>
-                  <p className="font-mono text-[11px] break-all text-ink-muted">
-                    {step.approver.email}
-                  </p>
+                  {step.onBehalfOf ? (
+                    <p className="text-xs text-ink-muted">
+                      Pengganti untuk {step.onBehalfOf.name} (delegasi)
+                    </p>
+                  ) : null}
+                  {step.pool?.length ? (
+                    <ul className="space-y-0.5">
+                      {step.pool.map((member) => (
+                        <li key={member.email} className="font-mono text-[11px] break-all text-ink-muted">
+                          {member.name !== member.email ? `${member.name} · ` : ""}
+                          {member.email}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="font-mono text-[11px] break-all text-ink-muted">
+                      {step.approver.email}
+                    </p>
+                  )}
                   {step.decision ? (
                     <p
                       className={`text-xs ${step.decision === "APPROVED" ? "text-ok" : "text-danger"}`}
                     >
                       {step.decision === "APPROVED" ? "Disetujui" : "Ditolak"}
+                      {step.pool?.length && step.decidedBy ? ` oleh ${step.decidedBy.name}` : ""}
                       {step.decidedAt ? ` · ${formatDate(step.decidedAt)}` : ""}
                       {step.reason ? ` — ${step.reason}` : ""}
                     </p>
                   ) : (
-                    <p className="text-xs text-ink-faint">Belum memutuskan</p>
+                    <p className="text-xs text-ink-faint">
+                      {step.pool?.length
+                        ? "Menunggu — keputusan pertama dari anggota tim yang berlaku"
+                        : "Belum memutuskan"}
+                    </p>
                   )}
                 </li>
               ))}
@@ -249,6 +268,21 @@ export default async function RequestDetailPage({
                 </div>
               ))}
             </dl>
+
+            {canRevise ? (
+              <div className="mt-4 space-y-2 border-t border-hairline pt-4">
+                <Link
+                  href={`/pengajuan/${request.id}/revisi`}
+                  className={buttonClasses("secondary")}
+                >
+                  Revisi pengajuan
+                </Link>
+                <p className="text-xs text-ink-faint">
+                  Revisi membatalkan persetujuan yang sudah ada dan otomatis mengirim email
+                  persetujuan baru ke manager.
+                </p>
+              </div>
+            ) : null}
 
             {canCancel ? (
               <div className="mt-4 border-t border-hairline pt-4">

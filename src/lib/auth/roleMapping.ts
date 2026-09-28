@@ -14,10 +14,14 @@ import { PORTAL_ROLES, type PortalRole } from "./roles";
  * able to see, in one place, exactly which groups confer authority here.
  */
 
+/*
+ * No group maps to an approver role any more — there are none. Membership of a
+ * managers' or security group grants nothing in this portal; approvers decide
+ * from their email. `AD_GROUP_MANAGER` and `AD_GROUP_CISO`, if still set, are
+ * ignored rather than honoured.
+ */
 const ROLE_GROUP_ENV: Record<PortalRole, string> = {
   HC_REQUESTER: "AD_GROUP_HC",
-  MANAGER: "AD_GROUP_MANAGER",
-  CISO_APPROVER: "AD_GROUP_CISO",
   SYSTEM_ADMIN: "AD_GROUP_ADMIN",
   OPS_OPERATOR: "AD_GROUP_OPS",
   AUDITOR: "AD_GROUP_AUDITOR",

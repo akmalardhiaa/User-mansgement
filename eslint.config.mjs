@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // One-off scripts kept for reference — the codemod that replaced the native
+    // selects lives here. Not shipped, not imported, and not worth holding to
+    // the application's rules.
+    "scratch/**",
   ]),
 ]);
 

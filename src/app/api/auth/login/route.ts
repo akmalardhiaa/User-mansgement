@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
 import { authenticateAD } from "@/lib/auth/ad";
+import { portalRolesOf } from "@/lib/auth/roles";
 import { SESSION_COOKIE, createSession, sessionCookieOptions } from "@/lib/auth/session";
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
 import { preflight, withCors } from "@/lib/http/cors";
@@ -57,6 +58,27 @@ export async function POST(request: Request) {
     // One message for both an unknown account and a wrong password, so the
     // response never reveals which usernames exist.
     if (!user) return withCors(fail("Username atau kata sandi salah.", 401), request);
+
+    /*
+     * Only HC signs in here. Every other employee — managers and the CISO team
+     * included — is a valid AD account with no business in this portal: they
+     * approve from the email they are sent, and never need a session.
+     *
+     * Refused before any session exists. The message is specific on purpose:
+     * a manager told "wrong password" would reset a password that works and
+     * file a ticket about it. The rate limit is NOT reset here, so this answer
+     * cannot be used to test passwords faster than a failed login would.
+     */
+    if (portalRolesOf(user.roles).length === 0) {
+      return withCors(
+        fail(
+          "Portal ini hanya untuk tim Human Capital. Manager dan tim CISO memberikan persetujuan langsung dari email yang mereka terima.",
+          403,
+          { code: "NOT_A_PORTAL_USER" },
+        ),
+        request,
+      );
+    }
 
     const { id, maxAgeSeconds } = await createSession({
       userId: user.id,

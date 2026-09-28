@@ -34,6 +34,13 @@ export interface ApprovalTokenRecord {
   requestId: string;
   version: number;
   stage: ApprovalStage;
+  /**
+   * The address this link was emailed to. A stage sent to a team issues one
+   * link per member, and this is how the decision is credited to the member
+   * whose link was used rather than to "the team". Absent on links issued
+   * before teams existed, which were always for one named approver.
+   */
+  recipient?: string;
   expiresAt: string;
   consumedAt?: string;
   revokedAt?: string;
@@ -62,6 +69,7 @@ export function issueToken(
   version: number,
   stage: ApprovalStage,
   now = new Date(),
+  recipient?: string,
 ): IssuedToken {
   const raw = randomBytes(32).toString("base64url");
 
@@ -72,6 +80,7 @@ export function issueToken(
       requestId,
       version,
       stage,
+      recipient: recipient?.trim().toLowerCase() || undefined,
       expiresAt: new Date(now.getTime() + ttlMs()).toISOString(),
       createdAt: now.toISOString(),
     },

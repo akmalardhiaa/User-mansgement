@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { AccessDenied } from "@/components/auth/AccessDenied";
 import { NewRequestView } from "@/components/lifecycle/NewRequestView";
@@ -24,8 +25,12 @@ export default async function NewRequestPage({
   }
 
   const { type, employeeId } = await searchParams;
-  const initialType = (LIFECYCLE_TYPES as readonly string[]).includes(String(type).toUpperCase())
-    ? (String(type).toUpperCase() as LifecycleType)
+  const requested = String(type).toUpperCase();
+  // A profile update is raised from the edit-profile screen, which has the
+  // record to diff against; this page has no form for it.
+  if (requested === "PROFILE_UPDATE") redirect("/users/edit");
+  const initialType = (LIFECYCLE_TYPES as readonly string[]).includes(requested)
+    ? (requested as LifecycleType)
     : undefined;
 
   const [employees, pendingIds] = await Promise.all([listEmployees(), loadPendingEmployeeIds()]);

@@ -31,7 +31,7 @@ const EmployeeReportModal = dynamic(
 import { Button } from "@/components/ui/Button";
 import { IconArrowUp, IconSearch, IconSwap } from "@/components/ui/Icons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { SORT_LABELS, type SortDirection, type SortKey } from "@/lib/dashboard/directory";
+import { SORT_LABELS, isNewEmployee, type SortDirection, type SortKey } from "@/lib/dashboard/directory";
 import type { PendingByEmployee } from "@/lib/lifecycle/pending";
 import { TRANSITION, TRANSITION_FAST } from "@/lib/motion";
 import type { Employee } from "@/lib/types";
@@ -80,6 +80,15 @@ function initials(name: string): string {
   );
 }
 
+/** Marks somebody whose account was created in the last day. */
+function NewBadge() {
+  return (
+    <span className="shrink-0 rounded-md border border-ok/30 bg-ok/10 px-1.5 py-0.5 text-[10px] font-semibold text-ok">
+      Baru
+    </span>
+  );
+}
+
 /** Columns that map onto a sort key, so their headers are buttons. */
 const COLUMNS: ReadonlyArray<{ key: SortKey; className?: string }> = [
   { key: "name" },
@@ -87,6 +96,43 @@ const COLUMNS: ReadonlyArray<{ key: SortKey; className?: string }> = [
   { key: "department" },
   { key: "status" },
 ];
+
+/**
+ * Nothing to show, and which of the two reasons it is.
+ *
+ * Lifted out of the table body, because the table is hidden on a narrow screen
+ * and an empty state that only exists inside it would leave a phone staring at
+ * blank space — the one moment the reader most needs to be told something.
+ */
+function EmptyState({ filtered, onReset }: { filtered: boolean; onReset: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={TRANSITION}
+      className="flex flex-col items-center gap-3 px-4 py-16 text-center"
+    >
+      <motion.span
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ ...TRANSITION, delay: 0.06 }}
+        className="grid size-12 place-items-center rounded-full border border-hairline bg-elevated/60 text-ink-faint"
+      >
+        <IconSearch className="size-5" />
+      </motion.span>
+      <p className="text-sm text-ink-muted">
+        {filtered
+          ? "Tidak ada karyawan yang cocok dengan filter ini."
+          : "Direktori masih kosong."}
+      </p>
+      {filtered ? (
+        <Button variant="ghost" size="sm" onClick={onReset}>
+          Hapus semua filter
+        </Button>
+      ) : null}
+    </motion.div>
+  );
+}
 
 export function EmployeeTable({
   employees,
@@ -102,7 +148,7 @@ export function EmployeeTable({
   const [reportEmployee, setReportEmployee] = useState<Employee | null>(null);
 
   return (
-    <div className="relative overflow-x-auto">
+    <div className="relative">
       <EmployeeDetailDrawer
         employee={drawerEmployee}
         pending={drawerEmployee ? pending[drawerEmployee.id] : undefined}
@@ -113,6 +159,84 @@ export function EmployeeTable({
 
       <EmployeeReportModal employee={reportEmployee} onClose={() => setReportEmployee(null)} />
 
+      {employees.length === 0 ? <EmptyState filtered={filtered} onReset={onReset} /> : null}
+
+      {/*
+       * Below `lg` the roster is a list of cards, not a table.
+       *
+       * Six columns need 58rem to sit side by side without being crushed, so on a
+       * phone this was a desktop table you dragged sideways: roughly two fifths of
+       * a row visible at a time, and a horizontal scroll for every person you
+       * wanted to read. Nothing is lost by hiding it — sorting lives in the
+       * toolbar above rather than in these column headers, so it stays reachable.
+       */}
+      {employees.length > 0 ? (
+        <ul className="divide-y divide-hairline/60 lg:hidden">
+          <AnimatePresence initial={false}>
+            {employees.map((employee, index) => {
+              const marker = pending[employee.id];
+              return (
+                <motion.li
+                  key={employee.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                    transition: { ...TRANSITION, delay: Math.min(index * 0.025, 0.24) },
+                  }}
+                  exit={{ opacity: 0, y: -6, transition: TRANSITION_FAST }}
+                  onClick={() => setDrawerEmployee(employee)}
+                  className="cursor-pointer px-4 py-3.5 transition-colors hover:bg-elevated/50"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-full border border-hairline-strong bg-elevated text-xs font-semibold text-ink-muted">
+                      {initials(employee.displayName)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-center gap-1.5 truncate font-medium text-ink">
+                        <span className="truncate">{employee.displayName}</span>
+                        {isNewEmployee(employee) ? <NewBadge /> : null}
+                      </p>
+                      <p className="truncate text-xs text-ink-faint">{employee.email}</p>
+                    </div>
+                    <StatusBadge status={employee.status} />
+                  </div>
+
+                  <p className="mt-2 pl-12 text-xs break-words text-ink-muted">
+                    {employee.jobTitle} · {employee.department}
+                  </p>
+
+                  <div
+                    className="mt-2.5 flex flex-wrap items-center gap-2 pl-12"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {marker ? <PendingBadge marker={marker} /> : null}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDrawerEmployee(employee)}
+                      title="Lihat profil detail karyawan"
+                    >
+                      Detail
+                    </Button>
+                    {canRequest && !marker ? (
+                      <Link
+                        href={`/pengajuan/baru?type=MOVEMENT&employeeId=${employee.id}`}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-hairline-strong bg-elevated px-2.5 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent/50"
+                      >
+                        <IconSwap className="size-3.5" />
+                        Ajukan perubahan
+                      </Link>
+                    ) : null}
+                  </div>
+                </motion.li>
+              );
+            })}
+          </AnimatePresence>
+        </ul>
+      ) : null}
+
+      <div className="hidden overflow-x-auto lg:block">
       <table className="w-full min-w-[58rem] text-left text-sm">
         <thead>
           <tr className="border-b border-hairline text-xs tracking-wide text-ink-faint uppercase">
@@ -190,8 +314,9 @@ export function EmployeeTable({
                         {initials(employee.displayName)}
                       </span>
                       <span className="min-w-0">
-                        <span className="block truncate font-medium text-ink transition-colors group-hover:text-accent">
-                          {employee.displayName}
+                        <span className="flex items-center gap-1.5 font-medium text-ink transition-colors group-hover:text-accent">
+                          <span className="truncate">{employee.displayName}</span>
+                          {isNewEmployee(employee) ? <NewBadge /> : null}
                         </span>
                         <span className="block truncate text-xs text-ink-faint">
                           {employee.email}
@@ -237,39 +362,9 @@ export function EmployeeTable({
               );
             })}
           </AnimatePresence>
-
-          {employees.length === 0 ? (
-            <motion.tr
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={TRANSITION}
-            >
-              <td colSpan={6} className="px-4 py-16">
-                <div className="flex flex-col items-center gap-3 text-center">
-                  <motion.span
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ ...TRANSITION, delay: 0.06 }}
-                    className="grid size-12 place-items-center rounded-full border border-hairline bg-elevated/60 text-ink-faint"
-                  >
-                    <IconSearch className="size-5" />
-                  </motion.span>
-                  <p className="text-sm text-ink-muted">
-                    {filtered
-                      ? "Tidak ada karyawan yang cocok dengan filter ini."
-                      : "Direktori masih kosong."}
-                  </p>
-                  {filtered ? (
-                    <Button variant="ghost" size="sm" onClick={onReset}>
-                      Hapus semua filter
-                    </Button>
-                  ) : null}
-                </div>
-              </td>
-            </motion.tr>
-          ) : null}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

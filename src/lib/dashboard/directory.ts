@@ -44,9 +44,23 @@ export const DEFAULT_FILTERS: DirectoryFilters = {
   query: "",
   status: "ALL",
   department: "ALL",
-  sort: "name",
+  /*
+   * Most recently changed first, not A–Z. Sorted by name, a new hire the worker
+   * had just created landed somewhere in the middle of the roster, and HC —
+   * looking at the top of the page for the person they had just onboarded —
+   * concluded it had not worked. Clicking "Nama" still sorts alphabetically.
+   */
+  sort: "updated",
   direction: "asc",
 };
+
+const NEW_FOR_MS = 24 * 60 * 60 * 1000;
+
+/** Created in the last day — flagged in the table so a new hire is easy to spot. */
+export function isNewEmployee(employee: Pick<Employee, "createdAt">, now = Date.now()): boolean {
+  const created = Date.parse(employee.createdAt);
+  return Number.isFinite(created) && now - created >= 0 && now - created < NEW_FOR_MS;
+}
 
 /**
  * Coerces anything that arrives over the wire into a usable filter.

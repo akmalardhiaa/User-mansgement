@@ -50,6 +50,7 @@ const TYPE_LABEL: Record<LifecycleType, string> = {
   ONBOARDING: "Onboarding",
   MOVEMENT: "Movement",
   TERMINATION: "Termination",
+  PROFILE_UPDATE: "Perubahan Profil",
 };
 
 const STATUS_LABEL: Partial<Record<LifecycleStatus, string>> = {
@@ -69,4 +70,45 @@ export function pendingLabel(marker: PendingMarker): string {
 
 export function lifecycleTypeLabel(type: LifecycleType): string {
   return TYPE_LABEL[type];
+}
+
+/**
+ * Somebody being onboarded, for the dashboard, before they have an account.
+ *
+ * The directory table lists accounts, and this person has none yet — putting
+ * them in it would say an account exists that no directory has confirmed. But
+ * HC raised the request and wants to see it the moment they did, so the
+ * dashboard shows these separately, as what they are: a person on their way
+ * in, at a named step, with no account until the worker has made one.
+ */
+export interface OnboardingInFlight {
+  requestId: string;
+  displayName: string;
+  email: string;
+  jobTitle: string;
+  department: string;
+  managerName: string;
+  status: LifecycleStatus;
+  effectiveAt?: string;
+  createdAt: string;
+}
+
+export function onboardingsInFlight(requests: readonly LifecycleRequest[]): OnboardingInFlight[] {
+  return requests
+    .filter((request) => request.payload.kind === "ONBOARDING" && isActive(request.status))
+    .map((request) => {
+      const payload = request.payload as Extract<LifecycleRequest["payload"], { kind: "ONBOARDING" }>;
+      return {
+        requestId: request.id,
+        displayName: payload.displayName,
+        email: payload.email,
+        jobTitle: payload.jobTitle,
+        department: payload.department,
+        managerName: request.approvals[0]?.approver.name ?? payload.managerName,
+        status: request.status,
+        effectiveAt: request.effectiveAt,
+        createdAt: request.createdAt,
+      };
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

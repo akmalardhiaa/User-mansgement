@@ -1,11 +1,4 @@
-import type {
-  InputHTMLAttributes,
-  ReactNode,
-  SelectHTMLAttributes,
-  TextareaHTMLAttributes,
-} from "react";
-
-import { IconChevron } from "@/components/ui/Icons";
+import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
 
 /**
  * The one place a form control's appearance is defined.
@@ -30,7 +23,7 @@ const WITH_ICON = "pl-9";
  * the focus state rather than decoration sitting next to one. `group-focus-within`
  * does the work — no state, no handlers.
  */
-function LeadingIcon({ children, align = "center" }: { children: ReactNode; align?: "center" | "top" }) {
+export function LeadingIcon({ children, align = "center" }: { children: ReactNode; align?: "center" | "top" }) {
   return (
     <span
       aria-hidden
@@ -43,7 +36,7 @@ function LeadingIcon({ children, align = "center" }: { children: ReactNode; alig
   );
 }
 
-interface FieldShellProps {
+export interface FieldShellProps {
   label: string;
   name: string;
   error?: string;
@@ -53,7 +46,7 @@ interface FieldShellProps {
 }
 
 /** Label, control, and whichever of the error or hint applies. */
-function FieldShell({ label, name, error, hint, className = "", children }: FieldShellProps) {
+export function FieldShell({ label, name, error, hint, className = "", children }: FieldShellProps) {
   return (
     <div className={className}>
       <label htmlFor={name} className="mb-1.5 block text-sm font-medium text-ink">
@@ -74,7 +67,7 @@ function FieldShell({ label, name, error, hint, className = "", children }: Fiel
   );
 }
 
-function describedBy(name: string, error?: string, hint?: ReactNode): string | undefined {
+export function describedBy(name: string, error?: string, hint?: ReactNode): string | undefined {
   if (error) return `${name}-error`;
   if (hint) return `${name}-hint`;
   return undefined;
@@ -106,50 +99,7 @@ export function Field({ label, name, error, hint, icon, className = "", ...props
   );
 }
 
-interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
-  label: string;
-  name: string;
-  error?: string;
-  hint?: ReactNode;
-  icon?: ReactNode;
-  children: ReactNode;
-}
-
-/**
- * A native `<select>`, deliberately. A custom listbox would be another thousand
- * lines of keyboard and screen-reader handling to arrive back where the platform
- * already is; only the arrow is replaced, because the browser's own does not
- * take the palette.
- */
-export function SelectField({
-  label,
-  name,
-  error,
-  hint,
-  icon,
-  className = "",
-  children,
-  ...props
-}: SelectFieldProps) {
-  return (
-    <FieldShell label={label} name={name} error={error} hint={hint} className={className}>
-      {icon ? <LeadingIcon>{icon}</LeadingIcon> : null}
-      <select
-        id={name}
-        name={name}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy(name, error, hint)}
-        className={`${CONTROL_CLASSES} appearance-none pr-9 ${icon ? WITH_ICON : ""} ${
-          error ? "border-danger/60" : ""
-        }`}
-        {...props}
-      >
-        {children}
-      </select>
-      <IconChevron className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-ink-faint" />
-    </FieldShell>
-  );
-}
+export { SelectField } from "./SelectField";
 
 interface TextareaFieldProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;

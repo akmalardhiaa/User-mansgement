@@ -1,8 +1,21 @@
 # One command to run the portal:
 #
-#   docker compose up --build
+#   docker compose up
 #
 # Then open http://localhost:3000 and sign in as ayu.prameswari / mock12345.
+#
+# That one command is meant to be the whole story, so two things below exist to
+# keep it true. The source is mounted, so editing a file does not need a rebuild
+# — `next dev` inside the container reads the same files you edit. And the
+# configuration has a committed layer of demo defaults underneath the local one,
+# so a fresh clone with no .env.docker still starts.
+#
+# The exception is dependencies and the build configuration: a changed
+# package.json, lockfile, next.config.ts or tsconfig.json needs
+#
+#   docker compose up --build
+#
+# because those are installed or baked into the image, not mounted.
 
 services:
   portal:
@@ -18,12 +31,38 @@ services:
     ports:
       - "3000:3000"
 
-    # Secrets arrive at run time, never in a layer. .dockerignore keeps .env*
-    # out of the build context entirely, so this file is the only way in.
+    # Two layers, and the order is the point. The example file is committed and
+    # holds the demo defaults — mock directory, email written to files, nothing
+    # secret — so `docker compose up` works on a machine that has just cloned
+    # this and has no .env.docker yet. The local file is read second, so every
+    # value it sets wins, and it is the only place the SMTP password lives.
+    #
+    # Secrets arrive at run time, never in a layer: .dockerignore keeps .env*
+    # out of the build context entirely, so this is the only way in.
     env_file:
-      - .env.docker
+      - path: .env.docker.example
+        required: true
+      - path: .env.docker
+        required: false
 
     volumes:
+      # The application's own code, so changing it needs no rebuild: the
+      # container compiles the same files you edit.
+      #
+      # Directories, deliberately — not the whole project. Mounting `.` would
+      # put the host's node_modules (Windows binaries) over the image's Linux
+      # one, and shadowing it back out takes an anonymous volume that Compose
+      # then REUSES on every recreate — so `--build` after adding a dependency
+      # would install it into the image and the container would keep running the
+      # old modules. Nothing here shadows anything, so that trap does not exist.
+      #
+      # The cost is that a new top-level directory needs a line here, and that
+      # next.config.ts, tsconfig.json and package.json are baked into the image:
+      # changing one of those means `--build`.
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./scripts:/app/scripts
+
       # The state the portal actually owns: the employee roster, server-side
       # sessions, the simulated directory, and the file-driver outbox. Bound to
       # the host so it survives `docker compose down` — and so the accounts

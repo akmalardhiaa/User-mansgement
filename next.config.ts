@@ -73,6 +73,17 @@ const nextConfig: NextConfig = isStaticExport
     }
   : {
       distDir,
+      /*
+       * The floating development badge, off.
+       *
+       * This container runs `next dev` deliberately (see the Dockerfile), and
+       * that badge was the only thing saying so on screen — a "Rendering…"
+       * pill and an N button in the corner of every page, including during a
+       * demo. Next still surfaces compile and runtime errors with this off, so
+       * nothing is being hidden except the ornament. Set it to
+       * `{ position: "bottom-left" }` to bring it back.
+       */
+      devIndicators: false,
       async headers() {
         return [{ source: "/:path*", headers: securityHeaders }];
       },
