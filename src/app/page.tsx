@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { requirePageSession } from "@/lib/auth/current";
 import { hasPermission } from "@/lib/auth/roles";
 import { listEmployees } from "@/lib/db/repository";
-import { loadPendingByEmployee } from "@/lib/lifecycle/pendingStore";
+import { loadOnboardingsInFlight, loadPendingByEmployee } from "@/lib/lifecycle/pendingStore";
 
 // The roster changes as HC edits it, so never serve a prerendered snapshot.
 export const dynamic = "force-dynamic";
@@ -23,8 +23,15 @@ export default async function DashboardPage() {
 
   // The roster and what is in flight against it, read together so the page
   // cannot render an account state and a request state from different moments.
-  const [employees, pending] = await Promise.all([listEmployees(), loadPendingByEmployee()]);
+  const [employees, pending, onboardings] = await Promise.all([
+    listEmployees(),
+    loadPendingByEmployee(),
+    // Shown the moment they are raised, beside — not inside — the table of
+    // accounts: none of them has an account yet.
+    loadOnboardingsInFlight(),
+  ]);
   const canRequest = hasPermission(session.roles, "request.create");
+  const canRun = hasPermission(session.roles, "execution.run");
 
   return (
     <div className="space-y-6">
@@ -65,7 +72,13 @@ export default async function DashboardPage() {
         }
       />
 
-      <DirectoryView employees={employees} pending={pending} canRequest={canRequest} />
+      <DirectoryView
+        employees={employees}
+        pending={pending}
+        onboardings={onboardings}
+        canRequest={canRequest}
+        canRun={canRun}
+      />
     </div>
   );
 }

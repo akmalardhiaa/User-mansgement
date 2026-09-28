@@ -41,3 +41,25 @@ export async function createAndSubmit(body: Record<string, unknown>): Promise<Su
 
   return { ok: true, request: submitted.data.request };
 }
+
+/**
+ * Revising is one call, not two.
+ *
+ * The server replaces the payload and sends the new version back to the manager
+ * in a single transaction, so there is no in-between draft to leave behind if
+ * the resubmit is refused — the request simply stays as it was. `version` is
+ * the one this screen loaded; if somebody revised it since, the server refuses
+ * rather than letting this tab overwrite text its user never saw.
+ */
+export async function reviseAndResubmit(
+  requestId: string,
+  version: number,
+  body: Record<string, unknown>,
+): Promise<SubmitOutcome> {
+  const revised = await postJson<{ request: LifecycleRequest }>(
+    `/api/lifecycle-requests/${requestId}/revise`,
+    { ...body, version },
+  );
+  if (!revised.ok) return { ok: false, failure: revised.failure };
+  return { ok: true, request: revised.data.request };
+}

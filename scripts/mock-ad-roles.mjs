@@ -72,7 +72,52 @@ const ROLES = [
     label: "CISO_APPROVER",
     accounts: ["bagus.nugroho"],
   },
+  {
+    env: "AD_GROUP_OPS",
+    fallback: "CN=HC Portal Ops,OU=Groups,DC=corp,DC=example,DC=com",
+    label: "OPS_OPERATOR",
+    // Nobody by default. The three-person chain does not need an operator,
+    // and a role granted to somebody who never exercises it is a role nobody
+    // notices is wrong. Reachable through --super.
+    accounts: [],
+  },
+  {
+    env: "AD_GROUP_AUDITOR",
+    fallback: "CN=Internal Audit,OU=Groups,DC=corp,DC=example,DC=com",
+    label: "AUDITOR",
+    accounts: [],
+  },
 ];
+
+/*
+ * One account holding every role, for walking the whole portal without
+ * signing in and out. `--super` alone takes the HC lead; `--super <name>`
+ * takes whoever you name. It ADDS to the cast rather than replacing it, so
+ * the three-person approval chain still works alongside it.
+ *
+ * Be exact about what this does and does not defeat. It grants every
+ * PERMISSION, including both approvals, which roles.ts deliberately keeps in
+ * separate roles. What it cannot do is approve something it raised, or hold
+ * both stages of one request: separation of duties is checked against
+ * IDENTITY at submit (assertSeparationOfDuties) and again at decision time,
+ * where decide() refuses anyone who is not the person that stage was
+ * addressed to. Holding the permission is necessary there, never sufficient.
+ */
+const superFlag = process.argv.indexOf("--super");
+const superNext = superFlag === -1 ? undefined : process.argv[superFlag + 1];
+const superAccount =
+  superFlag === -1
+    ? undefined
+    : superNext && !superNext.startsWith("--")
+      ? superNext
+      : "ayu.prameswari";
+
+if (superAccount) {
+  for (const role of ROLES) {
+    const held = role.accounts.some((n) => n.toLowerCase() === superAccount.toLowerCase());
+    if (!held) role.accounts = [...role.accounts, superAccount];
+  }
+}
 
 function resolvePath() {
   const configured = process.env.AD_MOCK_FILE?.trim() || "data/mock-ad.json";
@@ -248,6 +293,12 @@ await writeFile(undoPath, `${JSON.stringify(record, null, 2)}\n`, "utf8");
 /* ----------------------------------------------------------------- report */
 
 console.info(`\n  Direktori simulasi: ${target}\n`);
+
+if (superAccount) {
+  console.info(`  Mode super: ${superAccount} memegang SELURUH peran portal.`);
+  console.info("  Pemisahan tugas tetap berlaku: ia tidak bisa menyetujui pengajuannya");
+  console.info("  sendiri, dan tidak bisa memegang kedua tahap pada satu pengajuan.");
+}
 
 if (granted.length === 0 && enabled.length === 0) {
   console.info("  Tidak ada perubahan — peran sudah terpasang sebelumnya.\n");

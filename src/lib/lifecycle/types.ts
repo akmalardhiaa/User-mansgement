@@ -20,7 +20,7 @@
  *      counting, because nobody approved the new text.
  */
 
-export const LIFECYCLE_TYPES = ["ONBOARDING", "MOVEMENT", "TERMINATION"] as const;
+export const LIFECYCLE_TYPES = ["ONBOARDING", "MOVEMENT", "TERMINATION", "PROFILE_UPDATE"] as const;
 
 export type LifecycleType = (typeof LIFECYCLE_TYPES)[number];
 
@@ -87,8 +87,26 @@ export interface ApprovalStep {
   stage: ApprovalStage;
   /** Which version of the request this step decides on. */
   version: number;
-  /** Who was asked, resolved server-side at submit and frozen here. */
+  /**
+   * Who was asked, resolved server-side at submit and frozen here. For a stage
+   * answered by a team this names the team, and `pool` lists its members.
+   */
   approver: ActorIdentity;
+  /**
+   * Everyone who may answer this stage, when it goes to a team rather than one
+   * person. Frozen at submit: somebody who joins the team later was never asked
+   * about this request, and somebody who left still was. The first member to
+   * answer decides for the stage; every other member's link dies with it.
+   */
+  pool?: ActorIdentity[];
+  /**
+   * Set when `approver` is answering in place of the manager the request was
+   * routed to, under a delegation. The decision is then theirs, made on this
+   * person's behalf — and the trail says both names.
+   */
+  onBehalfOf?: ActorIdentity;
+  /** Which delegation put `approver` here. */
+  delegationId?: string;
   decision?: ApprovalDecision;
   /** Mandatory when the decision is REJECTED. */
   reason?: string;
@@ -167,7 +185,63 @@ export const TERMINATION_REASONS = [
 
 export type TerminationReason = (typeof TERMINATION_REASONS)[number];
 
-export type LifecyclePayload = OnboardingPayload | MovementPayload | TerminationPayload;
+/**
+ * The editable profile of an existing employee, as it will read once applied.
+ *
+ * Email and manager are absent on purpose. Email is the key that ties the record
+ * to its login account; the manager is who approves changes to this person, so
+ * letting the same request move them would let a request choose its own
+ * approver. Both belong to Movement.
+ */
+export interface ProfileFields {
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  jobTitle: string;
+  jobDescription?: string;
+  department: string;
+  employmentType?: EmploymentType;
+  expiredDate?: string;
+  locationType?: LocationType;
+  branchName?: string;
+  /** Internal HC note. Never included in an approval email body. */
+  description?: string;
+}
+
+export type ProfileField = keyof ProfileFields;
+
+/** One field a profile update changes, as it read before and as it will read after. */
+export interface ProfileChange {
+  field: ProfileField;
+  label: string;
+  from: string;
+  to: string;
+}
+
+/**
+ * Editing an existing employee's profile.
+ *
+ * This used to be a direct write with no approval at all — including department
+ * and job title, which is how a division change could skip the manager and the
+ * CISO entirely. It is now a request like the others: frozen at submit, decided
+ * twice, and applied only by the worker after the directory confirms it.
+ *
+ * `changes` is computed by the server against the record as it stood, never
+ * taken from the browser. It is what the approvers read — "department: A → B" —
+ * and a diff the requester could write themselves would be a diff that lies.
+ */
+export interface ProfileUpdatePayload {
+  kind: "PROFILE_UPDATE";
+  employeeId: string;
+  profile: ProfileFields;
+  changes: ProfileChange[];
+}
+
+export type LifecyclePayload =
+  | OnboardingPayload
+  | MovementPayload
+  | TerminationPayload
+  | ProfileUpdatePayload;
 
 /* -------------------------------------------------------------------------- */
 /* The request                                                                */
@@ -194,7 +268,7 @@ export interface LifecycleRequest {
   version: number;
   status: LifecycleStatus;
   requester: ActorIdentity;
-  /** Set for MOVEMENT and TERMINATION; an ONBOARDING has no record yet. */
+  /** Set for every type but ONBOARDING, which has no record yet. */
   employeeId?: string;
   subject: RequestSubject;
   payload: LifecyclePayload;

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { SESSION_COOKIE } from "@/lib/auth/session";
-import { checkCsrf } from "@/lib/http/csrf";
+import { checkCsrf, selfOrigins } from "@/lib/http/csrf";
 import { clientKey, rateLimit } from "@/lib/http/rateLimit";
 
 /**
@@ -136,7 +136,17 @@ export async function proxy(request: NextRequest) {
   const verdict = checkCsrf({
     method: request.method,
     pathname,
-    expectedOrigin: origin,
+    // Not `origin` alone: that is the address the framework was started with
+    // (`localhost`, or `0.0.0.0` in Docker), not the one in the browser — and
+    // compared against it, every form submitted from 127.0.0.1, a LAN address
+    // or the container was refused. See selfOrigins for why Host is safe here.
+    expectedOrigin: selfOrigins({
+      host: request.headers.get("host"),
+      protocol: request.nextUrl.protocol,
+      forwardedProto: request.headers.get("x-forwarded-proto"),
+      configured: process.env.APP_BASE_URL,
+      framework: origin,
+    }),
     origin: request.headers.get("origin"),
     referer: request.headers.get("referer"),
     hasSessionCookie: hasCookie,

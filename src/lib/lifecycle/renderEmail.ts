@@ -22,6 +22,7 @@ const TYPE_LABEL: Record<LifecycleType, string> = {
   ONBOARDING: "Onboarding",
   MOVEMENT: "Movement",
   TERMINATION: "Termination",
+  PROFILE_UPDATE: "Perubahan Profil",
 };
 
 function baseUrl(): string {
@@ -106,6 +107,15 @@ function payloadRows(payload: LifecyclePayload): Array<[string, string]> {
     ];
   }
 
+  if (payload.kind === "PROFILE_UPDATE") {
+    return [
+      ...payload.changes.map(
+        (change) => [change.label, `${change.from} → ${change.to}`] as [string, string],
+      ),
+      ["Tidak berubah", "Email, manager, dan hak akses (group) tetap seperti sekarang"],
+    ];
+  }
+
   if (payload.kind === "MOVEMENT") {
     return [
       ["Departemen tujuan", payload.toDepartment],
@@ -127,6 +137,42 @@ function payloadRows(payload: LifecyclePayload): Array<[string, string]> {
       : []),
     ["Tindakan", "Nonaktifkan dan karantina akun — bukan hapus permanen"],
   ];
+}
+
+/**
+ * Said up front when this is not the first version.
+ *
+ * An approver who already answered the earlier email would otherwise assume
+ * this is a duplicate and ignore it — or worse, go looking for the old link.
+ * The old link is dead; this says so.
+ */
+function revisionNotice(payload: ApprovalMailPayload): string {
+  if (payload.version <= 1) return "";
+  return `<p style="margin:0 0 16px;padding:12px;background:#fff4db;border-radius:8px;font-size:13px;line-height:1.6"><strong>Ini pengajuan yang sudah direvisi (versi ${payload.version}).</strong> Isinya berubah sejak email sebelumnya, jadi persetujuan untuk versi lama sudah dibatalkan dan tautan di email lama tidak berlaku lagi. Mohon tinjau ulang isi di bawah ini.</p>`;
+}
+
+/**
+ * Said up front when this went to a whole team.
+ *
+ * Every member reads the same request; only one answer counts. Saying so means
+ * a member who finds their link dead understands why instead of assuming the
+ * system broke — and knows not to chase a colleague's decision.
+ */
+function teamNotice(payload: ApprovalMailPayload): string {
+  if (!payload.teamSize || payload.teamSize <= 1) return "";
+  return `<p style="margin:0 0 16px;padding:12px;background:#eaf2fb;border-radius:8px;font-size:13px;line-height:1.6">Permintaan ini dikirim ke <strong>${payload.teamSize} anggota tim CISO</strong>, masing-masing dengan tautan pribadi. <strong>Keputusan pertama yang masuk yang berlaku</strong> — bila anggota lain sudah memutuskan, tautan Anda otomatis tidak berlaku dan halaman akan menampilkan siapa yang memutuskan.</p>`;
+}
+
+/**
+ * Said up front when the approver is standing in for someone.
+ *
+ * A substitute who does not realise they are one either ignores a request
+ * about a team they do not run, or approves it without the context the absent
+ * manager would have had. Either way they should know whose decision this is.
+ */
+function delegationNotice(payload: ApprovalMailPayload): string {
+  if (!payload.onBehalfOf) return "";
+  return `<p style="margin:0 0 16px;padding:12px;background:#f3ecfb;border-radius:8px;font-size:13px;line-height:1.6">Anda menerima permintaan ini sebagai <strong>pengganti ${escapeHtml(payload.onBehalfOf)}</strong>, yang sedang berhalangan (delegasi resmi dari Human Capital). Keputusan Anda dicatat atas nama Anda, sebagai pengganti ${escapeHtml(payload.onBehalfOf)}.</p>`;
 }
 
 function rowsToHtml(rows: Array<[string, string]>): string {
@@ -243,6 +289,9 @@ export function renderEmail(payload: ApprovalMailPayload, recipient: string): Em
     const body = `
 <h1 style="margin:0 0 12px;font-size:20px">Permintaan persetujuan ${escapeHtml(TYPE_LABEL[payload.type])}</h1>
 <p style="margin:0 0 16px;font-size:14px;line-height:1.6">Halo ${escapeHtml(payload.approverName)}, ada pengajuan yang menunggu keputusan Anda sebagai <strong>${payload.stage === "MANAGER" ? "Manager" : "CISO"}</strong>.</p>
+${revisionNotice(payload)}
+${teamNotice(payload)}
+${delegationNotice(payload)}
 <table style="width:100%;border-collapse:collapse;margin-bottom:20px">${detailRows(payload)}</table>
 ${
   payload.payload
@@ -259,7 +308,9 @@ ${
 
     return {
       to: { address: recipient, name: payload.approverName },
-      subject: `[Persetujuan] ${TYPE_LABEL[payload.type]} — ${payload.subjectName}`,
+      subject: `[Persetujuan] ${TYPE_LABEL[payload.type]} — ${payload.subjectName}${
+        payload.version > 1 ? ` (revisi v${payload.version})` : ""
+      }`,
       html: shell("Permintaan persetujuan", body),
       card: buildCard(payload, actionUrl),
     };

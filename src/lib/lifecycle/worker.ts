@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { getAdDriver } from "@/lib/ad";
 import { AdError, type AdAccountState, type AdDriver } from "@/lib/ad/types";
+import { recordActivityInDraft } from "@/lib/db/repository";
 import { mutateStore, readStore, type StoreShape } from "@/lib/db/store";
 import type { Employee } from "@/lib/types";
 
@@ -132,6 +133,9 @@ async function claimNext(workerId: string, at: Date): Promise<Claim | undefined>
     const due = draft.lifecycleRequests.find((request) => {
       if (request.status === "QUEUED") return true;
       if (request.status !== "SCHEDULED") return false;
+      // An onboarding is never held for its date — approval is the go-ahead.
+      // This also releases one scheduled before that rule existed.
+      if (request.type === "ONBOARDING") return true;
       return request.effectiveAt ? Date.parse(request.effectiveAt) <= at.getTime() : true;
     });
     if (!due) return undefined;
@@ -249,6 +253,8 @@ async function applyStep(
     }
     case "set-attributes":
       await driver.setAttributes(context.guid!, {
+        // Absent for onboarding and movement, which leave the name alone.
+        displayName: step.params.displayName as string | undefined,
         department: step.params.department as string | undefined,
         title: step.params.title as string | undefined,
         manager: step.params.manager as string | undefined,
@@ -291,6 +297,9 @@ function verify(plan: ExecutionPlan, state: AdAccountState | undefined): string 
   }
   for (const group of post.forbiddenGroups) {
     if (state.groups.includes(group)) return `Group seharusnya dicabut masih ada: ${group}.`;
+  }
+  if (post.attributes.displayName && state.displayName !== post.attributes.displayName) {
+    return `displayName seharusnya ${post.attributes.displayName}, terbaca ${state.displayName}.`;
   }
   if (post.attributes.department && state.department !== post.attributes.department) {
     return `department seharusnya ${post.attributes.department}, terbaca ${state.department}.`;
@@ -372,6 +381,32 @@ async function finishSucceeded(
           employee.jobDescription = payload.toJobDescription;
           employee.managerName = payload.toManagerName;
           employee.managerEmail = payload.toManagerEmail;
+        }
+        if (payload.kind === "PROFILE_UPDATE") {
+          const profile = payload.profile;
+          employee.firstName = profile.firstName;
+          employee.lastName = profile.lastName;
+          employee.displayName = profile.displayName;
+          employee.jobTitle = profile.jobTitle;
+          employee.jobDescription = profile.jobDescription;
+          employee.department = profile.department;
+          employee.employmentType = profile.employmentType;
+          // Only a contract has an end date, and only a branch has a branch
+          // name: a stale value left behind would later read as still applying.
+          employee.expiredDate = profile.employmentType === "CONTRACT" ? profile.expiredDate : undefined;
+          employee.locationType = profile.locationType;
+          employee.branchName = profile.locationType === "CABANG" ? profile.branchName : undefined;
+          employee.description = profile.description;
+
+          recordActivityInDraft(draft, {
+            actor: `${claim.request.requester.name} (disetujui Manager & CISO)`,
+            action: "employee.profile_updated",
+            employeeId: employee.id,
+            employeeName: employee.displayName,
+            detail: `Profil ${employee.displayName} diperbarui lewat pengajuan ${claim.request.id} — ${payload.changes
+              .map((change) => change.label.toLowerCase())
+              .join(", ")}.`,
+          });
         }
         employee.status = observed.enabled ? "ACTIVE" : "DISABLED";
         employee.objectGUID = observed.objectGUID;
@@ -536,7 +571,10 @@ async function runOne(claim: Claim, driver: AdDriver, workerId: string): Promise
     );
   }
 
-  const plan = buildPlan(request.payload, before ? { groups: before.groups } : undefined);
+  const plan = buildPlan(
+    request.payload,
+    before ? { groups: before.groups, enabled: before.enabled, ou: before.ou } : undefined,
+  );
 
   for (const step of plan.steps) {
     if (done.has(step.key)) continue;

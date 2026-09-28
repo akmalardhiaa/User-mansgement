@@ -4,10 +4,19 @@ import type { PortalSession } from "@/lib/auth/session";
 import { mutateStore, readStore, type StoreShape } from "@/lib/db/store";
 import type { Employee } from "@/lib/types";
 
-import { checkToken, hashEquals, hashToken } from "./approvalToken";
+import { checkToken, hashEquals, hashToken, type ApprovalTokenRecord } from "./approvalToken";
 import { emitApprovalRequest, emitResult, revokeRequestTokens } from "./outbox";
 import { hashPayload, payloadMatches } from "./payload";
-import { assertSeparationOfDuties, isSamePerson, resolveRouting } from "./routing";
+import { resolveCisoTeamForSubmit } from "./cisoTeam";
+import { activeDelegationFor, type Delegation } from "./delegation";
+import { diffProfile, profileOf } from "./profileUpdate";
+import {
+  answererMatching,
+  answerersOf,
+  assertSeparationOfDuties,
+  isSamePerson,
+  resolveRouting,
+} from "./routing";
 import {
   assertTransition,
   isActive,
@@ -129,6 +138,63 @@ function subjectFor(payload: LifecyclePayload, employee: Employee | undefined): 
 }
 
 /**
+ * Fills in what a profile update changes, from the record as it stands.
+ *
+ * The diff is always the server's. Whatever arrived from the browser is
+ * replaced, so the "from" column an approver reads is the actual record and not
+ * a claim about it. A profile update that changes nothing is refused: asking two
+ * people to approve an identical record wastes their attention and trains them
+ * to approve without reading.
+ */
+function withProfileChanges(payload: LifecyclePayload, employee: Employee | undefined): LifecyclePayload {
+  if (payload.kind !== "PROFILE_UPDATE") return payload;
+  if (!employee) throw new LifecycleError("NOT_FOUND", "Karyawan yang diajukan tidak ditemukan.");
+
+  const changes = diffProfile(profileOf(employee), payload.profile);
+  if (changes.length === 0) {
+    throw new LifecycleError(
+      "INVALID",
+      "Tidak ada perubahan pada profil. Ubah minimal satu isian sebelum mengajukan.",
+    );
+  }
+  return { ...payload, changes };
+}
+
+/**
+ * The manager a request NAMES must be a real, active person in the directory.
+ *
+ * Onboarding and Movement let HC choose the approving manager, and that choice
+ * used to include typing any address at all — so a requester could route their
+ * own request's first approval to a mailbox they controlled, and no
+ * separation-of-duties check could see it. The picker no longer offers free
+ * typing, but the picker is only what is offered; this is what is allowed.
+ *
+ * The name is replaced with the directory's, too: the address decides who is
+ * asked, and a display name the requester typed next to someone else's address
+ * would put a misleading name in the email and the audit trail.
+ */
+function withDirectoryManager(draft: StoreShape, payload: LifecyclePayload): LifecyclePayload {
+  if (payload.kind !== "ONBOARDING" && payload.kind !== "MOVEMENT") return payload;
+
+  const address = (payload.kind === "ONBOARDING" ? payload.managerEmail : payload.toManagerEmail)
+    .trim()
+    .toLowerCase();
+  const manager = draft.employees.find(
+    (employee) => employee.email.trim().toLowerCase() === address && employee.status === "ACTIVE",
+  );
+  if (!manager) {
+    throw new LifecycleError(
+      "INVALID",
+      `Manager harus karyawan aktif yang terdaftar di direktori. ${address || "(kosong)"} tidak ditemukan atau tidak aktif — pilih manager dari daftar.`,
+    );
+  }
+
+  return payload.kind === "ONBOARDING"
+    ? { ...payload, managerName: manager.displayName, managerEmail: address }
+    : { ...payload, toManagerName: manager.displayName, toManagerEmail: address };
+}
+
+/**
  * The attributes execution will later compare against.
  *
  * Only what this request is about — not the whole record. A snapshot that
@@ -177,7 +243,7 @@ export function visibleTo(request: LifecycleRequest, session: PortalSession): bo
   const me = identityOf(session);
   return (
     isSamePerson(request.requester, me) ||
-    request.approvals.some((step) => isSamePerson(step.approver, me))
+    request.approvals.some((step) => Boolean(answererMatching(step, me)))
   );
 }
 
@@ -251,16 +317,18 @@ export async function createDraft(
 
     if (employeeId) assertNoActiveRequest(draft, employeeId);
 
+    const payload = withDirectoryManager(draft, withProfileChanges(input.payload, employee));
+
     const timestamp = now();
     const request: LifecycleRequest = {
       id: `lr_${randomUUID()}`,
-      type: typeOf(input.payload),
+      type: typeOf(payload),
       version: 1,
       status: "DRAFT",
       requester,
       employeeId,
-      subject: subjectFor(input.payload, employee),
-      payload: input.payload,
+      subject: subjectFor(payload, employee),
+      payload,
       // Empty until submit: an unsubmitted draft has nothing to be held to.
       payloadHash: "",
       approvals: [],
@@ -305,6 +373,8 @@ export async function submitRequest(
   session: PortalSession,
 ): Promise<LifecycleRequest> {
   const actor = identityOf(session);
+  // Read before the transaction: a directory lookup must never hold the store lock.
+  const cisoTeam = await resolveCisoTeamForSubmit();
 
   return mutateStore((draft) => {
     const request = findRequest(draft, id);
@@ -319,48 +389,110 @@ export async function submitRequest(
       throw new LifecycleError("FORBIDDEN", "Hanya pemohon yang dapat mengirim pengajuan ini.");
     }
 
-    assertTransition(request.status, "PENDING_MANAGER");
-
-    const employee = request.employeeId ? findEmployee(draft, request.employeeId) : undefined;
-    if (request.employeeId) assertNoActiveRequest(draft, request.employeeId, request.id);
-
-    const routing = resolveRouting(request.payload, employee);
-    assertSeparationOfDuties(request.requester, routing);
-
-    // Both steps are created now, not one at a time: the identity asked to
-    // approve each stage is part of what was decided at submit, and resolving
-    // the CISO later would let a routing change slip in mid-flight.
-    request.approvals = [
-      { stage: "MANAGER", version: request.version, approver: routing.manager },
-      { stage: "CISO", version: request.version, approver: routing.ciso },
-    ];
-    request.payloadHash = hashPayload(request.payload);
-    request.beforeSnapshot = employee ? snapshotOf(employee) : undefined;
-    request.status = "PENDING_MANAGER";
-    request.submittedAt = now();
-    request.updatedAt = request.submittedAt;
-
-    audit(draft, {
-      actorId: actor.userId ?? actor.email,
-      actorName: actor.name,
-      source: "PORTAL",
-      action: "request.submitted",
-      target: request.id,
-      correlationId: request.id,
-      detail: {
-        version: request.version,
-        payloadHash: request.payloadHash,
-        manager: routing.manager.email,
-        ciso: routing.ciso.email,
-      },
-    });
-
-    // Committed with the submit, not after it: a crash here must not leave a
-    // request routed to a manager who was never asked.
-    emitApprovalRequest(draft, request, "MANAGER");
-
+    submitInDraft(draft, request, actor, cisoTeam);
     return request;
   });
+}
+
+/**
+ * The CISO stage: one named approver, or the team.
+ *
+ * A team of one is recorded exactly as a single approver always was, so a
+ * deployment configured with one address sees no difference anywhere.
+ */
+function cisoStep(version: number, team: ActorIdentity[]): ApprovalStep {
+  if (team.length === 1) return { stage: "CISO", version, approver: team[0] };
+  return {
+    stage: "CISO",
+    version,
+    approver: { name: `Tim CISO · ${team.length} orang`, email: "" },
+    pool: team,
+  };
+}
+
+/**
+ * The submit itself, inside a transaction somebody else opened.
+ *
+ * Shared by a plain submit and by a revision that goes straight back out, so
+ * both run exactly the same routing, separation-of-duties check, fingerprint and
+ * notification. Everything here throws before it persists anything: the caller's
+ * transaction only commits if the whole submit succeeded.
+ */
+function submitInDraft(
+  draft: StoreShape,
+  request: LifecycleRequest,
+  actor: ActorIdentity,
+  /** The CISO team, when it had to be read from the directory before the transaction. */
+  cisoTeamOverride?: ActorIdentity[],
+): void {
+  assertTransition(request.status, "PENDING_MANAGER");
+
+  const employee = request.employeeId ? findEmployee(draft, request.employeeId) : undefined;
+  if (request.employeeId) assertNoActiveRequest(draft, request.employeeId, request.id);
+
+  // Recomputed at the moment the payload is frozen, so the "from" column is the
+  // record exactly as the before-snapshot below captures it — and the named
+  // manager re-checked against the directory as it stands now, not as it stood
+  // when a draft was opened.
+  request.payload = withDirectoryManager(draft, withProfileChanges(request.payload, employee));
+
+  const routing = resolveRouting(request.payload, employee, cisoTeamOverride);
+  let cisoTeam = assertSeparationOfDuties(request.requester, routing);
+
+  /*
+   * A manager who is away may have handed their approvals to a substitute.
+   *
+   * Separation of duties is checked against BOTH people. Against the manager
+   * of record first (above), so that a requester who is the manager cannot
+   * route around the rule by being "away"; then against the substitute, who
+   * must not be the requester either and is taken off the CISO team for this
+   * request, exactly as the manager would have been.
+   */
+  const delegation = activeDelegationFor(draft.delegations, routing.manager.email, new Date());
+  if (delegation) {
+    cisoTeam = assertSeparationOfDuties(request.requester, { manager: delegation.to, ciso: cisoTeam });
+  }
+
+  // Both steps are created now, not one at a time: the identity asked to
+  // approve each stage is part of what was decided at submit, and resolving
+  // the CISO team later would let a routing change slip in mid-flight.
+  request.approvals = [
+    delegation
+      ? {
+          stage: "MANAGER",
+          version: request.version,
+          approver: delegation.to,
+          onBehalfOf: routing.manager,
+          delegationId: delegation.id,
+        }
+      : { stage: "MANAGER", version: request.version, approver: routing.manager },
+    cisoStep(request.version, cisoTeam),
+  ];
+  request.payloadHash = hashPayload(request.payload);
+  request.beforeSnapshot = employee ? snapshotOf(employee) : undefined;
+  request.status = "PENDING_MANAGER";
+  request.submittedAt = now();
+  request.updatedAt = request.submittedAt;
+
+  audit(draft, {
+    actorId: actor.userId ?? actor.email,
+    actorName: actor.name,
+    source: "PORTAL",
+    action: "request.submitted",
+    target: request.id,
+    correlationId: request.id,
+    detail: {
+      version: request.version,
+      payloadHash: request.payloadHash,
+      manager: (delegation?.to ?? routing.manager).email,
+      ...(delegation ? { onBehalfOf: routing.manager.email, delegationId: delegation.id } : {}),
+      ciso: cisoTeam.map((member) => member.email).join(", "),
+    },
+  });
+
+  // Committed with the submit, not after it: a crash here must not leave a
+  // request routed to a manager who was never asked.
+  emitApprovalRequest(draft, request, "MANAGER");
 }
 
 export interface DecisionInput {
@@ -405,7 +537,8 @@ export async function decide(
 
     // Identity first, so somebody who simply holds the role is turned away
     // before any of the following can tell them anything about the request.
-    if (!isSamePerson(step.approver, actor)) {
+    // For a team, being any member is enough — and being none of them is not.
+    if (!answererMatching(step, actor)) {
       throw new LifecycleError(
         "FORBIDDEN",
         "Keputusan ini ditujukan kepada approver lain. Anda tidak dapat memutuskannya.",
@@ -497,12 +630,18 @@ function applyDecision(
 
   audit(draft, {
     actorId: actor.userId ?? actor.email,
-    actorName: actor.name,
+    // Never recorded as though the absent manager had decided.
+    actorName: step.onBehalfOf ? `${actor.name} (atas nama ${step.onBehalfOf.name})` : actor.name,
     source,
     action: input.decision === "APPROVED" ? "request.approved" : "request.rejected",
     target: request.id,
     correlationId: request.id,
-    detail: { stage: input.stage, version: request.version, status: request.status },
+    detail: {
+      stage: input.stage,
+      version: request.version,
+      status: request.status,
+      ...(step.onBehalfOf ? { onBehalfOf: step.onBehalfOf.email } : {}),
+    },
   });
 
   if (input.decision === "REJECTED") {
@@ -518,7 +657,14 @@ function applyDecision(
   // request moves into the execution queue and waits for a worker — which is
   // why APPROVED and COMPLETED are different things.
   if (request.status === "APPROVED") {
-    const queued = statusAfterApproval(request.effectiveAt, new Date(decidedAt));
+    // An onboarding is made the moment it is approved, whatever date it
+    // carries: HC's rule is that approval IS the go-ahead for a new hire. The
+    // start date stays on the record as the employee's first day; it no longer
+    // parks the account creation behind it.
+    const queued = statusAfterApproval(
+      request.type === "ONBOARDING" ? undefined : request.effectiveAt,
+      new Date(decidedAt),
+    );
     assertTransition(request.status, queued);
     request.status = queued;
 
@@ -592,7 +738,11 @@ export async function decideByToken(
     });
 
     if (!check.ok) {
-      throw new LifecycleError("CONFLICT", REJECTION_MESSAGE[check.reason] ?? "Tautan tidak valid.");
+      const settled = settledFor(request, record);
+      throw new LifecycleError(
+        "CONFLICT",
+        settled ? settledMessage(settled) : rejectionFor(check.reason, record),
+      );
     }
 
     const awaiting = stageAwaiting(request.status);
@@ -608,7 +758,16 @@ export async function decideByToken(
     );
     if (!step) throw new LifecycleError("CONFLICT", "Tahap persetujuan tidak ditemukan.");
     if (step.decision) {
-      throw new LifecycleError("CONFLICT", REJECTION_MESSAGE.CONSUMED);
+      const settled = settledFor(request, record);
+      throw new LifecycleError("CONFLICT", settled ? settledMessage(settled) : REJECTION_MESSAGE.CONSUMED);
+    }
+
+    // Which member this link was sent to. A link bound to an address that is
+    // not on the stage cannot have been issued by this app for it, and is not
+    // allowed to decide on anybody's behalf.
+    const member = memberForToken(step, record);
+    if (!member) {
+      throw new LifecycleError("FORBIDDEN", "Tautan ini tidak ditujukan kepada approver tahap ini.");
     }
 
     if (!payloadMatches(request.payload, request.payloadHash)) {
@@ -630,14 +789,68 @@ export async function decideByToken(
       request,
       step,
       { version: request.version, stage: record.stage, ...input },
-      // Credited to the approver the stage was addressed to, not to whoever
+      // Credited to the person this link was emailed to — for a team, the
+      // member whose link it was, not "the team". Still not proof of who
       // clicked: the link is evidence of delivery, not of identity.
-      step.approver,
+      member,
       "EMAIL",
     );
 
     return request;
   });
+}
+
+/**
+ * The message for a link that cannot be used, as specific as the record allows.
+ *
+ * A manager whose waiting requests were handed to their substitute will open
+ * the old email when they come back. "No longer valid" would read as a fault;
+ * saying where the request went does not.
+ */
+function rejectionFor(reason: string, record: ApprovalTokenRecord): string {
+  if (reason === "REVOKED" && record.revokedReason === "request-rerouted") {
+    return "Permintaan ini sudah dialihkan ke pengganti Anda selama Anda berhalangan (delegasi dari Human Capital). Tidak perlu tindakan dari Anda.";
+  }
+  return REJECTION_MESSAGE[reason] ?? "Tautan tidak valid.";
+}
+
+function memberForToken(step: ApprovalStep, record: ApprovalTokenRecord): ActorIdentity | undefined {
+  if (!record.recipient) return step.approver;
+  return answerersOf(step).find(
+    (candidate) => candidate.email.trim().toLowerCase() === record.recipient,
+  );
+}
+
+interface Settled {
+  decision: ApprovalDecision;
+  by: string;
+  at: string;
+}
+
+/**
+ * Who already answered the stage a dead link was for, if somebody did.
+ *
+ * For a team this is the ordinary case, not an error: six of seven members will
+ * open a link somebody else already answered, and "this link is no longer
+ * valid" would read as though something had gone wrong. Only reported for the
+ * version the link was issued for — a link killed by a revision says so instead.
+ */
+function settledFor(request: LifecycleRequest, record: ApprovalTokenRecord): Settled | undefined {
+  if (request.version !== record.version) return undefined;
+  const step = request.approvals.find(
+    (candidate) => candidate.stage === record.stage && candidate.version === record.version,
+  );
+  if (!step?.decision || !step.decidedBy || !step.decidedAt) return undefined;
+  return { decision: step.decision, by: step.decidedBy.name, at: step.decidedAt };
+}
+
+function settledMessage(settled: Settled): string {
+  const at = new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Jakarta",
+  }).format(new Date(settled.at));
+  return `Sudah ${settled.decision === "APPROVED" ? "disetujui" : "ditolak"} oleh ${settled.by} pada ${at}. Tidak perlu tindakan dari Anda.`;
 }
 
 /** What the fallback page may show somebody holding a link. */
@@ -653,6 +866,10 @@ export interface TokenPreview {
   payload: LifecyclePayload;
   effectiveAt?: string;
   managerDecision?: { by: string; at: string };
+  /** How many people this stage went to, when it went to a team. */
+  teamSize?: number;
+  /** The absent manager this approver is standing in for. */
+  onBehalfOf?: string;
 }
 
 /**
@@ -665,7 +882,9 @@ export interface TokenPreview {
  */
 export async function previewByToken(
   raw: string,
-): Promise<{ ok: true; preview: TokenPreview } | { ok: false; reason: string }> {
+): Promise<
+  { ok: true; preview: TokenPreview } | { ok: false; reason: string; settled?: boolean }
+> {
   const { approvalTokens, lifecycleRequests } = await readStore();
 
   const presented = hashToken(raw);
@@ -680,7 +899,13 @@ export async function previewByToken(
     version: request.version,
     stage: record.stage,
   });
-  if (!check.ok) return { ok: false, reason: REJECTION_MESSAGE[check.reason] ?? "Tautan tidak valid." };
+  if (!check.ok) {
+    // Somebody already answered: for a team member that is the normal outcome,
+    // and the page says who and when rather than reporting a broken link.
+    const settled = settledFor(request, record);
+    if (settled) return { ok: false, reason: settledMessage(settled), settled: true };
+    return { ok: false, reason: rejectionFor(check.reason, record) };
+  }
 
   const step = request.approvals.find(
     (candidate) => candidate.stage === record.stage && candidate.version === request.version,
@@ -698,13 +923,20 @@ export async function previewByToken(
       stage: record.stage,
       subjectName: request.subject.displayName,
       requesterName: request.requester.name,
-      approverName: step?.approver.name ?? "",
+      approverName: step ? (memberForToken(step, record)?.name ?? step.approver.name) : "",
+      teamSize: step?.pool && step.pool.length > 1 ? step.pool.length : undefined,
+      onBehalfOf: step?.onBehalfOf?.name,
       status: request.status,
       payload: request.payload,
       effectiveAt: request.effectiveAt,
       managerDecision:
         record.stage === "CISO" && managerStep?.decidedAt && managerStep.decidedBy
-          ? { by: managerStep.decidedBy.name, at: managerStep.decidedAt }
+          ? {
+              by: managerStep.onBehalfOf
+                ? `${managerStep.decidedBy.name} (atas nama ${managerStep.onBehalfOf.name})`
+                : managerStep.decidedBy.name,
+              at: managerStep.decidedAt,
+            }
           : undefined,
     },
   };
@@ -890,52 +1122,241 @@ export async function reviseRequest(
 
   return mutateStore((draft) => {
     const request = findRequest(draft, id);
+    reviseInDraft(draft, request, payload, actor, effectiveAt);
+    return request;
+  });
+}
 
-    if (!isSamePerson(request.requester, actor)) {
-      throw new LifecycleError("FORBIDDEN", "Hanya pemohon yang dapat merevisi pengajuan ini.");
+/**
+ * Revises a request and sends the new version straight back to the approvers.
+ *
+ * One transaction, on purpose. The revision and the resubmit either both land —
+ * new version, old approvals and links void, the manager emailed about the new
+ * text — or neither does. Doing them as two calls would leave a window, and a
+ * failure in it (a routing clash, a separation-of-duties refusal) would strand
+ * the request in DRAFT with its approvers told nothing.
+ *
+ * `expectedVersion` is the version the requester was looking at. A tab left
+ * open across somebody else's revision is refused rather than overwriting text
+ * the person never saw.
+ *
+ * A request still in DRAFT — raised but never successfully routed — is
+ * corrected in place: nobody was asked about it, so there are no approvals to
+ * void and no reason to bump its version.
+ */
+export async function reviseAndResubmit(
+  id: string,
+  expectedVersion: number,
+  payload: LifecyclePayload,
+  session: PortalSession,
+  effectiveAt?: string,
+): Promise<LifecycleRequest> {
+  const actor = identityOf(session);
+  const cisoTeam = await resolveCisoTeamForSubmit();
+
+  return mutateStore((draft) => {
+    const request = findRequest(draft, id);
+
+    if (request.version !== expectedVersion) {
+      throw new LifecycleError(
+        "CONFLICT",
+        `Pengajuan sudah berubah ke versi ${request.version}. Muat ulang sebelum merevisi.`,
+      );
     }
-    if (typeOf(payload) !== request.type) {
-      throw new LifecycleError("INVALID", "Revisi tidak boleh mengubah jenis pengajuan.");
+
+    if (request.status === "DRAFT") {
+      assertRevisable(draft, request, payload, actor);
+      request.payload = payload;
+      request.subject = subjectFor(payload, employeeFor(draft, payload));
+      request.effectiveAt = effectiveAt;
+      request.updatedAt = now();
+    } else {
+      reviseInDraft(draft, request, payload, actor, effectiveAt);
     }
 
-    assertTransition(request.status, "DRAFT");
+    submitInDraft(draft, request, actor, cisoTeam);
+    return request;
+  });
+}
 
-    /*
-     * Every link issued for the previous version dies here.
-     *
-     * This is the case the token's version binding exists for, checked twice on
-     * purpose: an approver holding an old email must not be able to approve
-     * text that has since been replaced.
-     */
-    revokeRequestTokens(draft, request.id, "request-revised");
+function employeeFor(draft: StoreShape, payload: LifecyclePayload): Employee | undefined {
+  return payload.kind === "ONBOARDING" ? undefined : findEmployee(draft, payload.employeeId);
+}
 
-    const previous: ApprovalStep[] = request.approvals;
-    const at = now();
+/**
+ * Who may revise, and into what.
+ *
+ * The subject is fixed. A revision that swapped the employee would carry the
+ * previous person's approvals trail, audit history and request number while
+ * being about somebody else entirely — that is a new request, and has to be
+ * raised as one.
+ */
+function assertRevisable(
+  draft: StoreShape,
+  request: LifecycleRequest,
+  payload: LifecyclePayload,
+  actor: ActorIdentity,
+): void {
+  if (!isSamePerson(request.requester, actor)) {
+    throw new LifecycleError("FORBIDDEN", "Hanya pemohon yang dapat merevisi pengajuan ini.");
+  }
+  if (typeOf(payload) !== request.type) {
+    throw new LifecycleError("INVALID", "Revisi tidak boleh mengubah jenis pengajuan.");
+  }
 
-    request.version += 1;
-    request.status = "DRAFT";
-    request.payload = payload;
-    request.payloadHash = "";
-    request.approvals = [];
-    request.effectiveAt = effectiveAt;
-    request.submittedAt = undefined;
-    request.updatedAt = at;
+  const employeeId = payload.kind === "ONBOARDING" ? undefined : payload.employeeId;
+  if (employeeId !== request.employeeId) {
+    throw new LifecycleError(
+      "INVALID",
+      "Revisi tidak boleh mengganti karyawan yang diajukan. Batalkan pengajuan ini dan buat pengajuan baru.",
+    );
+  }
+  if (employeeId) findEmployee(draft, employeeId);
+}
+
+/** The revision itself, inside a transaction somebody else opened. */
+function reviseInDraft(
+  draft: StoreShape,
+  request: LifecycleRequest,
+  payload: LifecyclePayload,
+  actor: ActorIdentity,
+  effectiveAt: string | undefined,
+): void {
+  assertRevisable(draft, request, payload, actor);
+  assertTransition(request.status, "DRAFT");
+
+  /*
+   * Every link issued for the previous version dies here.
+   *
+   * This is the case the token's version binding exists for, checked twice on
+   * purpose: an approver holding an old email must not be able to approve
+   * text that has since been replaced.
+   */
+  revokeRequestTokens(draft, request.id, "request-revised");
+
+  const previous: ApprovalStep[] = request.approvals;
+  const employee = employeeFor(draft, payload);
+  const at = now();
+
+  request.version += 1;
+  request.status = "DRAFT";
+  request.payload = withProfileChanges(payload, employee);
+  // An onboarding's subject IS its payload, so a corrected name has to show up
+  // in the list and in the next email rather than the one that was replaced.
+  request.subject = subjectFor(payload, employee);
+  request.payloadHash = "";
+  request.approvals = [];
+  request.effectiveAt = effectiveAt;
+  request.submittedAt = undefined;
+  request.updatedAt = at;
+
+  audit(draft, {
+    actorId: actor.userId ?? actor.email,
+    actorName: actor.name,
+    source: "PORTAL",
+    action: "request.revised",
+    target: request.id,
+    correlationId: request.id,
+    detail: {
+      version: request.version,
+      // Recorded so the trail shows what was thrown away, not just that
+      // something was.
+      approvalsVoided: previous.filter((step) => step.decision).length,
+    },
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Delegation: handing waiting requests to a substitute                       */
+/* -------------------------------------------------------------------------- */
+
+export interface RerouteReport {
+  rerouted: string[];
+  skipped: Array<{ requestId: string; reason: string }>;
+}
+
+/**
+ * Moves requests already waiting on an absent manager to their substitute.
+ *
+ * Only ever done because HC asked for it explicitly when registering the
+ * delegation — never as a side effect. Each moved request gets a fresh link
+ * sent to the substitute, and every link in the absent manager's inbox dies;
+ * nothing else about the request changes, so its version and fingerprint stay
+ * exactly as they were approved against.
+ *
+ * Separation of duties is re-checked per request. A substitute who raised one
+ * of them, or who would leave its CISO stage with nobody to answer, is not
+ * given that one: it is reported as skipped rather than quietly rerouted.
+ */
+export function rerouteWaitingInDraft(
+  draft: StoreShape,
+  delegation: Delegation,
+  actor: ActorIdentity,
+): RerouteReport {
+  const report: RerouteReport = { rerouted: [], skipped: [] };
+  const absent = delegation.from.email.trim().toLowerCase();
+
+  for (const request of draft.lifecycleRequests) {
+    if (request.status !== "PENDING_MANAGER") continue;
+
+    const step = request.approvals.find(
+      (candidate) => candidate.stage === "MANAGER" && candidate.version === request.version,
+    );
+    // Already covered by a delegation, or not this manager's: leave it alone.
+    if (!step || step.decision || step.onBehalfOf) continue;
+    if (step.approver.email.trim().toLowerCase() !== absent) continue;
+
+    const ciso = request.approvals.find(
+      (candidate) => candidate.stage === "CISO" && candidate.version === request.version,
+    );
+
+    let remaining: ActorIdentity[];
+    try {
+      remaining = assertSeparationOfDuties(request.requester, {
+        manager: delegation.to,
+        ciso: ciso ? answerersOf(ciso) : [],
+      });
+    } catch (error) {
+      report.skipped.push({
+        requestId: request.id,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      continue;
+    }
+
+    // The absent manager's link dies before the substitute's is issued.
+    revokeRequestTokens(draft, request.id, "request-rerouted");
+
+    step.onBehalfOf = step.approver;
+    step.approver = delegation.to;
+    step.delegationId = delegation.id;
+
+    // The substitute cannot also answer the CISO stage of the same request.
+    if (ciso?.pool && remaining.length !== ciso.pool.length) {
+      Object.assign(ciso, cisoStep(request.version, remaining));
+    }
+
+    request.updatedAt = now();
 
     audit(draft, {
       actorId: actor.userId ?? actor.email,
       actorName: actor.name,
       source: "PORTAL",
-      action: "request.revised",
+      action: "request.rerouted",
       target: request.id,
       correlationId: request.id,
       detail: {
         version: request.version,
-        // Recorded so the trail shows what was thrown away, not just that
-        // something was.
-        approvalsVoided: previous.filter((step) => step.decision).length,
+        from: delegation.from.email,
+        to: delegation.to.email,
+        delegationId: delegation.id,
       },
     });
 
-    return request;
-  });
+    emitApprovalRequest(draft, request, "MANAGER");
+    report.rerouted.push(request.id);
+  }
+
+  return report;
 }
+

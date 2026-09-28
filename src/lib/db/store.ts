@@ -3,7 +3,10 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { getDataFilePath } from "@/lib/config/storage";
+import { processLock } from "@/lib/db/processShared";
+import { createStateFileIfAbsent, markStateFileSeen, readStateFile } from "@/lib/db/stateFile";
 import type { ApprovalTokenRecord } from "@/lib/lifecycle/approvalToken";
+import type { Delegation } from "@/lib/lifecycle/delegation";
 import type { ExecutionJob } from "@/lib/lifecycle/executionTypes";
 import type { EmailDelivery, OutboxEvent } from "@/lib/lifecycle/outboxTypes";
 import type { AuditEvent, LifecycleRequest } from "@/lib/lifecycle/types";
@@ -46,6 +49,12 @@ export interface StoreShape {
    */
   approvalTokens: ApprovalTokenRecord[];
   /**
+   * Managers' approvals handed to a substitute while they are away. Kept
+   * forever, ended ones included: who could approve on whose behalf, and when,
+   * is part of the evidence for every decision made under one.
+   */
+  delegations: Delegation[];
+  /**
    * When the legacy workflow was archived, if it has been. Its only job is to
    * make the migration idempotent: running it twice must not re-reconcile
    * accounts an operator has since corrected by hand.
@@ -76,6 +85,7 @@ function emptyStore(): StoreShape {
     outboxEvents: [],
     emailDeliveries: [],
     approvalTokens: [],
+    delegations: [],
     auditEvents: [],
   };
 }
@@ -90,34 +100,47 @@ function resolvePath(): string {
     : path.join(/* turbopackIgnore: true */ process.cwd(), configured);
 }
 
+function parse(raw: string): StoreShape {
+  const parsed = JSON.parse(raw) as Partial<StoreShape>;
+  return {
+    employees: parsed.employees ?? [],
+    requests: parsed.requests ?? [],
+    // Defaulted rather than required, so a store written before the log
+    // existed loads instead of throwing. The same applies to the two
+    // lifecycle collections: an existing store predates both.
+    activity: parsed.activity ?? [],
+    lifecycleRequests: parsed.lifecycleRequests ?? [],
+    executionJobs: parsed.executionJobs ?? [],
+    outboxEvents: parsed.outboxEvents ?? [],
+    emailDeliveries: parsed.emailDeliveries ?? [],
+    approvalTokens: parsed.approvalTokens ?? [],
+    delegations: parsed.delegations ?? [],
+    auditEvents: parsed.auditEvents ?? [],
+    legacyArchivedAt: parsed.legacyArchivedAt,
+  };
+}
+
+function serialise(store: StoreShape): string {
+  return `${JSON.stringify(store, null, 2)}\n`;
+}
+
 async function load(): Promise<StoreShape> {
   const file = resolvePath();
-  try {
-    const raw = await readFile(file, "utf8");
-    const parsed = JSON.parse(raw) as Partial<StoreShape>;
-    return {
-      employees: parsed.employees ?? [],
-      requests: parsed.requests ?? [],
-      // Defaulted rather than required, so a store written before the log
-      // existed loads instead of throwing. The same applies to the two
-      // lifecycle collections: an existing store predates both.
-      activity: parsed.activity ?? [],
-      lifecycleRequests: parsed.lifecycleRequests ?? [],
-      executionJobs: parsed.executionJobs ?? [],
-      outboxEvents: parsed.outboxEvents ?? [],
-      emailDeliveries: parsed.emailDeliveries ?? [],
-      approvalTokens: parsed.approvalTokens ?? [],
-      auditEvents: parsed.auditEvents ?? [],
-      legacyArchivedAt: parsed.legacyArchivedAt,
-    };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      const seeded = emptyStore();
-      await persist(seeded);
-      return seeded;
-    }
-    throw error;
-  }
+
+  // Throws rather than returning nothing if a store this process has read
+  // before goes missing — see stateFile.ts for the day that mattered.
+  const raw = await readStateFile(file);
+  if (raw !== undefined) return parse(raw);
+
+  /*
+   * A genuine first run: seed it. Written with "create only if absent", never
+   * write-then-rename, so a store that reappears between being found missing
+   * and this line is read, not overwritten.
+   */
+  const seeded = emptyStore();
+  await mkdir(path.dirname(file), { recursive: true });
+  if (await createStateFileIfAbsent(file, serialise(seeded))) return seeded;
+  return parse(await readFile(file, "utf8"));
 }
 
 async function persist(store: StoreShape): Promise<void> {
@@ -125,25 +148,17 @@ async function persist(store: StoreShape): Promise<void> {
   await mkdir(path.dirname(file), { recursive: true });
   // Write-then-rename so a crash mid-write can never leave a truncated file.
   const tmp = `${file}.${randomUUID()}.tmp`;
-  await writeFile(tmp, `${JSON.stringify(store, null, 2)}\n`, "utf8");
+  await writeFile(tmp, serialise(store), "utf8");
   await rename(tmp, file);
+  markStateFileSeen(file);
 }
 
 /**
- * Serialises every store access. Node is single-threaded but `await` points
- * interleave, so two concurrent webhook deliveries could otherwise read the
- * same snapshot and clobber each other's write.
+ * Serialises every store access: the API routes, the pages and the schedulers
+ * in instrumentation.ts all queue on the same lock. See processShared.ts for
+ * why that lock can't be a module-level variable.
  */
-let queue: Promise<unknown> = Promise.resolve();
-
-function withLock<T>(task: () => Promise<T>): Promise<T> {
-  const result = queue.then(task, task);
-  queue = result.then(
-    () => undefined,
-    () => undefined,
-  );
-  return result;
-}
+const withLock = processLock("hc-store");
 
 /** Read-only snapshot of the store. */
 export function readStore(): Promise<StoreShape> {

@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 
-import { createAndSubmit } from "@/components/lifecycle/submitRequest";
+import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
 import { Button } from "@/components/ui/Button";
 import { Card, Field, SelectField, TextareaField } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
 import { IconAlert, IconClock, IconNote, IconUser, IconUserCheck } from "@/components/ui/Icons";
 import { TERMINATION_REASONS, type LifecycleRequest, type TerminationReason } from "@/lib/lifecycle/types";
 import type { Employee } from "@/lib/types";
+import { DATE_BOUNDS, dateInputBounds } from "@/lib/validation/dates";
 
 const SECTION =
   "mb-4 flex items-center gap-2 text-xs font-medium tracking-[0.14em] text-ink-faint uppercase";
@@ -39,20 +40,24 @@ const REASON_LABEL: Record<TerminationReason, string> = {
 export function TerminationForm({
   employees,
   initialEmployeeId,
+  revise,
   onSubmitted,
 }: {
-  /** Already excludes anyone with a request in flight. */
+  /** Already excludes anyone with a request in flight — except when revising. */
   employees: Employee[];
   initialEmployeeId?: string;
+  /** The request being revised. Its subject is fixed; everything else starts from it. */
+  revise?: LifecycleRequest;
   onSubmitted: (request: LifecycleRequest) => void;
 }) {
-  const [employeeId, setEmployeeId] = useState(initialEmployeeId ?? "");
+  const previous = revise?.payload.kind === "TERMINATION" ? revise.payload : undefined;
+  const [employeeId, setEmployeeId] = useState(previous?.employeeId ?? initialEmployeeId ?? "");
   const [values, setValues] = useState({
-    reasonCategory: "RESIGN",
-    lastWorkingDate: "",
-    handoverTo: "",
-    note: "",
-    effectiveAt: "",
+    reasonCategory: previous?.reasonCategory ?? "RESIGN",
+    lastWorkingDate: previous?.lastWorkingDate.slice(0, 10) ?? "",
+    handoverTo: previous?.handoverTo ?? "",
+    note: previous?.note ?? "",
+    effectiveAt: revise?.effectiveAt?.slice(0, 10) ?? "",
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -76,14 +81,17 @@ export function TerminationForm({
     setFormError(null);
     setFieldErrors({});
 
-    const result = await createAndSubmit({
+    const body = {
       type: "TERMINATION",
       employeeId,
       ...values,
       handoverTo: values.handoverTo || undefined,
       note: values.note || undefined,
       effectiveAt: values.effectiveAt || undefined,
-    });
+    };
+    const result = revise
+      ? await reviseAndResubmit(revise.id, revise.version, body)
+      : await createAndSubmit(body);
 
     if (result.ok) {
       onSubmitted(result.request);
@@ -111,7 +119,12 @@ export function TerminationForm({
             value={employeeId}
             onChange={(event) => setEmployeeId(event.target.value)}
             error={fieldErrors.employeeId}
-            hint="Karyawan yang sedang memiliki pengajuan berjalan tidak muncul di sini."
+            disabled={Boolean(revise)}
+            hint={
+              revise
+                ? "Karyawan tidak bisa diganti lewat revisi. Batalkan dan buat pengajuan baru bila salah orang."
+                : "Karyawan yang sedang memiliki pengajuan berjalan tidak muncul di sini."
+            }
           >
             <option value="">Pilih karyawan…</option>
             {employees.map((candidate) => (
@@ -172,6 +185,7 @@ export function TerminationForm({
               label="Tanggal terakhir bekerja"
               name="lastWorkingDate"
               type="date"
+              {...dateInputBounds(DATE_BOUNDS.lastWorkingDate)}
               icon={<IconClock className="size-4" />}
               value={values.lastWorkingDate}
               onChange={(event) => update("lastWorkingDate", event.target.value)}
@@ -182,6 +196,7 @@ export function TerminationForm({
               label="Waktu efektif penonaktifan (opsional)"
               name="effectiveAt"
               type="date"
+              {...dateInputBounds(DATE_BOUNDS.effectiveAt)}
               icon={<IconClock className="size-4" />}
               value={values.effectiveAt}
               onChange={(event) => update("effectiveAt", event.target.value)}
@@ -230,7 +245,7 @@ export function TerminationForm({
 
         <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
           <Button type="submit" variant="danger" loading={submitting} disabled={!employeeId}>
-            {submitting ? "Mengirim…" : "Kirim ke approver"}
+            {submitting ? "Mengirim…" : revise ? "Kirim revisi ke approver" : "Kirim ke approver"}
           </Button>
           <p className="text-xs text-ink-faint">
             Akses belum dicabut. Pengajuan dikirim ke manager, lalu CISO.

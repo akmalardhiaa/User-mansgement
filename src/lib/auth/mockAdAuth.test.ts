@@ -141,22 +141,22 @@ describe("the names an account answers to", () => {
 
 describe("where authority comes from", () => {
   it("resolves roles from group membership, not from a hardcoded list", async () => {
-    vi.stubEnv("AD_GROUP_MANAGER", "CN=Division Managers");
+    vi.stubEnv("AD_GROUP_HC", "CN=HC Officers");
     stub(
       account({
-        groups: ["CN=Division Managers,OU=Groups,DC=corp,DC=example,DC=com"],
+        groups: ["CN=HC Officers,OU=Groups,DC=corp,DC=example,DC=com"],
       }),
     );
 
     const user = await authViaMockAd("sarah.wijaya", "mock12345");
 
-    expect(user?.roles).toEqual(["MANAGER"]);
+    expect(user?.roles).toEqual(["HC_REQUESTER"]);
   });
 
   it("gives no authority to somebody in no mapped group", async () => {
-    // Signs in, sees their own profile, and nothing else. Being in the
-    // directory proves identity; it grants nothing here.
-    vi.stubEnv("AD_GROUP_MANAGER", "CN=Division Managers");
+    // Being in the directory proves identity; it grants nothing here — and with
+    // no role at all, the login route refuses to open a session.
+    vi.stubEnv("AD_GROUP_HC", "CN=HC Officers");
     stub(account({ groups: ["CN=HC-Base,OU=Groups,DC=corp,DC=example,DC=com"] }));
 
     const user = await authViaMockAd("sarah.wijaya", "mock12345");

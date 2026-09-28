@@ -60,8 +60,15 @@ export interface ExecutionPlan {
     requiredGroups: string[];
     /** Groups it must NOT hold. */
     forbiddenGroups: string[];
-    attributes: { department?: string; title?: string; manager?: string };
+    attributes: { displayName?: string; department?: string; title?: string; manager?: string };
   };
+}
+
+/** What the directory said about the object before anything ran. */
+export interface PlanBefore {
+  groups: string[];
+  enabled?: boolean;
+  ou?: string;
 }
 
 /** The account name the directory will know this person by. */
@@ -69,10 +76,43 @@ export function accountNameFor(email: string): string {
   return email.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "");
 }
 
-export function buildPlan(
-  payload: LifecyclePayload,
-  before?: { groups: string[]; managerAccount?: string },
-): ExecutionPlan {
+export function buildPlan(payload: LifecyclePayload, before?: PlanBefore): ExecutionPlan {
+  if (payload.kind === "PROFILE_UPDATE") {
+    /*
+     * Only the attributes the directory actually holds are written: name,
+     * department, title. Employment type, location, the HC note and the rest
+     * live in the portal's record alone and are applied from the verified result.
+     *
+     * The postconditions pin everything else to how it was found — same enabled
+     * state, same OU, no group touched. A profile edit that quietly re-enabled a
+     * disabled account or moved it out of quarantine is exactly the side effect
+     * the read-back is there to catch.
+     */
+    const attributes = {
+      displayName: payload.profile.displayName,
+      department: payload.profile.department,
+      title: payload.profile.jobTitle,
+    };
+
+    return {
+      steps: [
+        {
+          key: "set-attributes",
+          label: "Memperbarui nama, departemen, dan jabatan",
+          params: attributes,
+        },
+        { key: "verify", label: "Membaca ulang hasil dari direktori", params: {} },
+      ],
+      postconditions: {
+        enabled: before?.enabled ?? true,
+        ou: before?.ou ?? accessProfileOu("standard"),
+        requiredGroups: [...(before?.groups ?? [])],
+        forbiddenGroups: [],
+        attributes,
+      },
+    };
+  }
+
   if (payload.kind === "ONBOARDING") {
     const groups = accessProfileGroups(payload.accessProfileId);
     const ou = accessProfileOu(payload.accessProfileId);

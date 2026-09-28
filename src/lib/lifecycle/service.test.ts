@@ -46,7 +46,7 @@ const MANAGER: PortalSession = {
   username: "sarah",
   email: "sarah.wijaya@example.com",
   fullName: "Sarah Wijaya",
-  roles: ["MANAGER"],
+  roles: [],
 };
 
 const CISO: PortalSession = {
@@ -55,7 +55,7 @@ const CISO: PortalSession = {
   username: "ciso",
   email: "ciso@example.com",
   fullName: "Dimas Anggara",
-  roles: ["CISO_APPROVER"],
+  roles: [],
 };
 
 const INTRUDER: PortalSession = {
@@ -64,7 +64,7 @@ const INTRUDER: PortalSession = {
   username: "yoga",
   email: "yoga.pratama@example.com",
   fullName: "Yoga Pratama",
-  roles: ["MANAGER"],
+  roles: [],
 };
 
 /** Rizky, from the seed roster. His manager of record is Sarah. */

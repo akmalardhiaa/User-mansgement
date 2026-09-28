@@ -5,8 +5,6 @@ import type { PortalRole } from "@/lib/auth/roles";
 
 const ROLE_LABEL: Record<PortalRole, string> = {
   HC_REQUESTER: "Human Capital",
-  MANAGER: "Manager",
-  CISO_APPROVER: "CISO / IT Security",
   SYSTEM_ADMIN: "Administrator sistem",
   OPS_OPERATOR: "Operator",
   AUDITOR: "Auditor",

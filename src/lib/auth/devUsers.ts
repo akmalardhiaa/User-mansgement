@@ -11,19 +11,15 @@ import type { PortalRole } from "./roles";
  *
  * Between them these cover the cases worth being able to try by hand.
  *
- * Two of them exist to make the approval chain reachable at all: `dimas` and
- * `sarah` carry the addresses that the seeded directory actually records as
- * people's managers, so a request routed to "the manager of this employee"
- * lands on an account somebody can sign into. Without that the demo can raise
- * requests and never approve one, because routing resolves a real address and
- * no login answers to it.
+ * Only `admin` can sign in. The portal is HC's alone: managers and the CISO
+ * team approve from their email and have no role here. The others stay on the
+ * list as valid directory accounts WITHOUT a portal role, so trying to sign in
+ * as one shows exactly what a manager sees in production — a refusal that tells
+ * them to use the email instead.
  *
- * `budi` deliberately holds MANAGER while managing nobody. He is the negative
- * fixture: a role is not authority over a particular request, and he should be
- * refused when he tries to decide one that was addressed to someone else.
- *
- * `rina` has no portal role at all — a perfectly valid employee who should see
- * her own profile and nothing else.
+ * `dimas` and `sarah` still matter: they carry the addresses the seeded
+ * directory records as people's managers, which is where approval emails for
+ * the demo roster are routed.
  */
 export interface DevUser {
   username: string;
@@ -49,7 +45,7 @@ export const DEV_USERS: DevUser[] = [
     password: "dimas12345",
     fullName: "Dimas Anggara",
     email: "dimas.anggara@example.com",
-    roles: ["MANAGER"],
+    roles: [],
     department: "Human Capital",
   },
   {
@@ -57,16 +53,17 @@ export const DEV_USERS: DevUser[] = [
     password: "sarah12345",
     fullName: "Sarah Wijaya",
     email: "sarah.wijaya@example.com",
-    roles: ["MANAGER"],
+    roles: [],
     department: "IT — Engineering",
   },
   {
-    // Holds MANAGER but manages nobody: the "right role, wrong request" case.
+    // A manager of nobody. Once the "right role, wrong request" fixture; there is
+    // no approver role any more, so now simply another account that cannot sign in.
     username: "budi",
     password: "budi12345",
     fullName: "Budi Santoso",
     email: "budi.santoso@example.com",
-    roles: ["MANAGER"],
+    roles: [],
     department: "Engineering",
   },
   {
@@ -74,7 +71,7 @@ export const DEV_USERS: DevUser[] = [
     password: "bagus12345",
     fullName: "Bagus Nugroho",
     email: "bagus.nugroho@example.com",
-    roles: ["CISO_APPROVER"],
+    roles: [],
     department: "IT — Security",
   },
   {
@@ -82,7 +79,7 @@ export const DEV_USERS: DevUser[] = [
     password: "rina12345",
     fullName: "Rina Pratiwi",
     email: "rina.pratiwi@example.com",
-    // Deliberately empty: signs in, sees her own profile, and nothing else.
+    // Deliberately empty: a valid employee with no business in this portal.
     roles: [],
     department: "Finance",
   },

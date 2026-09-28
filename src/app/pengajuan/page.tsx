@@ -6,11 +6,12 @@ import {
   LifecycleTypeBadge,
 } from "@/components/lifecycle/LifecycleStatusBadge";
 import { buttonClasses } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Field";
+import { Card, SelectField } from "@/components/ui/Field";
 import { IconApprovals, IconUserPlus } from "@/components/ui/Icons";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requirePageSession } from "@/lib/auth/current";
 import { hasPermission } from "@/lib/auth/roles";
+import { lifecycleTypeLabel } from "@/lib/lifecycle/pending";
 import { isSamePerson } from "@/lib/lifecycle/routing";
 import { identityOf, listRequests } from "@/lib/lifecycle/service";
 import { stageAwaiting } from "@/lib/lifecycle/stateMachine";
@@ -95,7 +96,7 @@ export default async function RequestListPage({
         <form method="get" className="flex flex-wrap items-end gap-3 border-b border-hairline p-4">
           <label className="flex flex-col gap-1.5 text-xs text-ink-muted">
             Jenis
-            <select
+            <SelectField
               name="type"
               defaultValue={type ?? ""}
               className="rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
@@ -103,15 +104,15 @@ export default async function RequestListPage({
               <option value="">Semua jenis</option>
               {LIFECYCLE_TYPES.map((value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {lifecycleTypeLabel(value)}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
 
           <label className="flex flex-col gap-1.5 text-xs text-ink-muted">
             Status
-            <select
+            <SelectField
               name="status"
               defaultValue={params.status ?? ""}
               className="rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
@@ -122,7 +123,7 @@ export default async function RequestListPage({
                   {value}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
 
           <button type="submit" className={buttonClasses("secondary", "sm")}>

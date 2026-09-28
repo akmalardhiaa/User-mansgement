@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkCsrf, type CsrfCheckInput } from "./csrf";
+import { checkCsrf, selfOrigins, type CsrfCheckInput } from "./csrf";
 
 const SELF = "https://portal.example.com";
 
@@ -92,5 +92,62 @@ describe("what is not protected, and why", () => {
     expect(
       checkCsrf(input({ pathname: "/api/approval-actions-fake", origin: "https://evil.example" })),
     ).toEqual({ allowed: false, reason: "ORIGIN_MISMATCH" });
+  });
+});
+
+describe("knowing this app's own origin", () => {
+  /** What the proxy passes, for a request that arrived with this Host. */
+  function self(host: string, overrides: Partial<Parameters<typeof selfOrigins>[0]> = {}) {
+    return selfOrigins({
+      host,
+      protocol: "http:",
+      forwardedProto: null,
+      configured: undefined,
+      framework: "http://localhost:3000",
+      ...overrides,
+    });
+  }
+
+  function post(origin: string, expectedOrigin: readonly string[]) {
+    return checkCsrf(input({ origin, expectedOrigin }));
+  }
+
+  it("accepts the portal opened at 127.0.0.1, not only at localhost", () => {
+    // `next dev` believes it is localhost whatever the browser typed.
+    expect(post("http://127.0.0.1:3000", self("127.0.0.1:3000"))).toEqual({ allowed: true });
+  });
+
+  it("accepts the portal opened at the machine's LAN address", () => {
+    expect(post("http://10.2.0.2:3000", self("10.2.0.2:3000"))).toEqual({ allowed: true });
+  });
+
+  it("accepts the portal in Docker, where the framework thinks it is 0.0.0.0", () => {
+    const expected = self("localhost:3000", { framework: "http://0.0.0.0:3000" });
+    expect(post("http://localhost:3000", expected)).toEqual({ allowed: true });
+  });
+
+  it("accepts https from the browser behind a TLS-terminating proxy", () => {
+    const expected = self("portal.example.com", { forwardedProto: "https" });
+    expect(post("https://portal.example.com", expected)).toEqual({ allowed: true });
+  });
+
+  it("accepts the published address from APP_BASE_URL", () => {
+    const expected = self("internal:3000", { configured: "https://portal.example.com/" });
+    expect(post("https://portal.example.com", expected)).toEqual({ allowed: true });
+  });
+
+  it("still refuses a forged request, whose Host is this site and whose Origin is not", () => {
+    // The browser sets Host to where it is sending — here — and Origin to the
+    // attacker's page. Reading Host does not let the attacker's origin in.
+    expect(post("https://evil.example", self("localhost:3000"))).toEqual({
+      allowed: false,
+      reason: "ORIGIN_MISMATCH",
+    });
+  });
+
+  it("ignores a forwarded scheme that is not http or https", () => {
+    expect(self("localhost:3000", { forwardedProto: "javascript" })).toEqual([
+      "http://localhost:3000",
+    ]);
   });
 });

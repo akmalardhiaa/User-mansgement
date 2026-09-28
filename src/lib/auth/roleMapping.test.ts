@@ -82,6 +82,22 @@ describe("holding more than one hat", () => {
   it("returns every role the person's groups map to", () => {
     // Separation of duties is enforced per decision, not by pretending nobody
     // can hold two roles — so this has to be visible to the layers above.
+    vi.stubEnv("AD_GROUP_HC", "CN=HC Officers");
+    vi.stubEnv("AD_GROUP_AUDITOR", "CN=Internal Audit");
+
+    const roles = rolesFromGroups([
+      "CN=HC Officers,OU=Groups,DC=corp",
+      "CN=Internal Audit,OU=Groups,DC=corp",
+    ]);
+
+    expect(roles).toContain("HC_REQUESTER");
+    expect(roles).toContain("AUDITOR");
+    expect(roles).toHaveLength(2);
+  });
+
+  it("gives managers and the CISO team nothing in the portal", () => {
+    // They approve from their email. A deployment that still sets the old
+    // variables must not quietly hand those groups a way in.
     vi.stubEnv("AD_GROUP_MANAGER", "CN=Division Managers");
     vi.stubEnv("AD_GROUP_CISO", "CN=IT Security Approvers");
 
@@ -90,9 +106,7 @@ describe("holding more than one hat", () => {
       "CN=IT Security Approvers,OU=Groups,DC=corp",
     ]);
 
-    expect(roles).toContain("MANAGER");
-    expect(roles).toContain("CISO_APPROVER");
-    expect(roles).toHaveLength(2);
+    expect(roles).toEqual([]);
   });
 
   it("names a role once even when two settings both match it", () => {

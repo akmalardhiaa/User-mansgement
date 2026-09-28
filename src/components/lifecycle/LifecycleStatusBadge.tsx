@@ -42,6 +42,10 @@ const TYPE_PRESENTATION: Record<LifecycleType, { label: string; className: strin
   ONBOARDING: { label: "Onboarding", className: "border-ok/30 bg-ok/10 text-ok" },
   MOVEMENT: { label: "Movement", className: "border-info/30 bg-info/10 text-info" },
   TERMINATION: { label: "Termination", className: "border-danger/30 bg-danger/10 text-danger" },
+  PROFILE_UPDATE: {
+    label: "Perubahan Profil",
+    className: "border-accent/30 bg-accent/10 text-accent",
+  },
 };
 
 export function LifecycleTypeBadge({ type }: { type: LifecycleType }) {

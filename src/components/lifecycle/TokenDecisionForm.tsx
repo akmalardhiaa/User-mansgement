@@ -27,14 +27,17 @@ export function TokenDecisionForm({
   /**
    * Which button the approver pressed in the email.
    *
-   * "APPROVED" submits on mount: the decision was made in the inbox, and asking
-   * for it again here was the step this page existed to impose.
+   * "APPROVED" submits on mount: the decision was made in the inbox, one click,
+   * which is what the company asked for. A confirmation step was tried on
+   * 21 September 2026 and taken out again at their request.
    *
    * Be clear about what that costs. Anything which opens the link AND runs its
-   * scripts now approves — a security gateway that clicks links on the way in,
-   * or a forwarded message someone else opens. The endpoint is still POST-only,
-   * so merely fetching the URL decides nothing; executing the page does. That is
-   * a narrower exposure than a GET that mutates, and it is not zero.
+   * scripts approves — a security gateway that detonates links in a sandbox, or
+   * a forwarded message someone else opens. With the CISO stage sent to a whole
+   * team the exposure is multiplied by the team, and one such approval also
+   * kills every other member's link. The endpoint is still POST-only, so merely
+   * fetching the URL decides nothing, and the decision is credited to the owner
+   * of the link — narrower than a GET that mutates, and not zero.
    *
    * "REJECTED" never auto-submits. A rejection requires a reason, the requester
    * reads it, and there is nothing to submit until somebody writes one.
@@ -67,7 +70,7 @@ export function TokenDecisionForm({
 
   /*
    * Fires once. React runs effects twice in development's strict mode, and the
-   * token is single-use — a second POST would come back "already consumed" and
+   * token is single-use — a second POST would come back "already decided" and
    * show the approver an error for something that in fact worked.
    */
   const submitted = useRef(false);
@@ -126,6 +129,7 @@ export function TokenDecisionForm({
 
       <div className="mt-4 space-y-4">
         <FormAlert tone="error">{error}</FormAlert>
+
 
         {rejecting ? (
           <TextareaField

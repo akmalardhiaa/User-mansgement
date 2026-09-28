@@ -1,4 +1,6 @@
 import { isAccessProfileId } from "@/lib/lifecycle/accessProfiles";
+import { DATE_BOUNDS, checkDate, startOfJakartaDay, type DateBounds } from "@/lib/validation/dates";
+import { parseEmployeeProfileInput } from "@/lib/validation/employeeProfileInput";
 import {
   LIFECYCLE_TYPES,
   TERMINATION_REASONS,
@@ -35,10 +37,6 @@ const NIK_PATTERN = /^[A-Za-z0-9._-]{3,32}$/;
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function isIsoDate(value: string): boolean {
-  return !Number.isNaN(Date.parse(value));
 }
 
 /**
@@ -86,35 +84,55 @@ function accessProfile(errors: LifecycleErrors, body: Record<string, unknown>): 
   return value;
 }
 
+/**
+ * A date that is real and plausible for what it means — see validation/dates.ts
+ * for why "parses" was not enough.
+ */
 function date(
   errors: LifecycleErrors,
   body: Record<string, unknown>,
   field: string,
   label: string,
   required: boolean,
+  bounds: DateBounds,
+  now: Date,
 ): string | undefined {
   const value = asString(body[field]);
   if (!value) {
     if (required) errors[field] = `${label} wajib diisi.`;
     return undefined;
   }
-  if (!isIsoDate(value)) {
-    errors[field] = `${label} tidak valid.`;
+  const check = checkDate(value, label, bounds, now);
+  if (!check.ok) {
+    errors[field] = check.message;
     return undefined;
   }
   return value;
 }
 
-export function parseLifecycleRequestInput(payload: unknown): LifecycleInputResult {
+export function parseLifecycleRequestInput(payload: unknown, now = new Date()): LifecycleInputResult {
   const body = (payload ?? {}) as Record<string, unknown>;
   const errors: LifecycleErrors = {};
 
   const type = asString(body.type).toUpperCase() as LifecycleType;
   if (!(LIFECYCLE_TYPES as readonly string[]).includes(type)) {
-    return { ok: false, errors: { type: "Jenis pengajuan harus Onboarding, Movement, atau Termination." } };
+    return {
+      ok: false,
+      errors: { type: "Jenis pengajuan harus Onboarding, Movement, Termination, atau Perubahan Profil." },
+    };
   }
 
-  const effectiveAt = date(errors, body, "effectiveAt", "Waktu efektif", false);
+  /*
+   * When the approved change runs. An onboarding has none: its account is made
+   * as soon as both approvals are in, whatever dates the form carries — the
+   * start date is recorded as the first day of work and schedules nothing. Two
+   * date fields meant HC set a start date of today and an effective date months
+   * out, and watched the new hire never appear.
+   */
+  const effectiveAt =
+    type === "ONBOARDING"
+      ? undefined
+      : date(errors, body, "effectiveAt", "Waktu efektif", false, DATE_BOUNDS.effectiveAt, now);
 
   let built: LifecyclePayload | undefined;
 
@@ -135,7 +153,7 @@ export function parseLifecycleRequestInput(payload: unknown): LifecycleInputResu
       requireField(errors, body, "managerEmail", "Email manager", 5, 200),
       "Email manager",
     );
-    const startDate = date(errors, body, "startDate", "Tanggal mulai", true);
+    const startDate = date(errors, body, "startDate", "Tanggal mulai", true, DATE_BOUNDS.startDate, now);
     const accessProfileId = accessProfile(errors, body);
     const jobDescription = optional(errors, body, "jobDescription", "Keterangan jabatan", 2000);
 
@@ -145,7 +163,7 @@ export function parseLifecycleRequestInput(payload: unknown): LifecycleInputResu
     }
     // A contract with no end date reads as permanent to everyone downstream.
     const expiredDate =
-      employmentType === "CONTRACT" ? date(errors, body, "expiredDate", "Tanggal berakhir kontrak", true) : undefined;
+      employmentType === "CONTRACT" ? date(errors, body, "expiredDate", "Tanggal berakhir kontrak", true, DATE_BOUNDS.newContractEnd, now) : undefined;
 
     const locationType = asString(body.locationType).toUpperCase();
     if (locationType !== "PUSAT" && locationType !== "CABANG") {
@@ -208,7 +226,7 @@ export function parseLifecycleRequestInput(payload: unknown): LifecycleInputResu
 
   if (type === "TERMINATION") {
     const employeeId = requireField(errors, body, "employeeId", "Karyawan", 1, 120);
-    const lastWorkingDate = date(errors, body, "lastWorkingDate", "Tanggal terakhir bekerja", true);
+    const lastWorkingDate = date(errors, body, "lastWorkingDate", "Tanggal terakhir bekerja", true, DATE_BOUNDS.lastWorkingDate, now);
 
     const reasonCategory = asString(body.reasonCategory).toUpperCase();
     if (!(TERMINATION_REASONS as readonly string[]).includes(reasonCategory)) {
@@ -231,7 +249,27 @@ export function parseLifecycleRequestInput(payload: unknown): LifecycleInputResu
     }
   }
 
+  if (type === "PROFILE_UPDATE") {
+    const employeeId = requireField(errors, body, "employeeId", "Karyawan", 1, 120);
+    const profile = parseEmployeeProfileInput(body, now);
+    if (!profile.ok) Object.assign(errors, profile.errors);
+
+    if (Object.keys(errors).length === 0 && profile.ok) {
+      built = {
+        kind: "PROFILE_UPDATE",
+        employeeId,
+        profile: profile.value,
+        // Deliberately empty. Anything the browser sends here is ignored: the
+        // diff approvers read is computed by the server against the record.
+        changes: [],
+      };
+    }
+  }
+
   if (Object.keys(errors).length > 0 || !built) return { ok: false, errors };
 
-  return { ok: true, value: { payload: built, effectiveAt } };
+  return {
+    ok: true,
+    value: { payload: built, effectiveAt: effectiveAt ? startOfJakartaDay(effectiveAt) : undefined },
+  };
 }

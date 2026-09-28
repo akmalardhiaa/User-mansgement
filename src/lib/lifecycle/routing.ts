@@ -1,6 +1,16 @@
 import type { Employee } from "@/lib/types";
 
-import type { ActorIdentity, LifecyclePayload } from "./types";
+import type { ActorIdentity, ApprovalStep, LifecyclePayload } from "./types";
+
+/** Everyone who may answer a stage: its team, or the one person it was addressed to. */
+export function answerersOf(step: ApprovalStep): readonly ActorIdentity[] {
+  return step.pool?.length ? step.pool : [step.approver];
+}
+
+/** The member of a stage a person is, if they are one. */
+export function answererMatching(step: ApprovalStep, actor: ActorIdentity): ActorIdentity | undefined {
+  return answerersOf(step).find((member) => isSamePerson(member, actor));
+}
 
 /**
  * Who approves what.
@@ -18,7 +28,8 @@ import type { ActorIdentity, LifecyclePayload } from "./types";
 
 export interface ApproverRouting {
   manager: ActorIdentity;
-  ciso: ActorIdentity;
+  /** One CISO approver, or the whole CISO team — any one of whom may answer. */
+  ciso: ActorIdentity | readonly ActorIdentity[];
 }
 
 export class RoutingError extends Error {
@@ -58,6 +69,49 @@ export function resolveCiso(): ActorIdentity {
 }
 
 /**
+ * The CISO team: everyone the second stage is sent to.
+ *
+ * `CISO_APPROVER_EMAILS` lists them, comma-separated, each either a bare
+ * address or `Name <address>`. Every member gets their own email and their own
+ * single-use link; the first to answer decides, and every other member's link
+ * dies in the same transaction.
+ *
+ * Who is NOT on this list matters as much as who is. The head of the CISO
+ * function supervises the team rather than approving, and is kept out simply by
+ * not being listed — nothing in this app hands them a link.
+ *
+ * Without the list, the single `CISO_APPROVER_EMAIL` still works as a team of
+ * one, so an existing deployment keeps behaving exactly as before.
+ */
+export function resolveCisoTeam(): ActorIdentity[] {
+  const raw = process.env.CISO_APPROVER_EMAILS?.trim();
+  if (!raw) return [resolveCiso()];
+
+  const team: ActorIdentity[] = [];
+  for (const entry of raw.split(",")) {
+    const text = entry.trim();
+    if (!text) continue;
+
+    const named = /^(.*?)<\s*([^<>\s]+)\s*>$/.exec(text);
+    const email = (named ? named[2] : text).toLowerCase();
+    const name = named?.[1].trim() || email;
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      // Loud, not skipped: a mistyped member is a person who silently never
+      // hears about anything, and nobody would notice until it mattered.
+      throw new RoutingError(`CISO_APPROVER_EMAILS memuat alamat yang tidak sah: "${text}".`);
+    }
+    // The same person listed twice would get two links for one vote.
+    if (!team.some((member) => member.email === email)) team.push({ name, email });
+  }
+
+  if (team.length === 0) {
+    throw new RoutingError("CISO_APPROVER_EMAILS diisi tetapi tidak memuat satu alamat pun.");
+  }
+  return team;
+}
+
+/**
  * The manager who decides the first stage.
  *
  * Which manager depends on what is being asked, and the difference matters:
@@ -66,6 +120,10 @@ export function resolveCiso(): ActorIdentity {
  *     is going TO. They are the one who has to want the headcount.
  *   - Termination routes to the manager the person reports to NOW, because
  *     there is no destination and the current manager is the one affected.
+ *   - A profile update routes to the current manager too. It cannot name a
+ *     manager of its own — that field is not editable — so there is no
+ *     destination to route to, and letting the request choose its approver
+ *     would defeat having one.
  */
 export function resolveManager(
   payload: LifecyclePayload,
@@ -99,8 +157,9 @@ function identity(name: string, email: string): ActorIdentity {
 export function resolveRouting(
   payload: LifecyclePayload,
   employee: Employee | undefined,
+  cisoTeam: readonly ActorIdentity[] = resolveCisoTeam(),
 ): ApproverRouting {
-  return { manager: resolveManager(payload, employee), ciso: resolveCiso() };
+  return { manager: resolveManager(payload, employee), ciso: cisoTeam };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -121,30 +180,42 @@ export function isSamePerson(a: ActorIdentity, b: ActorIdentity): boolean {
 }
 
 /**
- * Refuses a routing where one person would wear two hats.
+ * Refuses a routing where one person would wear two hats — and returns the CISO
+ * team members who may answer this particular request.
  *
  * Two approvals only mean something if two different people give them. This is
  * checked at submit rather than at decision time so the request is refused
  * before anybody is emailed about it — discovering the clash halfway through
  * would leave a request that cannot legitimately be completed.
+ *
+ * For a team, a clash does not sink the request: the member who raised it, or
+ * who is also its manager, is simply left out and never gets a link. Only when
+ * nobody on the team is left is the request refused.
  */
 export function assertSeparationOfDuties(
   requester: ActorIdentity,
   routing: ApproverRouting,
-): void {
+): ActorIdentity[] {
   if (isSamePerson(requester, routing.manager)) {
     throw new SeparationOfDutiesError(
       "Pemohon tidak boleh menjadi manager yang menyetujui pengajuannya sendiri.",
     );
   }
-  if (isSamePerson(requester, routing.ciso)) {
+
+  const team: readonly ActorIdentity[] = Array.isArray(routing.ciso)
+    ? routing.ciso
+    : [routing.ciso as ActorIdentity];
+
+  const isRequester = (member: ActorIdentity) => isSamePerson(requester, member);
+  const isManager = (member: ActorIdentity) => isSamePerson(routing.manager, member);
+  const eligible = team.filter((member) => !isRequester(member) && !isManager(member));
+
+  if (eligible.length === 0) {
     throw new SeparationOfDutiesError(
-      "Pemohon tidak boleh menjadi approver CISO untuk pengajuannya sendiri.",
+      team.some(isRequester)
+        ? "Pemohon tidak boleh menjadi approver CISO untuk pengajuannya sendiri."
+        : "Manager dan CISO harus dua orang berbeda. Gunakan delegasi resmi bila keduanya bertabrakan.",
     );
   }
-  if (isSamePerson(routing.manager, routing.ciso)) {
-    throw new SeparationOfDutiesError(
-      "Manager dan CISO harus dua orang berbeda. Gunakan delegasi resmi bila keduanya bertabrakan.",
-    );
-  }
+  return eligible;
 }

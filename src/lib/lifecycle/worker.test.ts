@@ -111,6 +111,7 @@ async function seed(store: Partial<StoreShape>, ad: AdAccountState[] = []): Prom
     outboxEvents: [],
     emailDeliveries: [],
     approvalTokens: [],
+    delegations: [],
     auditEvents: [],
     ...store,
   };
@@ -156,6 +157,43 @@ describe("onboarding, start to finish", () => {
     const [account] = await readMockDirectory();
     expect(account.enabled).toBe(true);
     expect(account.groups).toEqual(accessProfileGroups("engineering"));
+  });
+
+  it("is made now even when it was scheduled for a later date", async () => {
+    // An onboarding approved with an effective date of 1 January 2027, from
+    // before approval became the go-ahead for a new hire.
+    await seed({
+      lifecycleRequests: [
+        request({
+          payload: ONBOARDING,
+          status: "SCHEDULED",
+          effectiveAt: "2027-01-01T00:00:00+07:00",
+        }),
+      ],
+    });
+
+    const report = await runDueJobs({ workerId: "w1", now: new Date("2026-09-22T03:00:00.000Z") });
+    expect(report.completed).toBe(1);
+    expect((await store()).employees.some((e) => e.email === ONBOARDING.email)).toBe(true);
+  });
+
+  it("still waits for the date when it is not an onboarding", async () => {
+    // A termination scheduled for later must not disable somebody early.
+    await seed({
+      employees: [employee()],
+      lifecycleRequests: [
+        request({
+          payload: { kind: "TERMINATION", employeeId: "emp_1", reasonCategory: "RESIGN", lastWorkingDate: "2026-12-31" },
+          employeeId: "emp_1",
+          status: "SCHEDULED",
+          effectiveAt: "2027-01-01T00:00:00+07:00",
+        }),
+      ],
+    }, [adAccount()]);
+
+    const report = await runDueJobs({ workerId: "w1", now: new Date("2026-09-22T03:00:00.000Z") });
+    expect(report.ran).toBe(0);
+    expect((await store()).lifecycleRequests[0].status).toBe("SCHEDULED");
   });
 });
 
@@ -428,21 +466,29 @@ describe("a worker that stopped without reporting", () => {
 
 describe("scheduling", () => {
   it("leaves a request alone until its effective date arrives", async () => {
-    await seed({
-      lifecycleRequests: [
-        request({
-          payload: ONBOARDING,
-          status: "SCHEDULED",
-          effectiveAt: "2099-01-01T00:00:00.000Z",
-        }),
-      ],
-    });
+    // Not an onboarding: those are made as soon as they are approved.
+    await seed(
+      {
+        employees: [employee()],
+        lifecycleRequests: [
+          request({
+            payload: { kind: "TERMINATION", employeeId: "emp_1", reasonCategory: "RESIGN", lastWorkingDate: "2026-12-31" },
+            employeeId: "emp_1",
+            status: "SCHEDULED",
+            effectiveAt: "2099-01-01T00:00:00.000Z",
+          }),
+        ],
+      },
+      [adAccount()],
+    );
 
     const report = await runDueJobs({ workerId: "w1", now: new Date("2026-09-16T00:00:00.000Z") });
 
     expect(report.ran).toBe(0);
     expect((await store()).lifecycleRequests[0].status).toBe("SCHEDULED");
-    expect(await readMockDirectory()).toHaveLength(0);
+    // The account is untouched: still enabled, nobody disabled early.
+    const [account] = await readMockDirectory();
+    expect(account.enabled).toBe(true);
   });
 
   it("runs it once the date has passed", async () => {

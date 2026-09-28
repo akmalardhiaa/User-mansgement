@@ -1,6 +1,9 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+
+import { processLock } from "@/lib/db/processShared";
+import { markStateFileSeen, readStateFile } from "@/lib/db/stateFile";
 
 import type { PortalRole } from "./roles";
 
@@ -53,14 +56,13 @@ function resolvePath(): string {
 }
 
 async function load(): Promise<SessionFile> {
-  try {
-    const raw = await readFile(resolvePath(), "utf8");
-    const parsed = JSON.parse(raw) as Partial<SessionFile>;
-    return { sessions: parsed.sessions ?? [] };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { sessions: [] };
-    throw error;
-  }
+  // Missing is only "no sessions yet" on a first run; a file that vanished
+  // after being read throws rather than signing everybody out on the next
+  // write. See lib/db/stateFile.ts.
+  const raw = await readStateFile(resolvePath());
+  if (raw === undefined) return { sessions: [] };
+  const parsed = JSON.parse(raw) as Partial<SessionFile>;
+  return { sessions: parsed.sessions ?? [] };
 }
 
 async function persist(file: SessionFile): Promise<void> {
@@ -71,19 +73,17 @@ async function persist(file: SessionFile): Promise<void> {
   const tmp = `${target}.${randomUUID()}.tmp`;
   await writeFile(tmp, `${JSON.stringify(file, null, 2)}\n`, "utf8");
   await rename(tmp, target);
+  markStateFileSeen(target);
 }
 
-/** Serialises access, so two concurrent requests cannot clobber each other. */
-let queue: Promise<unknown> = Promise.resolve();
-
-function withLock<T>(task: () => Promise<T>): Promise<T> {
-  const result = queue.then(task, task);
-  queue = result.then(
-    () => undefined,
-    () => undefined,
-  );
-  return result;
-}
+/**
+ * Serialises access, so two concurrent requests cannot clobber each other,
+ * including one handled by a page and one by a route handler, which run
+ * different copies of this module. Split, a page render refreshing a session
+ * could save over a logout that had just revoked it. See
+ * lib/db/processShared.ts.
+ */
+const withLock = processLock("hc-sessions");
 
 export function readSessions(): Promise<SessionRecord[]> {
   return withLock(async () => (await load()).sessions);

@@ -4,6 +4,8 @@ import type { StoreShape } from "@/lib/db/store";
 
 import { issueToken, revokeTokens } from "./approvalToken";
 import { seal } from "./outboxCrypto";
+import { INTERNAL_PROFILE_FIELDS, REDACTED_VALUE } from "./profileUpdate";
+import { answerersOf } from "./routing";
 import type { OutboxEvent, OutboxKind } from "./outboxTypes";
 import type { ApprovalStage, LifecyclePayload, LifecycleRequest, LifecycleType } from "./types";
 
@@ -32,6 +34,10 @@ export interface ApprovalMailPayload {
   subjectName: string;
   requesterName: string;
   approverName: string;
+  /** How many people this stage was sent to, when it went to a team. */
+  teamSize?: number;
+  /** The manager this approver is standing in for, under a delegation. */
+  onBehalfOf?: string;
   effectiveAt?: string;
   /**
    * The request itself, so an approver can judge it from the message rather
@@ -83,7 +89,33 @@ function push(
  * by default and has to be named to travel. Excluding by omission puts the
  * burden on whoever adds the field to remember; this way forgetting is safe.
  */
-function mailSafePayload(payload: LifecyclePayload): LifecyclePayload {
+export function mailSafePayload(payload: LifecyclePayload): LifecyclePayload {
+  if (payload.kind === "PROFILE_UPDATE") {
+    /*
+     * The HC note stays in the portal. The approver still sees THAT it changed —
+     * a change hidden from the approver is a change nobody approved — but its
+     * content is replaced before it ever reaches the queue, and the full target
+     * profile is dropped entirely: the changes are what is being decided.
+     */
+    const internal = new Set<string>(INTERNAL_PROFILE_FIELDS);
+    return {
+      kind: payload.kind,
+      employeeId: payload.employeeId,
+      profile: {
+        firstName: payload.profile.firstName,
+        lastName: payload.profile.lastName,
+        displayName: payload.profile.displayName,
+        jobTitle: payload.profile.jobTitle,
+        department: payload.profile.department,
+      },
+      changes: payload.changes.map((change) =>
+        internal.has(change.field)
+          ? { field: change.field, label: change.label, from: "—", to: REDACTED_VALUE }
+          : change,
+      ),
+    };
+  }
+
   if (payload.kind !== "TERMINATION") return payload;
 
   return {
@@ -96,26 +128,28 @@ function mailSafePayload(payload: LifecyclePayload): LifecyclePayload {
 }
 
 /**
- * Asks an approver to decide.
+ * Asks an approver — or every member of an approving team — to decide.
  *
- * Issues the single-use link, records its hash, and seals the raw value into
- * the queued message. The raw token exists in exactly two places from here: this
- * sealed payload, and the email once it is rendered. It is deleted from the
- * payload the moment the message is accepted.
+ * Each person gets their own message and their own single-use link, bound to
+ * their address. A shared link sent to a distribution list would be cheaper,
+ * and it would make the audit trail unable to say who approved, let anybody the
+ * message was forwarded to decide, and give no way to leave out a member who is
+ * party to the request. Per-person links answer all three.
+ *
+ * The raw token exists in exactly two places from here: this sealed payload,
+ * and the email once it is rendered. It is deleted from the payload the moment
+ * the message is accepted.
  */
 export function emitApprovalRequest(
   draft: StoreShape,
   request: LifecycleRequest,
   stage: ApprovalStage,
   now = new Date(),
-): OutboxEvent | undefined {
+): OutboxEvent[] {
   const step = request.approvals.find(
     (candidate) => candidate.stage === stage && candidate.version === request.version,
   );
-  if (!step) return undefined;
-
-  const issued = issueToken(request.id, request.version, stage, now);
-  draft.approvalTokens.push(issued.record);
+  if (!step) return [];
 
   const managerStep =
     stage === "CISO"
@@ -124,39 +158,53 @@ export function emitApprovalRequest(
         )
       : undefined;
 
-  const payload: ApprovalMailPayload = {
-    kind: "approval.request",
-    token: issued.raw,
-    requestId: request.id,
-    version: request.version,
-    type: request.type,
-    stage,
-    subjectName: request.subject.displayName,
-    requesterName: request.requester.name,
-    approverName: step.approver.name,
-    effectiveAt: request.effectiveAt,
-    payload: mailSafePayload(request.payload),
-    managerDecision:
-      managerStep?.decidedAt && managerStep.decidedBy
-        ? { by: managerStep.decidedBy.name, at: managerStep.decidedAt }
-        : undefined,
-  };
-
+  const members = answerersOf(step);
   const at = now.toISOString();
-  return push(
-    draft,
-    {
+
+  return members.map((member) => {
+    const issued = issueToken(request.id, request.version, stage, now, member.email);
+    draft.approvalTokens.push(issued.record);
+
+    const payload: ApprovalMailPayload = {
       kind: "approval.request",
-      aggregateId: request.id,
+      token: issued.raw,
+      requestId: request.id,
       version: request.version,
+      type: request.type,
       stage,
-      recipient: step.approver.email,
-      sealedPayload: seal(JSON.stringify(payload)),
-      // Due immediately. The dispatcher decides when it actually runs.
-      nextAttemptAt: at,
-    },
-    at,
-  );
+      subjectName: request.subject.displayName,
+      requesterName: request.requester.name,
+      approverName: member.name,
+      teamSize: members.length > 1 ? members.length : undefined,
+      onBehalfOf: step.onBehalfOf?.name,
+      effectiveAt: request.effectiveAt,
+      payload: mailSafePayload(request.payload),
+      managerDecision:
+        managerStep?.decidedAt && managerStep.decidedBy
+          ? {
+              by: managerStep.onBehalfOf
+                ? `${managerStep.decidedBy.name} (atas nama ${managerStep.onBehalfOf.name})`
+                : managerStep.decidedBy.name,
+              at: managerStep.decidedAt,
+            }
+          : undefined,
+    };
+
+    return push(
+      draft,
+      {
+        kind: "approval.request",
+        aggregateId: request.id,
+        version: request.version,
+        stage,
+        recipient: member.email,
+        sealedPayload: seal(JSON.stringify(payload)),
+        // Due immediately. The dispatcher decides when it actually runs.
+        nextAttemptAt: at,
+      },
+      at,
+    );
+  });
 }
 
 /**

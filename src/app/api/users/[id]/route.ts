@@ -1,8 +1,6 @@
-import { actorNameOf } from "@/lib/auth/current";
 import { requirePermission } from "@/lib/auth/guard";
-import { getEmployeeById, updateEmployeeProfile } from "@/lib/db/repository";
-import { fail, ok, readJson } from "@/lib/http/apiResponse";
-import { parseEmployeeProfileInput } from "@/lib/validation/employeeProfileInput";
+import { getEmployeeById } from "@/lib/db/repository";
+import { fail, ok } from "@/lib/http/apiResponse";
 
 export const dynamic = "force-dynamic";
 
@@ -19,40 +17,13 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/users/[id]"
   return ok({ employee });
 }
 
-/**
- * PUT /api/users/[id] — edit an employee's profile.
+/*
+ * There is deliberately no PUT here any more.
  *
- * This is the unmediated half of the model: correcting a name, filling in a job
- * description, recording that someone moved from contract to permanent. None
- * of it changes who has access, which is why it needs no approval.
- *
- * Anything that *does* change access goes elsewhere on purpose, so this route
- * cannot be used to route a change around the manager.
+ * It used to write a profile straight to the record, department and job title
+ * included, with no approval — so a division change could skip the manager and
+ * the CISO entirely, and the directory would claim a change Active Directory had
+ * never been told about. Editing a profile is now a PROFILE_UPDATE request
+ * (POST /api/lifecycle-requests), approved twice and applied by the worker.
+ * Leaving the old route beside it would leave the bypass beside the control.
  */
-export async function PUT(request: Request, ctx: RouteContext<"/api/users/[id]">) {
-  const guarded = await requirePermission("employee.update");
-  if (!guarded.ok) return guarded.response;
-
-  const { id } = await ctx.params;
-
-  const parsed = parseEmployeeProfileInput(await readJson(request));
-  if (!parsed.ok) {
-    return fail("Perbaiki isian yang ditandai.", 422, { fieldErrors: parsed.errors });
-  }
-
-  try {
-    const employee = await updateEmployeeProfile(id, parsed.value, actorNameOf(guarded.session));
-    return ok({ employee, message: "Profil karyawan diperbarui." });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Gagal memperbarui profil.";
-
-    // The repository throws for both "no such employee" and "busy in an
-    // approval". They are different answers: one is a 404, the other a 409
-    // the caller can resolve by finishing that request first.
-    if (message.includes("tidak ditemukan")) return fail(message, 404);
-    if (message.includes("sedang dalam proses")) return fail(message, 409);
-
-    console.error("[users:update]", error);
-    return fail("Gagal memperbarui profil karyawan.", 500);
-  }
-}

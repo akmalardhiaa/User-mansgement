@@ -27,7 +27,12 @@ export function RequestSubmitted({
   onRaiseAnother: () => void;
 }) {
   const manager = request.approvals.find((step) => step.stage === "MANAGER")?.approver;
-  const ciso = request.approvals.find((step) => step.stage === "CISO")?.approver;
+  const cisoStep = request.approvals.find((step) => step.stage === "CISO");
+  // A team is shown as the team, with its size where an address would be: each
+  // member gets their own email, and the first answer decides.
+  const ciso = cisoStep?.pool?.length
+    ? { name: cisoStep.approver.name, email: `${cisoStep.pool.length} email terpisah · keputusan pertama berlaku` }
+    : cisoStep?.approver;
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={TRANSITION}>

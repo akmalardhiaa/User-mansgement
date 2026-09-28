@@ -112,6 +112,16 @@ export interface AdDriver {
   findByGuid(objectGUID: string): Promise<AdAccountState | undefined>;
 
   /**
+   * Everyone who is a member of a group, as the directory states it now.
+   *
+   * A read, used to learn who is on the CISO team at the moment a request is
+   * submitted — so joining or leaving the team is a change made in the
+   * directory, by the people who own it, and not a line in this app's config.
+   * The group is matched as a whole DN, never as a substring.
+   */
+  listGroupMembers(groupDn: string): Promise<AdAccountState[]>;
+
+  /**
    * Creates the object DISABLED, always.
    *
    * An account that exists and works before its group memberships have been

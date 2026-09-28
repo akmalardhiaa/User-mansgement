@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 
-import { createAndSubmit } from "@/components/lifecycle/submitRequest";
+import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
 import { Button } from "@/components/ui/Button";
 import { Card, Field, SelectField, TextareaField } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
@@ -19,8 +19,10 @@ import {
 import { ManagerPicker } from "@/components/users/ManagerPicker";
 import { ACCESS_PROFILES } from "@/lib/lifecycle/accessProfiles";
 import type { LifecycleRequest } from "@/lib/lifecycle/types";
-import { DEPARTMENTS } from "@/lib/db/seed";
+import { ComboField } from "@/components/ui/ComboField";
+import { DEPARTMENT_GROUPS, JOB_TITLE_GROUPS } from "@/lib/db/seed";
 import type { Employee } from "@/lib/types";
+import { DATE_BOUNDS, dateInputBounds } from "@/lib/validation/dates";
 
 const SECTION =
   "mb-4 flex items-center gap-2 text-xs font-medium tracking-[0.14em] text-ink-faint uppercase";
@@ -42,7 +44,6 @@ const EMPTY = {
   managerEmail: "",
   startDate: "",
   accessProfileId: "standard",
-  effectiveAt: "",
 };
 
 /**
@@ -53,18 +54,46 @@ const EMPTY = {
  * directory objects server-side, by people who review that mapping — which is
  * the difference between choosing a role and writing one.
  */
+/** The form's starting values when revising: the proposal as it was sent. */
+function fromRequest(request: LifecycleRequest | undefined): typeof EMPTY {
+  if (request?.payload.kind !== "ONBOARDING") return EMPTY;
+  const payload = request.payload;
+  return {
+    nik: payload.nik,
+    firstName: payload.firstName,
+    lastName: payload.lastName,
+    displayName: payload.displayName,
+    email: payload.email,
+    jobTitle: payload.jobTitle,
+    jobDescription: payload.jobDescription ?? "",
+    department: payload.department,
+    employmentType: payload.employmentType,
+    expiredDate: payload.expiredDate?.slice(0, 10) ?? "",
+    locationType: payload.locationType,
+    branchName: payload.branchName ?? "",
+    managerName: payload.managerName,
+    managerEmail: payload.managerEmail,
+    startDate: payload.startDate.slice(0, 10),
+    accessProfileId: payload.accessProfileId,
+  };
+}
+
 export function OnboardingForm({
   employees,
+  revise,
   onSubmitted,
 }: {
   employees: Employee[];
+  /** The request being revised. Everything starts from what was sent. */
+  revise?: LifecycleRequest;
   onSubmitted: (request: LifecycleRequest) => void;
 }) {
-  const [values, setValues] = useState(EMPTY);
+  const [values, setValues] = useState(() => fromRequest(revise));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const nameEdited = useRef(false);
+  // When revising, the name was already written by hand — stop it following.
+  const nameEdited = useRef(Boolean(revise));
 
   function update(field: keyof typeof EMPTY, value: string) {
     setValues((current) => {
@@ -90,16 +119,18 @@ export function OnboardingForm({
     setFormError(null);
     setFieldErrors({});
 
-    const result = await createAndSubmit({
+    const body = {
       type: "ONBOARDING",
       ...values,
-      // Empty strings would fail date validation; absent means "as soon as it
-      // is approved", which is the ordinary case.
+      // Empty strings would fail date validation. There is no effective date for
+      // an onboarding: the account is made as soon as both approvals are in.
       expiredDate: values.employmentType === "CONTRACT" ? values.expiredDate : undefined,
       branchName: values.locationType === "CABANG" ? values.branchName : undefined,
-      effectiveAt: values.effectiveAt || undefined,
       jobDescription: values.jobDescription || undefined,
-    });
+    };
+    const result = revise
+      ? await reviseAndResubmit(revise.id, revise.version, body)
+      : await createAndSubmit(body);
 
     if (result.ok) {
       onSubmitted(result.request);
@@ -178,30 +209,27 @@ export function OnboardingForm({
             Penempatan
           </p>
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field
+            <ComboField
               label="Jabatan"
               name="jobTitle"
+              groups={JOB_TITLE_GROUPS}
               icon={<IconBriefcase className="size-4" />}
               value={values.jobTitle}
-              onChange={(event) => update("jobTitle", event.target.value)}
+              onChange={(next) => update("jobTitle", next)}
               error={fieldErrors.jobTitle}
               placeholder="Backend Engineer"
+              hint="Pilih dari daftar, atau ketik jabatan baru."
             />
-            <Field
+            <ComboField
               label="Departemen"
               name="department"
-              list="onboarding-departments"
+              groups={DEPARTMENT_GROUPS}
               icon={<IconBuilding className="size-4" />}
               value={values.department}
-              onChange={(event) => update("department", event.target.value)}
+              onChange={(next) => update("department", next)}
               error={fieldErrors.department}
               hint="Pilih dari daftar, atau ketik divisi baru."
             />
-            <datalist id="onboarding-departments">
-              {DEPARTMENTS.map((department) => (
-                <option key={department} value={department} />
-              ))}
-            </datalist>
 
             <SelectField
               label="Status kepegawaian"
@@ -219,6 +247,7 @@ export function OnboardingForm({
                 label="Kontrak berakhir"
                 name="expiredDate"
                 type="date"
+                {...dateInputBounds(DATE_BOUNDS.newContractEnd)}
                 value={values.expiredDate}
                 onChange={(event) => update("expiredDate", event.target.value)}
                 error={fieldErrors.expiredDate}
@@ -253,20 +282,12 @@ export function OnboardingForm({
               label="Tanggal mulai bekerja"
               name="startDate"
               type="date"
+              {...dateInputBounds(DATE_BOUNDS.startDate)}
               icon={<IconClock className="size-4" />}
               value={values.startDate}
               onChange={(event) => update("startDate", event.target.value)}
               error={fieldErrors.startDate}
-            />
-            <Field
-              label="Waktu efektif (opsional)"
-              name="effectiveAt"
-              type="date"
-              icon={<IconClock className="size-4" />}
-              value={values.effectiveAt}
-              onChange={(event) => update("effectiveAt", event.target.value)}
-              error={fieldErrors.effectiveAt}
-              hint="Kosongkan agar dijalankan segera setelah kedua approval masuk."
+              hint="Dicatat sebagai hari pertama kerja. Akun langsung dibuat begitu kedua persetujuan masuk, apa pun tanggalnya."
             />
 
             <TextareaField
@@ -325,7 +346,7 @@ export function OnboardingForm({
 
         <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
           <Button type="submit" loading={submitting}>
-            {submitting ? "Mengirim…" : "Kirim ke approver"}
+            {submitting ? "Mengirim…" : revise ? "Kirim revisi ke approver" : "Kirim ke approver"}
           </Button>
           <p className="text-xs text-ink-faint">
             Akun belum dibuat. Pengajuan dikirim ke manager, lalu CISO.

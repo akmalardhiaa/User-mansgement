@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
-import type { PortalRole } from "./roles";
+import { portalRolesOf, type PortalRole } from "./roles";
 import { mutateSessions, readSessions, type SessionRecord } from "./sessionStore";
 
 /**
@@ -81,7 +81,7 @@ function toSession(record: SessionRecord): PortalSession {
     username: record.username,
     email: record.email,
     fullName: record.fullName,
-    roles: record.roles,
+    roles: portalRolesOf(record.roles),
     department: record.department,
     createdAt: record.createdAt,
     absoluteExpiresAt: record.absoluteExpiresAt,
@@ -181,6 +181,14 @@ export async function resolveSession(id: string | undefined): Promise<PortalSess
   const record = sessions.find((candidate) => hashEquals(candidate.idHash, idHash));
 
   if (!record || !isLive(record, now)) return undefined;
+
+  /*
+   * Only portal users hold a session. One opened before a role was retired —
+   * a manager or CISO approver signed in when those could — carries nothing
+   * that still counts, and must stop working now rather than idle on until it
+   * expires.
+   */
+  if (portalRolesOf(record.roles).length === 0) return undefined;
 
   // Idle expiry only moves forward if the record is already stale enough to be
   // worth a write; see TOUCH_THROTTLE_MS.

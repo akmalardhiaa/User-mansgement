@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { DirectoryToolbar } from "@/components/dashboard/DirectoryToolbar";
 import { EmployeeTable } from "@/components/dashboard/EmployeeTable";
+import { OnboardingPipeline } from "@/components/dashboard/OnboardingPipeline";
 import { StatsRow } from "@/components/dashboard/StatsRow";
 import { Reveal } from "@/components/motion/Reveal";
 import { Card } from "@/components/ui/Field";
@@ -17,7 +18,7 @@ import {
   type DirectoryFilters,
   type SortKey,
 } from "@/lib/dashboard/directory";
-import type { PendingByEmployee } from "@/lib/lifecycle/pending";
+import type { OnboardingInFlight, PendingByEmployee } from "@/lib/lifecycle/pending";
 import type { Employee } from "@/lib/types";
 
 /**
@@ -33,13 +34,19 @@ import type { Employee } from "@/lib/types";
 export function DirectoryView({
   employees,
   pending,
+  onboardings = [],
   canRequest = false,
+  canRun = false,
 }: {
   employees: Employee[];
   /** Open lifecycle requests, keyed by the employee they concern. */
   pending: PendingByEmployee;
+  /** People raised for onboarding who have no account yet. */
+  onboardings?: OnboardingInFlight[];
   /** Whether this viewer may raise a lifecycle request. */
   canRequest?: boolean;
+  /** Whether this viewer may run the worker. */
+  canRun?: boolean;
 }) {
   const { toast } = useToast();
   const [filters, setFilters] = useState<DirectoryFilters>(DEFAULT_FILTERS);
@@ -112,6 +119,8 @@ export function DirectoryView({
         active={filters.status}
         onSelect={(status) => change({ status })}
       />
+
+      <OnboardingPipeline items={onboardings} canRun={canRun} />
 
       <Reveal delay={0.08}>
         <Card className="overflow-hidden">

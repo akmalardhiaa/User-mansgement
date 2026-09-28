@@ -1,9 +1,12 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { ChoiceField, type ChoiceGroup } from "@/components/ui/ChoiceField";
+import { SelectField } from "@/components/ui/Field";
+
 import {
   IconArrowUp,
   IconClose,
@@ -19,6 +22,7 @@ import {
   isDefaultFilters,
   type DirectoryFilters,
 } from "@/lib/dashboard/directory";
+import { DEPARTMENT_GROUPS } from "@/lib/db/seed";
 import { TRANSITION_FAST } from "@/lib/motion";
 import { EMPLOYEE_STATUSES, type EmployeeStatus } from "@/lib/types";
 
@@ -62,6 +66,34 @@ export function DirectoryToolbar({
 }: DirectoryToolbarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const dirty = !isDefaultFilters(filters);
+  const departmentGroups = useMemo<ChoiceGroup[]>(() => {
+    const available = new Set(departments);
+    const catalogued = new Set<string>();
+
+    const groups = DEPARTMENT_GROUPS.map((group) => {
+      const items = group.items
+        .filter((department) => available.has(department))
+        .map((department) => {
+          catalogued.add(department);
+          return { value: department, label: department };
+        });
+
+      return { label: group.label, items };
+    }).filter((group) => group.items.length > 0);
+
+    // A roster can contain a legacy or newly-created division before the
+    // catalogue catches up. It must stay filterable rather than disappearing
+    // just because it has not yet been given a heading.
+    const otherDepartments = departments
+      .filter((department) => !catalogued.has(department))
+      .map((department) => ({ value: department, label: department }));
+
+    return [
+      { items: [{ value: "ALL", label: "Semua departemen" }] },
+      ...groups,
+      ...(otherDepartments.length ? [{ label: "Lainnya", items: otherDepartments }] : []),
+    ];
+  }, [departments]);
 
   // "/" jumps to search, the convention every tool with a list in it uses.
   useEffect(() => {
@@ -138,7 +170,7 @@ export function DirectoryToolbar({
 
         <div className="relative w-full sm:w-auto">
           <IconFilter className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-faint" />
-          <select
+          <SelectField
             value={filters.status}
             onChange={(event) =>
               onChange({ status: event.target.value as DirectoryFilters["status"] })
@@ -153,34 +185,27 @@ export function DirectoryToolbar({
                 {employeeStatusLabel(status)}
               </option>
             ))}
-          </select>
-          <SelectArrow />
+          </SelectField>
+          
         </div>
 
-        <div className="relative w-full sm:w-auto">
-          <IconFilter className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-faint" />
-          <select
-            value={filters.department}
-            onChange={(event) => onChange({ department: event.target.value })}
-            aria-label="Saring berdasarkan departemen"
-            className={SELECT_CLASSES}
-          >
-            <option value="ALL">Semua departemen</option>
-            {departments.map((department) => (
-              <option key={department} value={department}>
-                {department}
-              </option>
-            ))}
-          </select>
-          <SelectArrow />
-        </div>
+        <ChoiceField
+          label="Saring berdasarkan departemen"
+          name="directory-department"
+          value={filters.department}
+          onChange={(department) => onChange({ department })}
+          groups={departmentGroups}
+          placeholder="Semua departemen"
+          icon={<IconFilter className="size-3.5" />}
+          className="w-full sm:w-60 [&>label]:sr-only"
+        />
 
         {/* The direction toggle is welded to the sort select — they are one
             control, and a gap between them reads as two unrelated ones. */}
         <div className="flex w-full items-center sm:w-auto">
           <div className="relative flex-1 sm:flex-none">
             <IconSort className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-faint" />
-            <select
+            <SelectField
               value={filters.sort}
               onChange={(event) =>
                 onChange({ sort: event.target.value as DirectoryFilters["sort"] })
@@ -196,8 +221,8 @@ export function DirectoryToolbar({
                   Urut: {SORT_LABELS[key]}
                 </option>
               ))}
-            </select>
-            <SelectArrow />
+            </SelectField>
+            
           </div>
           <button
             type="button"
@@ -255,23 +280,5 @@ export function DirectoryToolbar({
         </div>
       </div>
     </div>
-  );
-}
-
-/** The custom chevron, since a native select's own arrow ignores the palette. */
-function SelectArrow() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-ink-faint"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m6 9 6 6 6-6" />
-    </svg>
   );
 }
