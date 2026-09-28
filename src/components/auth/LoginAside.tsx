@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { IconApprovals, IconCheck, IconUser } from "@/components/ui/Icons";
 import { stagger, staggerItem, TRANSITION_FAST } from "@/lib/motion";
 
@@ -35,25 +36,16 @@ const ORBS = [
   },
 ] as const;
 
+/** Icons here, words in the dictionary: the list itself is the same in both. */
 const FEATURE_POINTS = [
-  {
-    title: "Direktori Karyawan Terintegrasi",
-    description: "Pencarian cepat, penyaringan divisi, dan manajemen status akun secara real-time.",
-    icon: IconUser,
-  },
-  {
-    title: "Persetujuan Bertingkat lewat Email",
-    description: "Alur persetujuan terverifikasi oleh Manager dan IT Security otomatis melalui email.",
-    icon: IconApprovals,
-  },
-  {
-    title: "Jejak Audit Lintas Sistem",
-    description: "Rekam jejak transparan dan akuntabel untuk setiap perubahan hak akses.",
-    icon: IconCheck,
-  },
-];
+  { key: "directory", icon: IconUser },
+  { key: "approval", icon: IconApprovals },
+  { key: "audit", icon: IconCheck },
+] as const;
 
 export function LoginAside() {
+  const t = useT();
+
   return (
     <div className="relative hidden overflow-hidden rounded-3xl border border-hairline-strong/80 bg-surface/70 p-9 backdrop-blur-xl lg:block shadow-[0_20px_50px_rgba(7,19,33,0.5)]">
       {/* Ambient background glowing orbs */}
@@ -85,20 +77,20 @@ export function LoginAside() {
             <span className="relative inline-flex size-2 rounded-full bg-accent" />
           </span>
           <span className="text-xs font-bold tracking-widest text-accent uppercase">
-            HUMAN CAPITAL PLATFORM
+            {t.loginAside.platform}
           </span>
         </motion.div>
 
         {/* Hero Title with Shimmer */}
         <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-balance leading-tight">
-          Portal Terpadu <br />
+          {t.loginAside.headlineTop} <br />
           <span className="text-shimmer-brand text-4xl drop-shadow-[0_4px_12px_rgba(253,183,19,0.25)]">
-            User Management
+            {t.loginAside.headlineBottom}
           </span>
         </h2>
 
         <p className="mt-3 text-sm leading-relaxed text-ink-muted/90 max-w-md">
-          Kelola siklus hidup akses akun karyawan secara otomatis, aman, dan transparan melalui satu dasbor modern.
+          {t.loginAside.lead}
         </p>
 
         {/* Staggered Animated Feature Cards */}
@@ -110,7 +102,7 @@ export function LoginAside() {
         >
           {FEATURE_POINTS.map((item) => (
             <motion.div
-              key={item.title}
+              key={item.key}
               variants={staggerItem}
               whileHover={{ x: 6, scale: 1.015 }}
               transition={TRANSITION_FAST}
@@ -121,10 +113,10 @@ export function LoginAside() {
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-ink group-hover:text-accent transition-colors duration-200">
-                  {item.title}
+                  {t.loginAside[`${item.key}Title`]}
                 </h3>
                 <p className="mt-0.5 text-xs text-ink-muted leading-normal">
-                  {item.description}
+                  {t.loginAside[`${item.key}Body`]}
                 </p>
               </div>
             </motion.div>

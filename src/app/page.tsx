@@ -6,6 +6,7 @@ import { buttonClasses } from "@/components/ui/Button";
 import { IconUserPlus } from "@/components/ui/Icons";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requirePageSession } from "@/lib/auth/current";
+import { getTranslations } from "@/lib/i18n/server";
 import { hasPermission } from "@/lib/auth/roles";
 import { listEmployees } from "@/lib/db/repository";
 import { loadOnboardingsInFlight, loadPendingByEmployee } from "@/lib/lifecycle/pendingStore";
@@ -14,11 +15,12 @@ import { loadOnboardingsInFlight, loadPendingByEmployee } from "@/lib/lifecycle/
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const { t } = await getTranslations();
   // The proxy only checks that a cookie exists. This is where a stale or
   // revoked session is actually turned away, and where authority is checked.
   const session = await requirePageSession("/");
   if (!hasPermission(session.roles, "directory.read")) {
-    return <AccessDenied roles={session.roles} need="Akses baca direktori karyawan" />;
+    return <AccessDenied roles={session.roles} need={t.directory.needRead} />;
   }
 
   // The roster and what is in flight against it, read together so the page
@@ -36,22 +38,22 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Human Capital Platform"
+        eyebrow={t.directory.eyebrow}
         badge={
           <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-0.5 text-xs font-bold text-shimmer-brand shadow-[0_0_12px_rgba(253,183,19,0.25)]">
             <span className="size-1.5 rounded-full bg-accent" />
-            User Management
+            {t.directory.badge}
           </span>
         }
         title={
           <span className="flex flex-wrap items-center gap-3">
-            <span>Direktori Karyawan</span>
+            <span>{t.directory.titleMain}</span>
             <span className="text-shimmer-brand text-2xl sm:text-3xl font-extrabold">
-              & User Management
+              {t.directory.titleAccent}
             </span>
           </span>
         }
-        description="Portal terpadu direktori karyawan dan pengelolaan izin akses, dengan login Active Directory."
+        description={t.directory.description}
         actions={
           /*
            * This pointed at /users/new, which does not exist — the only route
@@ -66,7 +68,7 @@ export default async function DashboardPage() {
           canRequest ? (
             <Link href="/pengajuan/baru?type=ONBOARDING" className={buttonClasses()}>
               <IconUserPlus className="size-4" />
-              Tambah karyawan
+              {t.directory.addEmployee}
             </Link>
           ) : null
         }

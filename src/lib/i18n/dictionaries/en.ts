@@ -1,0 +1,169 @@
+import type { Dictionary } from "./id";
+
+/**
+ * English, typed against the Indonesian dictionary.
+ *
+ * Written for the same reader: somebody in Human Capital doing their job, not
+ * a developer. Where a word is the system's own — Onboarding, Movement, CISO —
+ * it stays as it is in both languages, because that is what people say out loud
+ * in both.
+ */
+export const en: Dictionary = {
+  nav: {
+    directory: "Directory",
+    requests: "Requests",
+    newRequest: "New request",
+    editProfile: "Edit profile",
+    activity: "Activity",
+    profile: "Profile",
+    mainNavigation: "Main navigation",
+    signOut: "Sign out",
+    signingOut: "Signing out…",
+    openMenu: "Open menu",
+    closeMenu: "Close menu",
+  },
+
+  language: {
+    switchTo: "Switch to Indonesian",
+    switchToShort: "Indonesia",
+    current: "Language: English",
+  },
+
+  login: {
+    metaTitle: "Sign in · HC User Management",
+    eyebrow: "User Management",
+    title: "Sign in",
+    subtitle: "Enter your Human Capital account credentials.",
+    username: "Username",
+    usernamePlaceholder: "username or email",
+    password: "Password",
+    submit: "Sign in",
+    submitting: "Signing in…",
+    withAd: "Sign in with your Active Directory account.",
+    demoTitle: "Demo mode — Active Directory is not connected",
+    demoBody:
+      "Sign in as admin with the password admin12345, or through the simulated directory as ayu.prameswari with mock12345. This portal is for Human Capital only: managers and the CISO team approve from email, not from here. The full list of demo accounts is in the README.",
+    demoEnvHint: "Set LDAP_URL in .env.local to switch on Active Directory sign-in.",
+    notConfiguredTitle: "Sign-in is not configured",
+    notConfiguredBody:
+      "Set LDAP_URL in the environment, then restart the application. There is an example in .env.example.",
+    failed: "Wrong username or password.",
+  },
+
+  loginAside: {
+    directoryTitle: "One employee directory",
+    platform: "HUMAN CAPITAL PLATFORM",
+    headlineTop: "One portal for",
+    headlineBottom: "User Management",
+    lead: "Run the whole life cycle of an employee's account — asked for, approved, and carried out — from one place, with a record of every step.",
+    directoryBody: "Fast search, filtering by division, and account status kept up to date.",
+    approvalTitle: "Two-stage approval by email",
+    approvalBody:
+      "Each request is approved by the manager and then by IT Security, from links sent to them.",
+    auditTitle: "An audit trail across systems",
+    auditBody: "Every change to access is recorded, with who asked and who approved it.",
+  },
+
+  accessDenied: {
+    title: "Access denied",
+    body: "You are signed in, but your portal roles do not cover this page.",
+    required: "Required",
+    yourRoles: "Your roles",
+    noRole: "No portal role yet",
+    roleHc: "Human Capital",
+    roleAdmin: "System administrator",
+    roleOps: "Operator",
+    roleAuditor: "Auditor",
+    hint: "Portal roles come from Active Directory group membership. Contact a system administrator if you should have access to this.",
+    viewProfile: "View my profile",
+  },
+
+  directory: {
+    eyebrow: "Human Capital Platform",
+    badge: "User Management",
+    titleMain: "Employee Directory",
+    titleAccent: "& User Management",
+    description:
+      "One place for the employee directory and the access that goes with it, with Active Directory sign-in.",
+    addEmployee: "Add employee",
+    needRead: "Permission to read the employee directory",
+
+    statusActive: "Active",
+    statusDisabled: "Disabled",
+
+    statTotal: "Total employees",
+    statTotalCaption: "The whole directory",
+    statActiveCaption: "Access working normally",
+    statPending: "With a request",
+    statPendingCaption: "Changes not carried out yet",
+    statDisabledCaption: "Accounts not in use",
+
+    searchPlaceholder: "Search name, email, job title…",
+    searchLabel: "Search employees",
+    clearSearch: "Clear search",
+    filterStatus: "Filter by status",
+    allStatus: "All statuses",
+    inApproval: "Awaiting approval",
+    filterDepartment: "Filter by department",
+    allDepartments: "All departments",
+    otherDepartment: "Other",
+    sortBy: "Sort by",
+    sortPrefix: "Sort",
+    ascending: "Ascending — click to reverse",
+    descending: "Descending — click to reverse",
+    ascendingShort: "Ascending (A→Z)",
+    descendingShort: "Descending (Z→A)",
+    export: "Export",
+    exportHint: "Download the visible rows as an Excel file",
+    exportFailed: "Export failed.",
+    countOf: "of",
+
+    columnName: "Name",
+    columnUpdated: "Last updated",
+    columnJobTitle: "Job title",
+    columnDepartment: "Department",
+    columnStatus: "Status",
+    columnPending: "Request in progress",
+    columnActions: "Actions",
+    detail: "Details",
+    detailHint: "See this employee's full profile",
+    proposeChange: "Raise a request",
+    proposeChangeHint: "Ask to move this person — goes to the manager, then to CISO",
+    newBadge: "New",
+    emptyFiltered: "No employee matches these filters.",
+    emptyDirectory: "The directory is empty.",
+
+    pipelineTitle: "New employees in progress",
+    pipelineHint:
+      "Shown from the moment they are requested. The account does not exist yet — they join the directory table once both approvals are in and the account is created in AD.",
+    pipelineSubmitted: "Submitted",
+    pipelineManager: "Manager",
+    pipelineCiso: "CISO",
+    pipelineCreated: "Created in AD",
+    pipelineDraft: "Draft — not sent to approvers yet",
+    pipelineWaitingManager: "Waiting for {name} to approve",
+    pipelineWaitingCiso: "Waiting for the CISO team's approval",
+    pipelineExecuting: "Being created in AD…",
+    pipelineFailed: "Could not be created in AD — open the request to see why",
+    pipelineReady: "Approved — ready to be created in AD",
+    pipelineStep: "Step",
+    pipelineReadyCount: "{count} ready to create",
+    pipelineViewRequest: "View request",
+    pipelineRunWorker: "Run the worker",
+  },
+
+  common: {
+    footer: "Human Capital · employee directory with Active Directory sign-in",
+    loading: "Loading…",
+    save: "Save",
+    cancel: "Cancel",
+    close: "Close",
+    back: "Back",
+    search: "Search",
+    retry: "Try again",
+    yes: "Yes",
+    no: "No",
+    optional: "optional",
+    none: "—",
+  },
+};
