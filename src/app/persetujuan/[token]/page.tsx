@@ -7,10 +7,14 @@ import { BrandMark } from "@/components/ui/BrandMark";
 import { Card } from "@/components/ui/Field";
 import { IconAlert, IconCheck } from "@/components/ui/Icons";
 import { previewByToken } from "@/lib/lifecycle/service";
+import { getTranslations } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Persetujuan · HC User Management" };
+export async function generateMetadata() {
+  const { t } = await getTranslations();
+  return { title: t.approval.metaTitle };
+}
 
 function formatDate(iso: string): string {
   return new Intl.DateTimeFormat("id-ID", {
@@ -40,6 +44,7 @@ export default async function ApprovalPage({
   params: Promise<{ token: string }>;
   searchParams: Promise<{ putusan?: string }>;
 }) {
+  const { t } = await getTranslations();
   const { token } = await params;
   const { putusan } = await searchParams;
   const result = await previewByToken(token);
@@ -63,24 +68,22 @@ export default async function ApprovalPage({
         <Card className="p-8">
           <p className="flex items-center gap-2 font-medium text-ok">
             <IconCheck className="size-4" />
-            Sudah diputuskan
+            {t.approval.settledTitle}
           </p>
           <p className="mt-2 max-w-prose text-sm text-ink-muted">{result.reason}</p>
           <p className="mt-4 max-w-prose text-xs text-ink-faint">
-            Permintaan ini dikirim ke beberapa orang sekaligus, dan keputusan pertama yang masuk yang
-            berlaku. Tautan Anda otomatis tidak berlaku begitu keputusan itu tercatat.
+            {t.approval.settledHint}
           </p>
         </Card>
       ) : !result.ok ? (
         <Card className="p-8">
           <p className="flex items-center gap-2 font-medium text-warn">
             <IconAlert className="size-4" />
-            Tautan tidak dapat dipakai
+            {t.approval.unusableTitle}
           </p>
           <p className="mt-2 max-w-prose text-sm text-ink-muted">{result.reason}</p>
           <p className="mt-4 max-w-prose text-xs text-ink-faint">
-            Bila Anda yakin seharusnya dapat memutuskan pengajuan ini, hubungi Human Capital untuk
-            meminta tautan baru. Tautan lama sengaja tidak dapat dihidupkan kembali.
+            {t.approval.unusableHint}
           </p>
         </Card>
       ) : (
@@ -96,22 +99,24 @@ export default async function ApprovalPage({
                   {result.preview.subjectName}
                 </h1>
                 <p className="mt-0.5 text-sm text-ink-muted">
-                  Diajukan {result.preview.requesterName} · versi {result.preview.version}
+                  {t.approval.raised
+                    .replace("{name}", result.preview.requesterName)
+                    .replace("{version}", String(result.preview.version))}
                 </p>
               </div>
             </div>
 
             {result.preview.teamSize ? (
               <p className="mt-4 rounded-lg border border-info/30 bg-info/10 px-3.5 py-2.5 text-xs text-info">
-                Dikirim ke {result.preview.teamSize} anggota tim CISO. Keputusan pertama yang masuk
-                yang berlaku; tautan anggota lain otomatis tidak berlaku setelahnya.
+                {t.approval.teamNotice.replace("{count}", String(result.preview.teamSize))}
               </p>
             ) : null}
 
             {result.preview.managerDecision ? (
               <p className="mt-4 rounded-lg border border-ok/30 bg-ok/10 px-3.5 py-2.5 text-xs text-ok">
-                Manager {result.preview.managerDecision.by} sudah menyetujui pada{" "}
-                {formatDate(result.preview.managerDecision.at)}.
+                {t.approval.managerApproved
+                  .replace("{name}", result.preview.managerDecision.by)
+                  .replace("{date}", formatDate(result.preview.managerDecision.at))}
               </p>
             ) : null}
 
@@ -130,7 +135,7 @@ export default async function ApprovalPage({
           <TokenDecisionForm token={token} stage={result.preview.stage} initial={initial} />
 
           <p className="text-center text-xs text-ink-faint">
-            Tautan ini sekali pakai dan memiliki masa berlaku. Jangan meneruskannya.
+            {t.approval.singleUseNote}
           </p>
         </>
       )}

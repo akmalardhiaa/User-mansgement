@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 
+import { useT } from "@/components/i18n/LocaleProvider";
+
 import { MovementForm } from "@/components/lifecycle/MovementForm";
 import { OnboardingForm } from "@/components/lifecycle/OnboardingForm";
 import { TerminationForm } from "@/components/lifecycle/TerminationForm";
@@ -32,6 +34,7 @@ export function ReviseRequestView({
   /** The employee the request is about. Absent for an onboarding. */
   subject?: Employee;
 }) {
+  const t = useT();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -56,5 +59,5 @@ export function ReviseRequestView({
   if (subject) {
     return <ProfileForm employee={subject} locked={false} revise={request} onSubmitted={done} />;
   }
-  return <p className="text-sm text-ink-muted">Karyawan yang diajukan tidak ditemukan lagi.</p>;
+  return <p className="text-sm text-ink-muted">{t.actions.subjectMissing}</p>;
 }

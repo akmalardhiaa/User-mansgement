@@ -3,10 +3,12 @@
 import { useState } from "react";
 
 import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
+import { useT } from "@/components/i18n/LocaleProvider";
 import { Button } from "@/components/ui/Button";
 import { Card, Field, SelectField, TextareaField } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
 import { IconAlert, IconClock, IconNote, IconUser, IconUserCheck } from "@/components/ui/Icons";
+import type { Dictionary } from "@/lib/i18n/dictionaries/id";
 import { TERMINATION_REASONS, type LifecycleRequest, type TerminationReason } from "@/lib/lifecycle/types";
 import type { Employee } from "@/lib/types";
 import { DATE_BOUNDS, dateInputBounds } from "@/lib/validation/dates";
@@ -14,12 +16,13 @@ import { DATE_BOUNDS, dateInputBounds } from "@/lib/validation/dates";
 const SECTION =
   "mb-4 flex items-center gap-2 text-xs font-medium tracking-[0.14em] text-ink-faint uppercase";
 
-const REASON_LABEL: Record<TerminationReason, string> = {
-  RESIGN: "Mengundurkan diri",
-  CONTRACT_END: "Kontrak berakhir",
-  RETIREMENT: "Pensiun",
-  TERMINATION: "Pemutusan hubungan kerja",
-  OTHER: "Lainnya",
+/** Reason keys to dictionary keys; the words live with the other form words. */
+const REASON_LABEL: Record<TerminationReason, keyof Dictionary["forms"]> = {
+  RESIGN: "reasonResign",
+  CONTRACT_END: "reasonContractEnd",
+  RETIREMENT: "reasonRetire",
+  TERMINATION: "reasonDismissal",
+  OTHER: "reasonOther",
 };
 
 /**
@@ -52,6 +55,7 @@ export function TerminationForm({
 }) {
   const previous = revise?.payload.kind === "TERMINATION" ? revise.payload : undefined;
   const [employeeId, setEmployeeId] = useState(previous?.employeeId ?? initialEmployeeId ?? "");
+  const t = useT();
   const [values, setValues] = useState({
     reasonCategory: previous?.reasonCategory ?? "RESIGN",
     lastWorkingDate: previous?.lastWorkingDate.slice(0, 10) ?? "",
@@ -110,10 +114,10 @@ export function TerminationForm({
         <div>
           <p className={SECTION}>
             <IconUser className="size-3.5" />
-            Karyawan yang dinonaktifkan
+            {t.execution.sectionWhoLeaves}
           </p>
           <SelectField
-            label="Karyawan"
+            label={t.forms.employee}
             name="employeeId"
             icon={<IconUser className="size-4" />}
             value={employeeId}
@@ -122,11 +126,11 @@ export function TerminationForm({
             disabled={Boolean(revise)}
             hint={
               revise
-                ? "Karyawan tidak bisa diganti lewat revisi. Batalkan dan buat pengajuan baru bila salah orang."
-                : "Karyawan yang sedang memiliki pengajuan berjalan tidak muncul di sini."
+                ? t.execution.subjectLocked
+                : t.execution.subjectInFlight
             }
           >
-            <option value="">Pilih karyawan…</option>
+            <option value="">{t.forms.chooseEmployee}</option>
             {employees.map((candidate) => (
               <option key={candidate.id} value={candidate.id}>
                 {candidate.displayName} · {candidate.department}
@@ -137,14 +141,14 @@ export function TerminationForm({
           {employee ? (
             <div className="mt-4 rounded-xl border border-hairline bg-elevated/40 p-4 text-sm">
               <p className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
-                Akun yang terdampak
+                {t.execution.sectionAffected}
               </p>
               <dl className="mt-2.5 space-y-1.5">
                 {[
-                  ["Nama", employee.displayName],
-                  ["Email", employee.email],
-                  ["Jabatan", `${employee.jobTitle} · ${employee.department}`],
-                  ["Manager", employee.managerName],
+                  [t.summary.name, employee.displayName],
+                  [t.summary.email, employee.email],
+                  [t.forms.jobTitle, `${employee.jobTitle} · ${employee.department}`],
+                  [t.forms.manager, employee.managerName],
                 ].map(([label, value]) => (
                   <div key={label} className="flex gap-3">
                     <dt className="w-24 shrink-0 text-xs text-ink-faint">{label}</dt>
@@ -153,8 +157,9 @@ export function TerminationForm({
                 ))}
               </dl>
               <p className="mt-3 border-t border-hairline pt-2.5 text-xs text-ink-muted">
-                Persetujuan tahap pertama diminta ke <strong className="text-ink">{employee.managerName}</strong>,
-                manager saat ini.
+                {t.execution.firstApproverIs.split("{name}")[0]}
+                <strong className="text-ink">{employee.managerName}</strong>
+                {t.execution.firstApproverIs.split("{name}")[1]}
               </p>
             </div>
           ) : null}
@@ -163,26 +168,26 @@ export function TerminationForm({
         <div>
           <p className={SECTION}>
             <IconNote className="size-3.5" />
-            Alasan dan jadwal
+            {t.execution.sectionReasonSchedule}
           </p>
           <div className="grid gap-5 sm:grid-cols-2">
             <SelectField
-              label="Kategori alasan"
+              label={t.forms.reasonCategory}
               name="reasonCategory"
               value={values.reasonCategory}
               onChange={(event) => update("reasonCategory", event.target.value)}
               error={fieldErrors.reasonCategory}
-              hint="Kategori saja — detailnya tidak dikirim ke approver."
+              hint={t.forms.reasonCategoryHint}
             >
               {TERMINATION_REASONS.map((reason) => (
                 <option key={reason} value={reason}>
-                  {REASON_LABEL[reason]}
+                  {t.forms[REASON_LABEL[reason]]}
                 </option>
               ))}
             </SelectField>
 
             <Field
-              label="Tanggal terakhir bekerja"
+              label={t.forms.lastWorkingDate}
               name="lastWorkingDate"
               type="date"
               {...dateInputBounds(DATE_BOUNDS.lastWorkingDate)}
@@ -193,7 +198,7 @@ export function TerminationForm({
             />
 
             <Field
-              label="Waktu efektif penonaktifan (opsional)"
+              label={t.forms.disableAt}
               name="effectiveAt"
               type="date"
               {...dateInputBounds(DATE_BOUNDS.effectiveAt)}
@@ -201,28 +206,28 @@ export function TerminationForm({
               value={values.effectiveAt}
               onChange={(event) => update("effectiveAt", event.target.value)}
               error={fieldErrors.effectiveAt}
-              hint="Kosongkan agar dijalankan segera setelah kedua approval masuk."
+              hint={t.forms.effectiveAtHint}
             />
 
             <Field
-              label="Serah terima kepada (opsional)"
+              label={t.forms.handoverTo}
               name="handoverTo"
               icon={<IconUserCheck className="size-4" />}
               value={values.handoverTo}
               onChange={(event) => update("handoverTo", event.target.value)}
               error={fieldErrors.handoverTo}
-              placeholder="Nama rekan yang melanjutkan pekerjaan"
+              placeholder={t.forms.handoverPlaceholder}
             />
 
             <TextareaField
-              label="Catatan internal (opsional)"
+              label={t.forms.internalNote}
               name="note"
               rows={3}
               icon={<IconNote className="size-4" />}
               value={values.note}
               onChange={(event) => update("note", event.target.value)}
               error={fieldErrors.note}
-              hint="Tersimpan di pengajuan. Tidak pernah dimasukkan ke email persetujuan."
+              hint={t.forms.internalNoteHint}
               className="sm:col-span-2"
             />
           </div>
@@ -232,20 +237,19 @@ export function TerminationForm({
           <IconAlert className="mt-0.5 size-4 shrink-0" />
           <div className="space-y-1.5">
             <p>
-              Tindakan default adalah <strong>menonaktifkan dan mengarantina</strong> akun, bukan
-              menghapusnya. Penghapusan permanen memerlukan proses terpisah.
+              {t.execution.quarantineBefore}
+              <strong>{t.execution.quarantineStrong}</strong>
+              {t.execution.quarantineAfter}
             </p>
             <p>
-              Menonaktifkan akun di direktori tidak otomatis memutus sesi yang sudah berjalan —
-              tiket Kerberos, VPN, dan sesi Microsoft 365 punya masa hidup sendiri. Pencabutan
-              menyeluruh memerlukan integrasi tambahan yang belum ada.
+              {t.execution.sessionsNote}
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
           <Button type="submit" variant="danger" loading={submitting} disabled={!employeeId}>
-            {submitting ? "Mengirim…" : revise ? "Kirim revisi ke approver" : "Kirim ke approver"}
+            {submitting ? t.forms.submitting : revise ? t.forms.submitRevision : t.forms.submit}
           </Button>
           <p className="text-xs text-ink-faint">
             Akses belum dicabut. Pengajuan dikirim ke manager, lalu CISO.

@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { PendingBadge } from "@/components/dashboard/PendingBadge";
 import { Button } from "@/components/ui/Button";
 import {
@@ -36,7 +37,7 @@ interface EmployeeDetailDrawerProps {
  * Three things were removed from this panel, and all three for the same reason:
  * they showed the user something that was not true.
  *
- *   - A "Riwayat Audit" tab listing four approval steps that were hard-coded.
+ *   - An "audit history" tab listing four approval steps that were hard-coded.
  *     It rendered the same four lines for every employee, including people
  *     whose account had never been approved by anyone. The real trail lives on
  *     the request, and is now linked to instead.
@@ -68,13 +69,14 @@ export function EmployeeDetailDrawer({
   onClose,
   onOpenReportPDF,
 }: EmployeeDetailDrawerProps) {
+  const t = useT();
   if (!employee) return null;
 
   const rows: Array<[typeof IconBriefcase, string, string]> = [
-    [IconBriefcase, "Jabatan", employee.jobTitle],
-    [IconBuilding, "Divisi", employee.department],
-    [IconUserCheck, "Manager", employee.managerName],
-    [IconMail, "Email manager", employee.managerEmail],
+    [IconBriefcase, t.forms.jobTitle, employee.jobTitle],
+    [IconBuilding, t.execution.division, employee.department],
+    [IconUserCheck, t.forms.manager, employee.managerName],
+    [IconMail, t.execution.managerEmail, employee.managerEmail],
   ];
 
   return (
@@ -113,7 +115,7 @@ export function EmployeeDetailDrawer({
                 <button
                   type="button"
                   onClick={onClose}
-                  aria-label="Tutup panel"
+                  aria-label={t.execution.closePanel}
                   className="rounded-lg p-1.5 text-ink-faint transition-colors hover:bg-elevated hover:text-ink"
                 >
                   <IconClose className="size-5" />
@@ -137,7 +139,7 @@ export function EmployeeDetailDrawer({
 
               {employee.description ? (
                 <div className="mt-4 rounded-xl border border-hairline/80 bg-canvas/50 p-3.5">
-                  <p className="text-xs font-medium text-ink-faint">Catatan HC:</p>
+                  <p className="text-xs font-medium text-ink-faint">{t.execution.hcNoteLabel}</p>
                   <p className="mt-1 text-xs leading-relaxed text-ink-muted">
                     {employee.description}
                   </p>
@@ -145,7 +147,7 @@ export function EmployeeDetailDrawer({
               ) : null}
 
               <div className="mt-4 rounded-xl border border-hairline/80 bg-canvas/50 p-3.5">
-                <p className="text-xs font-semibold text-ink">Pengajuan berjalan</p>
+                <p className="text-xs font-semibold text-ink">{t.execution.requestInProgress}</p>
                 {pending ? (
                   <div className="mt-2">
                     <PendingBadge marker={pending} />

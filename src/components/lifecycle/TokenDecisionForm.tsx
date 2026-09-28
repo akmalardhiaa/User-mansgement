@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { Button } from "@/components/ui/Button";
 import { Card, TextareaField } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
@@ -46,6 +47,7 @@ export function TokenDecisionForm({
 }) {
   const [reason, setReason] = useState("");
   const [rejecting, setRejecting] = useState(initial === "REJECTED");
+  const t = useT();
   const [busy, setBusy] = useState<"APPROVED" | "REJECTED" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ decision: string; status: string } | null>(null);
@@ -97,17 +99,16 @@ export function TokenDecisionForm({
           </span>
           <div>
             <h2 className="text-lg font-semibold text-ink">
-              {approved ? "Persetujuan Anda tercatat" : "Penolakan Anda tercatat"}
+              {approved ? t.approval.recordedApproved : t.approval.recordedRejected}
             </h2>
             <p className="mt-1 text-sm text-ink-muted">
               {approved
-                ? "Terima kasih. Tautan ini sudah dipakai dan tidak berlaku lagi."
-                : "Pemohon akan melihat alasan yang Anda tulis. Tautan ini sudah tidak berlaku."}
+                ? t.approval.recordedApprovedBody
+                : t.approval.recordedRejectedBody}
             </p>
             {approved ? (
               <p className="mt-3 rounded-lg border border-warn/30 bg-warn/10 px-3.5 py-2.5 text-xs leading-relaxed text-warn">
-                Persetujuan mengesahkan perubahan, bukan menjalankannya. Akun baru berubah setelah
-                eksekusi dijalankan dan hasilnya diverifikasi.
+                {t.approval.approvalNotExecution}
               </p>
             ) : null}
           </div>
@@ -119,12 +120,12 @@ export function TokenDecisionForm({
   return (
     <Card className="p-6">
       <h2 className="text-sm font-semibold text-ink">
-        Keputusan Anda — tahap {stage === "MANAGER" ? "Manager" : "CISO"}
+        {t.approval.yourDecision.replace("{stage}", stage === "MANAGER" ? "Manager" : "CISO")}
       </h2>
       <p className="mt-1 text-xs leading-relaxed text-ink-muted">
         {stage === "MANAGER"
-          ? "Anda menyetujui kebutuhan divisi atas perubahan ini."
-          : "Anda menyetujui dampak aksesnya. Persetujuan ini mengesahkan perubahan, bukan menjalankannya."}
+          ? t.approval.managerScope
+          : t.approval.cisoScope}
       </p>
 
       <div className="mt-4 space-y-4">
@@ -133,13 +134,13 @@ export function TokenDecisionForm({
 
         {rejecting ? (
           <TextareaField
-            label="Alasan penolakan"
+            label={t.approval.rejectReason}
             name="reason"
             rows={3}
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            placeholder="Jelaskan apa yang perlu diperbaiki sebelum diajukan ulang."
-            hint="Wajib diisi. Pemohon membaca alasan ini."
+            placeholder={t.approval.rejectReasonPlaceholder}
+            hint={t.approval.rejectReasonHint}
           />
         ) : null}
 
@@ -153,10 +154,10 @@ export function TokenDecisionForm({
                 disabled={reason.trim().length === 0 || busy !== null}
                 onClick={() => decide("REJECTED")}
               >
-                Kirim penolakan
+                {t.approval.sendRejection}
               </Button>
               <Button variant="ghost" disabled={busy !== null} onClick={() => setRejecting(false)}>
-                Batal
+                {t.common.cancel}
               </Button>
             </>
           ) : (
@@ -167,7 +168,7 @@ export function TokenDecisionForm({
                 disabled={busy !== null}
                 onClick={() => decide("APPROVED")}
               >
-                Setujui
+                {t.approval.approve}
               </Button>
               <Button
                 variant="danger"
@@ -175,7 +176,7 @@ export function TokenDecisionForm({
                 disabled={busy !== null}
                 onClick={() => setRejecting(true)}
               >
-                Tolak
+                {t.approval.reject}
               </Button>
             </>
           )}

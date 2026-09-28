@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+
+import { useT } from "@/components/i18n/LocaleProvider";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
@@ -21,6 +23,7 @@ import type { RunReport } from "@/lib/lifecycle/worker";
  * thing an operator needs to read.
  */
 export function RunWorkerButton() {
+  const t = useT();
   const router = useRouter();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
@@ -31,7 +34,7 @@ export function RunWorkerButton() {
 
     if (result.ok) {
       const { ran, completed, failed } = result.data;
-      if (ran === 0) toast("Tidak ada pekerjaan yang jatuh tempo.", "info");
+      if (ran === 0) toast(t.actions.nothingDue, "info");
       else if (failed === 0) toast(`${completed} pengajuan selesai dijalankan.`, "success");
       else toast(`${completed} selesai, ${failed} gagal. Periksa detailnya.`, "info");
       router.refresh();
@@ -44,7 +47,7 @@ export function RunWorkerButton() {
 
   return (
     <Button variant="secondary" size="sm" loading={busy} icon={<IconSync />} onClick={run}>
-      Jalankan worker
+      {t.actions.runWorker}
     </Button>
   );
 }

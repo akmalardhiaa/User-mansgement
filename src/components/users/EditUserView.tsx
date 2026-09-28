@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { RequestSubmitted } from "@/components/lifecycle/RequestSubmitted";
 import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
 import { FormAlert } from "@/components/ui/FormAlert";
@@ -39,6 +40,7 @@ export function EditUserView({
    */
   pendingIds?: string[];
 }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(employees[0]?.id ?? null);
   // The roster itself never changes here: nothing is written until the request
@@ -63,13 +65,13 @@ export function EditUserView({
     <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
       <Card className="h-fit p-4">
         <Field
-          label="Cari karyawan"
+          label={t.editProfile.searchEmployee}
           name="employeeSearch"
           type="search"
           icon={<IconSearch className="size-4" />}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Nama, email, departemen…"
+          placeholder={t.editProfile.searchPlaceholder}
         />
 
         <ul className="mt-3 max-h-[28rem] space-y-1 overflow-y-auto pr-1">
@@ -102,7 +104,7 @@ export function EditUserView({
         </ul>
 
         {matches.length === 0 ? (
-          <p className="py-6 text-center text-sm text-ink-muted">Tidak ada yang cocok.</p>
+          <p className="py-6 text-center text-sm text-ink-muted">{t.editProfile.noMatch}</p>
         ) : null}
       </Card>
 
@@ -120,7 +122,7 @@ export function EditUserView({
         />
       ) : (
         <Card className="grid place-items-center p-10">
-          <p className="text-sm text-ink-muted">Pilih karyawan di sebelah kiri untuk mengedit.</p>
+          <p className="text-sm text-ink-muted">{t.editProfile.pickSomeone}</p>
         </Card>
       )}
     </div>
@@ -171,6 +173,7 @@ export function ProfileForm({
   revise?: LifecycleRequest;
   onSubmitted: (request: LifecycleRequest) => void;
 }) {
+  const t = useT();
   const start: ProfileFields =
     revise?.payload.kind === "PROFILE_UPDATE" ? revise.payload.profile : profileOf(employee);
 
@@ -252,7 +255,7 @@ export function ProfileForm({
         <fieldset disabled={locked || saving} className="space-y-6 disabled:opacity-60">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
-              label="Nama depan"
+              label={t.forms.firstName}
               name="firstName"
               icon={<IconUser className="size-4" />}
               value={values.firstName}
@@ -261,7 +264,7 @@ export function ProfileForm({
               required
             />
             <Field
-              label="Nama belakang"
+              label={t.forms.lastName}
               name="lastName"
               value={values.lastName}
               onChange={(event) => update("lastName", event.target.value)}
@@ -271,18 +274,18 @@ export function ProfileForm({
           </div>
 
           <Field
-            label="Nama lengkap"
+            label={t.forms.fullName}
             name="displayName"
             value={values.displayName}
             onChange={(event) => update("displayName", event.target.value)}
             error={errors.displayName}
-            hint="Nama yang tampil di seluruh dashboard dan email persetujuan."
+            hint={t.editProfile.displayNameHint}
             required
           />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
-              label="Jabatan"
+              label={t.forms.jobTitle}
               name="jobTitle"
               icon={<IconBriefcase className="size-4" />}
               value={values.jobTitle}
@@ -291,44 +294,44 @@ export function ProfileForm({
               required
             />
             <Field
-              label="Departemen"
+              label={t.forms.department}
               name="department"
               icon={<IconBuilding className="size-4" />}
               value={values.department}
               onChange={(event) => update("department", event.target.value)}
               error={errors.department}
-              hint="Hanya mengubah nama divisi di profil — manager dan hak akses (group) tetap. Untuk pindah divisi lengkap dengan akses baru, gunakan Movement."
+              hint={t.editProfile.departmentHint}
               required
             />
           </div>
 
           <TextareaField
-            label="Keterangan jabatan"
+            label={t.editProfile.jobDescription}
             name="jobDescription"
             icon={<IconNote className="size-4" />}
             rows={3}
             value={values.jobDescription}
             onChange={(event) => update("jobDescription", event.target.value)}
             error={errors.jobDescription}
-            placeholder="Ruang lingkup pekerjaan, tanggung jawab utama…"
+            placeholder={t.editProfile.jobDescriptionPlaceholder}
           />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <SelectField
-              label="Status kepegawaian"
+              label={t.forms.employmentType}
               name="employmentType"
               value={values.employmentType}
               onChange={(event) => update("employmentType", event.target.value)}
               error={errors.employmentType}
             >
-              <option value="">Belum ditentukan</option>
-              <option value="PERMANENT">Karyawan Tetap</option>
-              <option value="CONTRACT">Kontrak</option>
+              <option value="">{t.editProfile.notSet}</option>
+              <option value="PERMANENT">{t.editProfile.permanent}</option>
+              <option value="CONTRACT">{t.forms.contract}</option>
             </SelectField>
 
             {isContract ? (
               <Field
-                label="Kontrak berakhir"
+                label={t.forms.contractEnd}
                 name="expiredDate"
                 type="date"
                 {...dateInputBounds(DATE_BOUNDS.contractEnd)}
@@ -342,20 +345,20 @@ export function ProfileForm({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <SelectField
-              label="Lokasi penempatan"
+              label={t.forms.location}
               name="locationType"
               value={values.locationType}
               onChange={(event) => update("locationType", event.target.value)}
               error={errors.locationType}
             >
-              <option value="">Belum ditentukan</option>
-              <option value="PUSAT">Pusat (Head Office)</option>
-              <option value="CABANG">Cabang (Branch Office)</option>
+              <option value="">{t.editProfile.notSet}</option>
+              <option value="PUSAT">{t.editProfile.headOffice}</option>
+              <option value="CABANG">{t.editProfile.branch}</option>
             </SelectField>
 
             {isBranch ? (
               <Field
-                label="Nama cabang"
+                label={t.forms.branchName}
                 name="branchName"
                 value={values.branchName}
                 onChange={(event) => update("branchName", event.target.value)}
@@ -367,28 +370,28 @@ export function ProfileForm({
           </div>
 
           <TextareaField
-            label="Catatan HC"
+            label={t.editProfile.hcNote}
             name="description"
             rows={3}
             value={values.description}
             onChange={(event) => update("description", event.target.value)}
             error={errors.description}
-            placeholder="Catatan internal, opsional."
+            placeholder={t.editProfile.hcNotePlaceholder}
           />
         </fieldset>
 
         <div className="space-y-3">
           <p className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
-            Perubahan yang akan diajukan
+            {t.editProfile.changesTitle}
           </p>
           {changes.length > 0 ? (
             <div className="overflow-x-auto rounded-xl border border-hairline">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-hairline bg-elevated/40 text-xs tracking-wide text-ink-faint uppercase">
-                    <th className="px-3 py-2 font-medium">Isian</th>
-                    <th className="px-3 py-2 font-medium">Sekarang</th>
-                    <th className="px-3 py-2 font-medium">Menjadi</th>
+                    <th className="px-3 py-2 font-medium">{t.summary.field}</th>
+                    <th className="px-3 py-2 font-medium">{t.forms.now}</th>
+                    <th className="px-3 py-2 font-medium">{t.forms.becomes}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -406,18 +409,17 @@ export function ProfileForm({
             </div>
           ) : (
             <p className="rounded-lg border border-hairline bg-elevated/40 px-3.5 py-2.5 text-xs text-ink-muted">
-              Belum ada perubahan. Ubah minimal satu isian untuk mengajukan.
+              {t.editProfile.noChanges}
             </p>
           )}
         </div>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-4">
           <Button type="submit" loading={saving} disabled={locked || changes.length === 0}>
-            {saving ? "Mengirim…" : revise ? "Kirim revisi ke approver" : "Ajukan perubahan"}
+            {saving ? t.forms.submitting : revise ? t.forms.submitRevision : t.editProfile.submit}
           </Button>
           <p className="min-w-0 flex-1 text-xs text-ink-muted">
-            Profil belum berubah saat diajukan. Email persetujuan dikirim otomatis ke manager karyawan,
-            lalu CISO; perubahan baru berlaku setelah keduanya menyetujui dan worker menjalankannya.
+            {t.editProfile.afterSubmit}
             Email dan manager tidak bisa diubah di sini.
           </p>
         </div>

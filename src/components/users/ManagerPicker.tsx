@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { SelectField } from "@/components/ui/Field";
 import { IconAlert, IconCheck, IconUserCheck } from "@/components/ui/Icons";
 import type { Employee } from "@/lib/types";
@@ -38,6 +39,7 @@ export function ManagerPicker({
   nameError?: string;
   emailError?: string;
 }) {
+  const t = useT();
   const candidates = employees.filter((employee) => employee.status === "ACTIVE");
   const address = value.managerEmail.trim().toLowerCase();
   const matched = candidates.find((employee) => employee.email.toLowerCase() === address);
@@ -58,15 +60,15 @@ export function ManagerPicker({
   return (
     <div className="space-y-2">
       <SelectField
-        label="Manager"
+        label={t.forms.manager}
         name="managerSelect"
         icon={<IconUserCheck />}
         value={matched?.email ?? ""}
         onChange={(event) => select(event.target.value)}
         error={nameError ?? emailError}
-        hint="Hanya karyawan aktif di direktori yang bisa dipilih — email persetujuan dikirim ke orang ini."
+        hint={t.editProfile.managerHint}
       >
-        <option value="">Pilih manager…</option>
+        <option value="">{t.editProfile.chooseManager}</option>
         {candidates.map((employee) => (
           <option key={employee.id} value={employee.email}>
             {employee.displayName} · {employee.department}

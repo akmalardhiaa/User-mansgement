@@ -1,11 +1,15 @@
 import { Card } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requirePageSession } from "@/lib/auth/current";
+import { getTranslations } from "@/lib/i18n/server";
 import type { PortalRole } from "@/lib/auth/roles";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Profil · HC User Management" };
+export async function generateMetadata() {
+  const { t } = await getTranslations();
+  return { title: t.profile.metaTitle };
+}
 
 const ROLE_LABEL: Record<PortalRole, string> = {
   HC_REQUESTER: "Human Capital",
@@ -25,27 +29,28 @@ const ROLE_LABEL: Record<PortalRole, string> = {
  * is why it also has to be the page that explains having none.
  */
 export default async function ProfilePage() {
+  const { t } = await getTranslations();
   const session = await requirePageSession("/profile");
 
   const rows: Array<[string, string]> = [
-    ["Nama", session.fullName],
-    ["Username", session.username],
-    ["Email", session.email],
-    ["Departemen", session.department ?? "—"],
+    [t.profile.name, session.fullName],
+    [t.profile.username, session.username],
+    [t.profile.email, session.email],
+    [t.profile.department, session.department ?? "—"],
     [
-      "Peran portal",
+      t.profile.portalRoles,
       session.roles.length > 0
         ? session.roles.map((role) => ROLE_LABEL[role] ?? role).join(", ")
-        : "Belum ada peran portal",
+        : t.profile.noRole,
     ],
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Akun"
-        title="Profil saya"
-        description="Informasi akun Anda dari Active Directory. Perubahan nama atau kata sandi dilakukan lewat AD."
+        eyebrow={t.profile.eyebrow}
+        title={t.profile.title}
+        description={t.profile.description}
       />
       <Card className="p-6">
         <dl className="divide-y divide-hairline">
@@ -60,7 +65,7 @@ export default async function ProfilePage() {
 
       {session.roles.length === 0 ? (
         <Card className="p-6">
-          <h2 className="text-sm font-semibold text-ink">Belum ada peran portal</h2>
+          <h2 className="text-sm font-semibold text-ink">{t.profile.noRole}</h2>
           <p className="mt-2 max-w-prose text-sm text-ink-muted">
             Akun Active Directory Anda dikenali, tetapi belum termasuk group mana pun yang
             dipetakan ke peran portal. Karena itu halaman selain profil ini belum dapat dibuka.

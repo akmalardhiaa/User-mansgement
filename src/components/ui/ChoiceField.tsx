@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { CONTROL_CLASSES, FieldShell, LeadingIcon, describedBy } from "@/components/ui/Field";
 import { IconCheck, IconChevron, IconSearch } from "@/components/ui/Icons";
 import { TRANSITION_FAST } from "@/lib/motion";
@@ -50,7 +51,7 @@ export function ChoiceField({
   value,
   onChange,
   groups,
-  placeholder = "Pilih…",
+  placeholder,
   icon,
   error,
   hint,
@@ -70,6 +71,7 @@ export function ChoiceField({
   searchable?: boolean;
   className?: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -199,7 +201,7 @@ export function ChoiceField({
           } ${error ? "border-danger/60" : ""}`}
         >
           <span className={`min-w-0 flex-1 truncate ${selected ? "text-ink" : "text-ink-faint"}`}>
-            {selected ? selected.label : placeholder}
+            {selected ? selected.label : (placeholder ?? t.actions.choosePlaceholder)}
             {selected?.meta ? <span className="text-ink-faint"> · {selected.meta}</span> : null}
           </span>
           <IconChevron
@@ -228,7 +230,7 @@ export function ChoiceField({
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
                       onKeyDown={onKeyDown}
-                      placeholder="Cari…"
+                      placeholder={t.actions.searchPlaceholder}
                       aria-label={`Cari ${label.toLowerCase()}`}
                       className="w-full rounded-md border border-hairline bg-canvas/60 py-1.5 pr-2 pl-8 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
                     />

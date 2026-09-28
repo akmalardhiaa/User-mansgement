@@ -3,37 +3,40 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { MovementForm } from "@/components/lifecycle/MovementForm";
 import { OnboardingForm } from "@/components/lifecycle/OnboardingForm";
 import { RequestSubmitted } from "@/components/lifecycle/RequestSubmitted";
 import { TerminationForm } from "@/components/lifecycle/TerminationForm";
 import { IconPower, IconSwap, IconUserPlus } from "@/components/ui/Icons";
+import type { Dictionary } from "@/lib/i18n/dictionaries/id";
 import { TRANSITION, stagger, staggerItem } from "@/lib/motion";
 import type { LifecycleRequest, LifecycleType } from "@/lib/lifecycle/types";
 import type { Employee } from "@/lib/types";
 
 const CHOICES: ReadonlyArray<{
   type: LifecycleType;
-  label: string;
-  description: string;
+  /** Dictionary keys, so both the name and the line under it follow the language. */
+  label: keyof Dictionary["actions"];
+  description: keyof Dictionary["actions"];
   icon: typeof IconUserPlus;
 }> = [
   {
     type: "ONBOARDING",
-    label: "Onboarding",
-    description: "Karyawan baru yang belum punya akun.",
+    label: "typeOnboarding",
+    description: "typeOnboardingHint",
     icon: IconUserPlus,
   },
   {
     type: "MOVEMENT",
-    label: "Movement",
-    description: "Pindah divisi, jabatan, atau manager.",
+    label: "typeMovement",
+    description: "typeMovementHint",
     icon: IconSwap,
   },
   {
     type: "TERMINATION",
-    label: "Termination",
-    description: "Menonaktifkan akun karyawan yang keluar.",
+    label: "typeTermination",
+    description: "typeTerminationHint",
     icon: IconPower,
   },
 ];
@@ -59,6 +62,7 @@ export function NewRequestView({
   initialType?: LifecycleType;
   initialEmployeeId?: string;
 }) {
+  const t = useT();
   const [type, setType] = useState<LifecycleType>(initialType ?? "ONBOARDING");
   const [submitted, setSubmitted] = useState<LifecycleRequest | null>(null);
 
@@ -74,7 +78,7 @@ export function NewRequestView({
         animate="visible"
         className="grid gap-3 sm:grid-cols-3"
         role="tablist"
-        aria-label="Jenis pengajuan"
+        aria-label={t.actions.requestKind}
       >
         {CHOICES.map((choice) => {
           const selected = type === choice.type;
@@ -95,8 +99,8 @@ export function NewRequestView({
               <choice.icon
                 className={`size-5 transition-colors ${selected ? "text-accent" : "text-ink-faint"}`}
               />
-              <p className="mt-2.5 text-sm font-semibold text-ink">{choice.label}</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">{choice.description}</p>
+              <p className="mt-2.5 text-sm font-semibold text-ink">{t.actions[choice.label]}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">{t.actions[choice.description]}</p>
             </motion.button>
           );
         })}

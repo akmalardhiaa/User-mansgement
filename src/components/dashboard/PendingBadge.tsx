@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { pendingLabel, type PendingMarker } from "@/lib/lifecycle/pending";
 
 /**
@@ -11,12 +14,14 @@ import { pendingLabel, type PendingMarker } from "@/lib/lifecycle/pending";
  * request itself.
  */
 export function PendingBadge({ marker }: { marker: PendingMarker }) {
+  const t = useT();
+
   return (
     <Link
       href={`/pengajuan/${marker.requestId}`}
       onClick={(event) => event.stopPropagation()}
       className="inline-flex items-center gap-1.5 rounded-md border border-warn/30 bg-warn/10 px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-warn transition-colors hover:border-warn/60"
-      title="Lihat pengajuan yang sedang berjalan"
+      title={t.execution.viewRunning}
     >
       <span className="size-1.5 rounded-full bg-warn" aria-hidden />
       {pendingLabel(marker)}

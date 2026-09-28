@@ -7,6 +7,7 @@ import { ReviseRequestView } from "@/components/lifecycle/ReviseRequestView";
 import { FormAlert } from "@/components/ui/FormAlert";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requirePageSession } from "@/lib/auth/current";
+import { getTranslations } from "@/lib/i18n/server";
 import { hasPermission } from "@/lib/auth/roles";
 import { listEmployees } from "@/lib/db/repository";
 import { isSamePerson } from "@/lib/lifecycle/routing";
@@ -15,7 +16,10 @@ import { canTransition } from "@/lib/lifecycle/stateMachine";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Revisi pengajuan · HC User Management" };
+export async function generateMetadata() {
+  const { t } = await getTranslations();
+  return { title: t.actions.reviseMetaTitle };
+}
 
 /**
  * The revision screen.
@@ -30,11 +34,12 @@ export default async function ReviseRequestPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t } = await getTranslations();
   const { id } = await params;
   const session = await requirePageSession(`/pengajuan/${id}/revisi`);
 
   if (!hasPermission(session.roles, "request.create")) {
-    return <AccessDenied roles={session.roles} need="Izin membuat dan merevisi pengajuan" />;
+    return <AccessDenied roles={session.roles} need={t.actions.reviseNeed} />;
   }
 
   let request;
@@ -64,7 +69,7 @@ export default async function ReviseRequestPage({
         {back}
         <FormAlert tone="error">
           {!isRequester
-            ? "Hanya pemohon yang dapat merevisi pengajuan ini."
+            ? t.actions.reviseRequesterOnly
             : `Pengajuan berstatus ${request.status} tidak dapat direvisi lagi. Revisi hanya bisa selama pengajuan masih menunggu persetujuan.`}
         </FormAlert>
       </div>
@@ -82,12 +87,15 @@ export default async function ReviseRequestPage({
         {back}
         <div className="mt-2">
           <PageHeader
-            eyebrow="Revisi pengajuan"
+            eyebrow={t.actions.reviseEyebrow}
             badge={<LifecycleTypeBadge type={request.type} />}
             title={request.subject.displayName}
-            description={`Versi ${request.version} → versi ${
-              request.status === "DRAFT" ? request.version : request.version + 1
-            }. Setelah dikirim, persetujuan yang sudah ada dibatalkan, tautan di email lama tidak berlaku lagi, dan email persetujuan baru langsung dikirim ke manager.`}
+            description={t.actions.reviseDescription
+              .replace("{from}", String(request.version))
+              .replace(
+                "{to}",
+                String(request.status === "DRAFT" ? request.version : request.version + 1),
+              )}
           />
         </div>
       </div>

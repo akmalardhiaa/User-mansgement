@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { CONTROL_CLASSES, FieldShell, LeadingIcon, describedBy } from "@/components/ui/Field";
 import { IconCheck, IconChevron } from "@/components/ui/Icons";
 import type { CatalogueGroup } from "@/lib/db/seed";
@@ -70,6 +71,7 @@ export function ComboField({
   placeholder?: string;
   className?: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const wrap = useRef<HTMLDivElement>(null);
@@ -204,7 +206,7 @@ export function ComboField({
         <button
           type="button"
           tabIndex={-1}
-          aria-label={open ? "Tutup daftar" : "Buka daftar"}
+          aria-label={open ? t.actions.closeList : t.actions.openList}
           onClick={() => setOpen((current) => !current)}
           className="absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded text-ink-faint transition-colors hover:text-ink"
         >
