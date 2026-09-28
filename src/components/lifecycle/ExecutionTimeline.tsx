@@ -1,4 +1,8 @@
+"use client";
+
+import { useT } from "@/components/i18n/LocaleProvider";
 import { Card } from "@/components/ui/Field";
+import type { Dictionary } from "@/lib/i18n/dictionaries/id";
 import type { ExecutionJob } from "@/lib/lifecycle/executionTypes";
 
 /**
@@ -11,16 +15,16 @@ import type { ExecutionJob } from "@/lib/lifecycle/executionTypes";
  * not a single red word.
  */
 
-const ERROR_LABEL: Record<string, string> = {
-  DRIFT: "Kondisi akun berubah sejak disetujui",
-  PAYLOAD_MISMATCH: "Isi pengajuan tidak cocok dengan yang disetujui",
-  AD_PERMISSION: "Hak worker tidak cukup",
-  AD_CONFLICT: "Objek bentrok di direktori",
-  AD_NOT_FOUND: "Objek tidak ditemukan",
-  AD_TIMEOUT_AFTER_WRITE: "Waktu tunggu habis setelah perubahan dikirim",
-  AD_UNAVAILABLE: "Direktori tidak dapat dihubungi",
-  VERIFY_FAILED: "Hasil tidak cocok saat dibaca ulang",
-  UNKNOWN: "Kesalahan tidak dikenal",
+const ERROR_LABEL: Record<string, keyof Dictionary["execution"]> = {
+  DRIFT: "drift",
+  PAYLOAD_MISMATCH: "payloadMismatch",
+  AD_PERMISSION: "adPermission",
+  AD_CONFLICT: "adConflict",
+  AD_NOT_FOUND: "adNotFound",
+  AD_TIMEOUT_AFTER_WRITE: "adTimeout",
+  AD_UNAVAILABLE: "adUnavailable",
+  VERIFY_FAILED: "verifyFailed",
+  UNKNOWN: "unknown",
 };
 
 function formatDate(iso: string): string {
@@ -32,11 +36,12 @@ function formatDate(iso: string): string {
 }
 
 export function ExecutionTimeline({ jobs }: { jobs: ExecutionJob[] }) {
+  const t = useT();
   if (jobs.length === 0) return null;
 
   return (
     <Card className="p-6">
-      <h2 className="text-sm font-semibold text-ink">Eksekusi ke direktori</h2>
+      <h2 className="text-sm font-semibold text-ink">{t.execution.timelineTitle}</h2>
 
       {jobs.map((job) => (
         <div key={job.operationId} className="mt-4">
@@ -73,7 +78,7 @@ export function ExecutionTimeline({ jobs }: { jobs: ExecutionJob[] }) {
 
           {job.errorCode ? (
             <div className="mt-3 rounded-lg border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-xs text-danger">
-              <p className="font-semibold">{ERROR_LABEL[job.errorCode] ?? job.errorCode}</p>
+              <p className="font-semibold">{ERROR_LABEL[job.errorCode] ? t.execution[ERROR_LABEL[job.errorCode]] : job.errorCode}</p>
               {job.errorMessage ? <p className="mt-0.5">{job.errorMessage}</p> : null}
               {job.errorCode === "DRIFT" ? (
                 <p className="mt-1.5 text-ink-muted">

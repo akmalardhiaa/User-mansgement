@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 
 import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
+import { useT } from "@/components/i18n/LocaleProvider";
 import { Button } from "@/components/ui/Button";
 import { Card, Field, SelectField, TextareaField } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
@@ -86,6 +87,7 @@ export function OnboardingForm({
   revise?: LifecycleRequest;
   onSubmitted: (request: LifecycleRequest) => void;
 }) {
+  const t = useT();
   const [values, setValues] = useState(() => fromRequest(revise));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -147,11 +149,11 @@ export function OnboardingForm({
         <div>
           <p className={SECTION}>
             <IconUser className="size-3.5" />
-            Identitas karyawan
+            {t.forms.sectionIdentity}
           </p>
           <div className="grid gap-5 sm:grid-cols-2">
             <Field
-              label="Nama depan"
+              label={t.forms.firstName}
               name="firstName"
               icon={<IconUser className="size-4" />}
               value={values.firstName}
@@ -160,7 +162,7 @@ export function OnboardingForm({
               placeholder="Nadia"
             />
             <Field
-              label="Nama belakang"
+              label={t.forms.lastName}
               name="lastName"
               icon={<IconUser className="size-4" />}
               value={values.lastName}
@@ -169,13 +171,13 @@ export function OnboardingForm({
               placeholder="Kusuma"
             />
             <Field
-              label="Nama lengkap"
+              label={t.forms.fullName}
               name="displayName"
               icon={<IconIdCard className="size-4" />}
               value={values.displayName}
               onChange={(event) => update("displayName", event.target.value)}
               error={fieldErrors.displayName}
-              hint="Terisi otomatis dari nama depan dan belakang; bisa diubah."
+              hint={t.forms.fullNameHint}
               className="sm:col-span-2"
             />
             {/*
@@ -185,7 +187,7 @@ export function OnboardingForm({
               persis dengan akun direktori.
             */}
             <Field
-              label="Email"
+              label={t.forms.email}
               name="email"
               type="email"
               icon={<IconMail className="size-4" />}
@@ -201,11 +203,11 @@ export function OnboardingForm({
         <div>
           <p className={SECTION}>
             <IconBriefcase className="size-3.5" />
-            Penempatan
+            {t.forms.sectionPlacement}
           </p>
           <div className="grid gap-5 sm:grid-cols-2">
             <ComboField
-              label="Jabatan"
+              label={t.forms.jobTitle}
               name="jobTitle"
               groups={JOB_TITLE_GROUPS}
               icon={<IconBriefcase className="size-4" />}
@@ -213,57 +215,57 @@ export function OnboardingForm({
               onChange={(next) => update("jobTitle", next)}
               error={fieldErrors.jobTitle}
               placeholder="Backend Engineer"
-              hint="Pilih dari daftar, atau ketik jabatan baru."
+              hint={t.forms.jobTitleHint}
             />
             <ComboField
-              label="Departemen"
+              label={t.forms.department}
               name="department"
               groups={DEPARTMENT_GROUPS}
               icon={<IconBuilding className="size-4" />}
               value={values.department}
               onChange={(next) => update("department", next)}
               error={fieldErrors.department}
-              hint="Pilih dari daftar, atau ketik divisi baru."
+              hint={t.forms.departmentHint}
             />
 
             <SelectField
-              label="Status kepegawaian"
+              label={t.forms.employmentType}
               name="employmentType"
               value={values.employmentType}
               onChange={(event) => update("employmentType", event.target.value)}
               error={fieldErrors.employmentType}
             >
-              <option value="PERMANENT">Karyawan tetap</option>
-              <option value="CONTRACT">Kontrak</option>
+              <option value="PERMANENT">{t.forms.permanent}</option>
+              <option value="CONTRACT">{t.forms.contract}</option>
             </SelectField>
 
             {values.employmentType === "CONTRACT" ? (
               <Field
-                label="Kontrak berakhir"
+                label={t.forms.contractEnd}
                 name="expiredDate"
                 type="date"
                 {...dateInputBounds(DATE_BOUNDS.newContractEnd)}
                 value={values.expiredDate}
                 onChange={(event) => update("expiredDate", event.target.value)}
                 error={fieldErrors.expiredDate}
-                hint="Kontrak tanpa tanggal berakhir terbaca sebagai permanen."
+                hint={t.forms.contractEndHint}
               />
             ) : null}
 
             <SelectField
-              label="Lokasi penempatan"
+              label={t.forms.location}
               name="locationType"
               value={values.locationType}
               onChange={(event) => update("locationType", event.target.value)}
               error={fieldErrors.locationType}
             >
-              <option value="PUSAT">Kantor pusat</option>
-              <option value="CABANG">Kantor cabang</option>
+              <option value="PUSAT">{t.forms.headOffice}</option>
+              <option value="CABANG">{t.forms.branch}</option>
             </SelectField>
 
             {values.locationType === "CABANG" ? (
               <Field
-                label="Nama cabang"
+                label={t.forms.branchName}
                 name="branchName"
                 icon={<IconBuilding className="size-4" />}
                 value={values.branchName}
@@ -274,7 +276,7 @@ export function OnboardingForm({
             ) : null}
 
             <Field
-              label="Tanggal mulai bekerja"
+              label={t.forms.startDate}
               name="startDate"
               type="date"
               {...dateInputBounds(DATE_BOUNDS.startDate)}
@@ -282,11 +284,11 @@ export function OnboardingForm({
               value={values.startDate}
               onChange={(event) => update("startDate", event.target.value)}
               error={fieldErrors.startDate}
-              hint="Dicatat sebagai hari pertama kerja. Akun langsung dibuat begitu kedua persetujuan masuk, apa pun tanggalnya."
+              hint={t.forms.startDateHint}
             />
 
             <TextareaField
-              label="Keterangan jabatan (opsional)"
+              label={t.forms.jobDescription}
               name="jobDescription"
               rows={2}
               icon={<IconNote className="size-4" />}
@@ -301,7 +303,7 @@ export function OnboardingForm({
         <div>
           <p className={SECTION}>
             <IconApprovals className="size-3.5" />
-            Atasan langsung dan profil akses
+            {t.forms.sectionManagerAccess}
           </p>
 
           <ManagerPicker
@@ -320,7 +322,7 @@ export function OnboardingForm({
 
           <div className="mt-5">
             <SelectField
-              label="Profil akses"
+              label={t.forms.accessProfile}
               name="accessProfileId"
               value={values.accessProfileId}
               onChange={(event) => update("accessProfileId", event.target.value)}
@@ -341,7 +343,7 @@ export function OnboardingForm({
 
         <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
           <Button type="submit" loading={submitting}>
-            {submitting ? "Mengirim…" : revise ? "Kirim revisi ke approver" : "Kirim ke approver"}
+            {submitting ? t.forms.submitting : revise ? t.forms.submitRevision : t.forms.submit}
           </Button>
           <p className="text-xs text-ink-faint">
             Akun belum dibuat. Pengajuan dikirim ke manager, lalu CISO.

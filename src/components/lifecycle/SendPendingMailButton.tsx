@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+
+import { useT } from "@/components/i18n/LocaleProvider";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
@@ -27,6 +29,7 @@ import type { DispatchReport } from "@/lib/lifecycle/dispatcher";
  * for trying; nothing in this system ever learns whether it arrived.
  */
 export function SendPendingMailButton() {
+  const t = useT();
   const router = useRouter();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
@@ -38,7 +41,7 @@ export function SendPendingMailButton() {
     if (result.ok) {
       const { attempted, accepted, retried, dead } = result.data;
       if (attempted === 0) {
-        toast("Tidak ada email yang jatuh tempo.", "info");
+        toast(t.actions.noMailDue, "info");
       } else if (dead > 0) {
         toast(`${accepted} diterima provider, ${dead} gagal permanen.`, "error");
       } else if (retried > 0) {
@@ -56,7 +59,7 @@ export function SendPendingMailButton() {
 
   return (
     <Button variant="secondary" size="sm" loading={busy} icon={<IconMail />} onClick={run}>
-      Kirim email tertunda
+      {t.actions.sendPendingMail}
     </Button>
   );
 }

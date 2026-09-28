@@ -1,3 +1,4 @@
+import { useT } from "@/components/i18n/LocaleProvider";
 import { SendPendingMailButton } from "@/components/lifecycle/SendPendingMailButton";
 import { Card } from "@/components/ui/Field";
 import type { EmailDelivery, OutboxEvent } from "@/lib/lifecycle/outboxTypes";
@@ -42,6 +43,7 @@ export function EmailDeliveryPanel({
   /** Whether the viewer holds `execution.run` and may send what is queued. */
   canDispatch?: boolean;
 }) {
+  const t = useT();
   if (events.length === 0) return null;
 
   // Offered only when there is something to send. A button that runs the
@@ -51,7 +53,7 @@ export function EmailDeliveryPanel({
   return (
     <Card className="p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-ink">Email persetujuan</h2>
+        <h2 className="text-sm font-semibold text-ink">{t.email.title}</h2>
         {canDispatch && hasPending ? <SendPendingMailButton /> : null}
       </div>
 

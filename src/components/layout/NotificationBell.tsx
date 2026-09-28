@@ -4,7 +4,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { IconApprovals, IconBell, IconChevron } from "@/components/ui/Icons";
+import type { Dictionary } from "@/lib/i18n/dictionaries/id";
 import { TRANSITION_FAST } from "@/lib/motion";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -24,11 +26,11 @@ interface NotificationItem {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const TYPE_LABELS: Record<string, string> = {
-  ONBOARDING: "Onboarding",
-  MOVEMENT: "Mutasi",
-  TERMINATION: "Offboarding",
-  PROFILE_UPDATE: "Perubahan Profil",
+const TYPE_LABELS: Record<string, keyof Dictionary["notifications"]> = {
+  ONBOARDING: "typeOnboarding",
+  MOVEMENT: "typeMovement",
+  TERMINATION: "typeTermination",
+  PROFILE_UPDATE: "typeProfileUpdate",
 };
 
 /** The colour says how much it matters; the words say what happened. */
@@ -39,20 +41,24 @@ const KIND_STYLES: Record<NotificationKind, string> = {
   COMPLETED: "bg-accent/10 text-accent",
 };
 
-function describe(item: NotificationItem): string {
+function describe(item: NotificationItem, t: Dictionary): string {
   switch (item.kind) {
     case "FAILED":
-      return "Gagal dijalankan — akun belum berubah";
+      return t.notifications.failed;
     case "WAITING_TOO_LONG": {
-      const who = item.stage === "CISO" ? "tim CISO" : "manager";
+      const who =
+        item.stage === "CISO" ? t.notifications.waitingCiso : t.notifications.waitingManager;
       const days = Math.floor((item.waitingHours ?? 0) / 24);
-      const waited = days >= 1 ? `${days} hari` : `${item.waitingHours ?? 0} jam`;
-      return `Belum dijawab ${who} — ${waited}`;
+      const waited =
+        days >= 1
+          ? t.notifications.days.replace("{count}", String(days))
+          : t.notifications.hours.replace("{count}", String(item.waitingHours ?? 0));
+      return t.notifications.waiting.replace("{who}", who).replace("{waited}", waited);
     }
     case "REJECTED":
-      return "Ditolak approver";
+      return t.notifications.rejected;
     case "COMPLETED":
-      return "Selesai dijalankan";
+      return t.notifications.completed;
   }
 }
 
@@ -70,6 +76,7 @@ function timeAgo(iso: string): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function NotificationBell() {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [needsAttention, setNeedsAttention] = useState(0);
@@ -136,8 +143,8 @@ export function NotificationBell() {
         id="notification-bell"
         aria-label={
           needsAttention > 0
-            ? `${needsAttention} pengajuan perlu diperhatikan`
-            : "Notifikasi — tidak ada yang perlu diperhatikan"
+            ? t.notifications.ariaCount.replace("{count}", String(needsAttention))
+            : t.notifications.ariaEmpty
         }
         aria-expanded={open}
         aria-haspopup="true"
@@ -175,13 +182,13 @@ export function NotificationBell() {
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
-              <h2 className="text-sm font-semibold text-ink">Notifikasi</h2>
+              <h2 className="text-sm font-semibold text-ink">{t.notifications.title}</h2>
               {needsAttention > 0 ? (
                 <span className="rounded-full bg-warn/15 px-2 py-0.5 text-[11px] font-semibold text-warn">
-                  {needsAttention} perlu diperhatikan
+                  {t.notifications.needAttention.replace("{count}", String(needsAttention))}
                 </span>
               ) : (
-                <span className="text-[11px] text-ink-faint">Semua beres ✓</span>
+                <span className="text-[11px] text-ink-faint">{t.notifications.allClear}</span>
               )}
             </div>
 
@@ -201,7 +208,7 @@ export function NotificationBell() {
                     <IconApprovals className="size-5" />
                   </span>
                   <p className="text-sm text-ink-muted">
-                    Tidak ada yang perlu diperhatikan.
+                    {t.notifications.nothingToSee}
                   </p>
                 </div>
               ) : (
@@ -219,7 +226,7 @@ export function NotificationBell() {
                             KIND_STYLES[item.kind]
                           }`}
                         >
-                          {TYPE_LABELS[item.type] ?? item.type}
+                          {TYPE_LABELS[item.type] ? t.notifications[TYPE_LABELS[item.type]] : item.type}
                         </span>
 
                         <div className="min-w-0 flex-1">
@@ -229,7 +236,7 @@ export function NotificationBell() {
                           {item.department ? (
                             <p className="truncate text-xs text-ink-muted">{item.department}</p>
                           ) : null}
-                          <p className="mt-0.5 text-[11px] text-ink-faint">{describe(item)}</p>
+                          <p className="mt-0.5 text-[11px] text-ink-faint">{describe(item, t)}</p>
                         </div>
 
                         <span className="shrink-0 text-[10px] text-ink-faint">
@@ -250,7 +257,7 @@ export function NotificationBell() {
                   onClick={() => setOpen(false)}
                   className="flex items-center justify-center gap-1 text-xs font-medium text-accent transition-opacity hover:opacity-80"
                 >
-                  Lihat semua pengajuan
+                  {t.notifications.viewAll}
                   <IconChevron className="-rotate-90 size-3" />
                 </Link>
               </div>

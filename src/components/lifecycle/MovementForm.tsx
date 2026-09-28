@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
+import { useT } from "@/components/i18n/LocaleProvider";
 import { Button } from "@/components/ui/Button";
 import { Card, Field, SelectField, TextareaField } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
@@ -48,6 +49,7 @@ export function MovementForm({
 }) {
   const previous = revise?.payload.kind === "MOVEMENT" ? revise.payload : undefined;
   const [employeeId, setEmployeeId] = useState(previous?.employeeId ?? initialEmployeeId ?? "");
+  const t = useT();
   const [values, setValues] = useState({
     toDepartment: previous?.toDepartment ?? "",
     toJobTitle: previous?.toJobTitle ?? "",
@@ -102,9 +104,9 @@ export function MovementForm({
 
   const diff: Array<[string, string, string]> = employee
     ? [
-        ["Departemen", employee.department, values.toDepartment || "—"],
-        ["Jabatan", employee.jobTitle, values.toJobTitle || "—"],
-        ["Manager", employee.managerName, values.toManagerName || "—"],
+        [t.forms.department, employee.department, values.toDepartment || "—"],
+        [t.forms.jobTitle, employee.jobTitle, values.toJobTitle || "—"],
+        [t.forms.manager, employee.managerName, values.toManagerName || "—"],
       ]
     : [];
 
@@ -119,7 +121,7 @@ export function MovementForm({
             Karyawan yang dipindahkan
           </p>
           <SelectField
-            label="Karyawan"
+            label={t.forms.employee}
             name="employeeId"
             icon={<IconUser className="size-4" />}
             value={employeeId}
@@ -128,11 +130,11 @@ export function MovementForm({
             disabled={Boolean(revise)}
             hint={
               revise
-                ? "Karyawan tidak bisa diganti lewat revisi. Batalkan dan buat pengajuan baru bila salah orang."
-                : "Karyawan yang sedang memiliki pengajuan berjalan tidak muncul di sini."
+                ? t.execution.subjectLocked
+                : t.execution.subjectInFlight
             }
           >
-            <option value="">Pilih karyawan…</option>
+            <option value="">{t.forms.chooseEmployee}</option>
             {employees.map((candidate) => (
               <option key={candidate.id} value={candidate.id}>
                 {candidate.displayName} · {candidate.department}
@@ -151,9 +153,9 @@ export function MovementForm({
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-hairline bg-elevated/40 text-xs tracking-wide text-ink-faint uppercase">
-                    <th className="px-3 py-2.5 sm:px-4 font-medium">Atribut</th>
-                    <th className="px-3 py-2.5 sm:px-4 font-medium">Sekarang</th>
-                    <th className="px-3 py-2.5 sm:px-4 font-medium">Menjadi</th>
+                    <th className="px-3 py-2.5 sm:px-4 font-medium">{t.forms.attribute}</th>
+                    <th className="px-3 py-2.5 sm:px-4 font-medium">{t.forms.now}</th>
+                    <th className="px-3 py-2.5 sm:px-4 font-medium">{t.forms.becomes}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -186,18 +188,18 @@ export function MovementForm({
           </p>
           <div className="grid gap-5 sm:grid-cols-2">
             <ComboField
-              label="Departemen tujuan"
+              label={t.forms.toDepartment}
               name="toDepartment"
               groups={DEPARTMENT_GROUPS}
               icon={<IconBuilding className="size-4" />}
               value={values.toDepartment}
               onChange={(next) => update("toDepartment", next)}
               error={fieldErrors.toDepartment}
-              hint="Pilih dari daftar, atau ketik divisi baru."
+              hint={t.forms.departmentHint}
             />
 
             <ComboField
-              label="Jabatan tujuan"
+              label={t.forms.toJobTitle}
               name="toJobTitle"
               groups={JOB_TITLE_GROUPS}
               icon={<IconBriefcase className="size-4" />}
@@ -205,11 +207,11 @@ export function MovementForm({
               onChange={(next) => update("toJobTitle", next)}
               error={fieldErrors.toJobTitle}
               placeholder="Security Engineer"
-              hint="Pilih dari daftar, atau ketik jabatan baru."
+              hint={t.forms.jobTitleHint}
             />
 
             <Field
-              label="Waktu efektif (opsional)"
+              label={t.forms.effectiveAt}
               name="effectiveAt"
               type="date"
               {...dateInputBounds(DATE_BOUNDS.effectiveAt)}
@@ -217,11 +219,11 @@ export function MovementForm({
               value={values.effectiveAt}
               onChange={(event) => update("effectiveAt", event.target.value)}
               error={fieldErrors.effectiveAt}
-              hint="Kosongkan agar dijalankan segera setelah kedua approval masuk."
+              hint={t.forms.effectiveAtHint}
             />
 
             <SelectField
-              label="Profil akses baru"
+              label={t.forms.newAccessProfile}
               name="accessProfileId"
               value={values.accessProfileId}
               onChange={(event) => update("accessProfileId", event.target.value)}
@@ -239,7 +241,7 @@ export function MovementForm({
             </SelectField>
 
             <TextareaField
-              label="Keterangan jabatan baru (opsional)"
+              label={t.forms.newJobDescription}
               name="toJobDescription"
               rows={2}
               icon={<IconNote className="size-4" />}
@@ -250,22 +252,22 @@ export function MovementForm({
             />
 
             <TextareaField
-              label="Alasan pemindahan"
+              label={t.forms.movementReason}
               name="reason"
               rows={2}
               icon={<IconNote className="size-4" />}
               value={values.reason}
               onChange={(event) => update("reason", event.target.value)}
               error={fieldErrors.reason}
-              placeholder="Rotasi internal, pengisian posisi kosong, …"
-              hint="Dibaca kedua approver."
+              placeholder={t.forms.movementReasonPlaceholder}
+              hint={t.forms.readByApprovers}
               className="sm:col-span-2"
             />
           </div>
         </div>
 
         <div>
-          <p className={SECTION}>Manager divisi tujuan</p>
+          <p className={SECTION}>{t.forms.toManager}</p>
           <ManagerPicker
             employees={employees}
             value={{ managerName: values.toManagerName, managerEmail: values.toManagerEmail }}
@@ -287,7 +289,7 @@ export function MovementForm({
 
         <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
           <Button type="submit" loading={submitting} disabled={!employeeId}>
-            {submitting ? "Mengirim…" : revise ? "Kirim revisi ke approver" : "Kirim ke approver"}
+            {submitting ? t.forms.submitting : revise ? t.forms.submitRevision : t.forms.submit}
           </Button>
           <p className="text-xs text-ink-faint">
             Posisi belum berubah. Direktori tetap menampilkan posisi sekarang sampai perubahan

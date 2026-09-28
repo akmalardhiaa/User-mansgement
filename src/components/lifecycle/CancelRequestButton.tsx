@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+
+import { useT } from "@/components/i18n/LocaleProvider";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
@@ -17,6 +19,7 @@ import type { LifecycleRequest } from "@/lib/lifecycle/types";
  * describing something that did not happen.
  */
 export function CancelRequestButton({ request }: { request: LifecycleRequest }) {
+  const t = useT();
   const router = useRouter();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
@@ -30,7 +33,7 @@ export function CancelRequestButton({ request }: { request: LifecycleRequest }) 
     );
 
     if (result.ok) {
-      toast("Pengajuan dibatalkan.", "info");
+      toast(t.actions.cancelled, "info");
       router.refresh();
       return;
     }
@@ -43,16 +46,16 @@ export function CancelRequestButton({ request }: { request: LifecycleRequest }) 
   if (!confirming) {
     return (
       <Button variant="ghost" size="sm" onClick={() => setConfirming(true)}>
-        Batalkan pengajuan
+        {t.actions.cancelRequest}
       </Button>
     );
   }
 
   return (
     <span className="inline-flex items-center gap-2">
-      <span className="text-xs text-ink-muted">Batalkan pengajuan ini?</span>
+      <span className="text-xs text-ink-muted">{t.actions.cancelConfirm}</span>
       <Button variant="danger" size="sm" loading={busy} onClick={cancel}>
-        Ya, batalkan
+        {t.actions.cancelYes}
       </Button>
       <Button variant="ghost" size="sm" disabled={busy} onClick={() => setConfirming(false)}>
         Tidak

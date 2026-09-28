@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+
+import { useT } from "@/components/i18n/LocaleProvider";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
@@ -23,6 +25,7 @@ import type { LifecycleRequest } from "@/lib/lifecycle/types";
  * record who claimed it.
  */
 export function RetryButton({ requestId }: { requestId: string }) {
+  const t = useT();
   const router = useRouter();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
@@ -37,7 +40,7 @@ export function RetryButton({ requestId }: { requestId: string }) {
     );
 
     if (result.ok) {
-      toast("Pengajuan dimasukkan kembali ke antrean eksekusi.", "success");
+      toast(t.actions.requeued, "success");
       setNeedsAcknowledgement(null);
       router.refresh();
       return;

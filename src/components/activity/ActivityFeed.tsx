@@ -3,7 +3,9 @@
 import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 
+import { useT } from "@/components/i18n/LocaleProvider";
 import { Button } from "@/components/ui/Button";
+import type { Dictionary } from "@/lib/i18n/dictionaries/id";
 import { SelectField } from "@/components/ui/Field";
 import { Card } from "@/components/ui/Field";
 import {
@@ -30,50 +32,50 @@ import { ACTIVITY_ACTIONS, type ActivityAction, type ActivityEntry } from "@/lib
 
 const ACTION_PRESENTATION: Record<
   ActivityAction,
-  { label: string; tone: string; icon: typeof IconClock }
+  { label: keyof Dictionary["activity"]; tone: string; icon: typeof IconClock }
 > = {
   "user.created": {
-    label: "Akun diajukan",
+    label: "userCreated" as const,
     tone: "border-info/30 bg-info/10 text-info",
     icon: IconUserPlus,
   },
   "transfer.requested": {
-    label: "Pindah divisi diajukan",
+    label: "transferRequested" as const,
     tone: "border-info/30 bg-info/10 text-info",
     icon: IconSwap,
   },
   "access.disabled": {
-    label: "Akses ditangguhkan",
+    label: "accessDisabled" as const,
     tone: "border-danger/30 bg-danger/10 text-danger",
     icon: IconPower,
   },
   "access.enabled": {
-    label: "Akses diaktifkan",
+    label: "accessEnabled" as const,
     tone: "border-ok/30 bg-ok/10 text-ok",
     icon: IconPower,
   },
   "request.approved": {
-    label: "Disetujui manager",
+    label: "requestApproved" as const,
     tone: "border-ok/30 bg-ok/10 text-ok",
     icon: IconCheck,
   },
   "request.rejected": {
-    label: "Ditolak manager",
+    label: "requestRejected" as const,
     tone: "border-danger/30 bg-danger/10 text-danger",
     icon: IconAlert,
   },
   "request.completed": {
-    label: "Penyiapan selesai",
+    label: "provisioningDone" as const,
     tone: "border-ok/30 bg-ok/10 text-ok",
     icon: IconCheck,
   },
   "directory.exported": {
-    label: "Direktori diekspor",
+    label: "directoryExported" as const,
     tone: "border-hairline-strong bg-elevated text-ink-muted",
     icon: IconDownload,
   },
   "employee.profile_updated": {
-    label: "Profil diperbarui",
+    label: "profileUpdated" as const,
     tone: "border-hairline-strong bg-elevated text-ink-muted",
     icon: IconUser,
   },
@@ -103,6 +105,7 @@ function dayKey(iso: string): string {
 }
 
 export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [action, setAction] = useState<ActivityAction | "ALL">("ALL");
 
@@ -138,20 +141,20 @@ export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Cari nama, pelaku, atau keterangan"
-          aria-label="Cari aktivitas"
+          placeholder={t.activity.searchPlaceholder}
+          aria-label={t.activity.searchLabel}
           className="w-full rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none sm:max-w-xs"
         />
         <SelectField
           value={action}
           onChange={(event) => setAction(event.target.value as ActivityAction | "ALL")}
-          aria-label="Saring berdasarkan jenis aktivitas"
+          aria-label={t.activity.filterKind}
           className="rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
         >
-          <option value="ALL">Semua aktivitas</option>
+          <option value="ALL">{t.activity.allKinds}</option>
           {ACTIVITY_ACTIONS.map((value) => (
             <option key={value} value={value}>
-              {ACTION_PRESENTATION[value].label}
+              {t.activity[ACTION_PRESENTATION[value].label]}
             </option>
           ))}
         </SelectField>
@@ -169,7 +172,7 @@ export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
             </Button>
           ) : null}
           <span aria-live="polite">
-            {visible.length} dari {entries.length}
+            {visible.length} {t.directory.countOf} {entries.length}
           </span>
         </div>
       </div>
@@ -181,8 +184,8 @@ export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
           </span>
           <p className="mt-3 text-sm text-ink-muted">
             {entries.length === 0
-              ? "Belum ada aktivitas yang tercatat."
-              : "Tidak ada aktivitas yang cocok dengan saringan ini."}
+              ? t.activity.empty
+              : t.execution.activityNoMatch}
           </p>
         </div>
       ) : (
@@ -217,7 +220,7 @@ export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
                       <div className="min-w-0 flex-1">
                         <p className="text-sm leading-snug text-ink">{entry.detail}</p>
                         <p className="mt-0.5 text-xs text-ink-faint">
-                          {style.label} · oleh {entry.actor}
+                          {t.activity[style.label]} · {t.activity.by} {entry.actor}
                         </p>
                       </div>
                     </motion.li>

@@ -17,6 +17,8 @@ import { Card } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requirePageSession } from "@/lib/auth/current";
 import { hasPermission } from "@/lib/auth/roles";
+import type { Dictionary } from "@/lib/i18n/dictionaries/id";
+import { getTranslations } from "@/lib/i18n/server";
 import { isSamePerson } from "@/lib/lifecycle/routing";
 import { LifecycleError, auditTrailFor, getRequest, identityOf } from "@/lib/lifecycle/service";
 import { canTransition } from "@/lib/lifecycle/stateMachine";
@@ -33,15 +35,16 @@ function formatDate(iso: string): string {
   }).format(new Date(iso));
 }
 
-const AUDIT_LABEL: Record<string, string> = {
-  "request.drafted": "Draf dibuat",
-  "request.submitted": "Dikirim ke approver",
-  "request.approved": "Disetujui",
-  "request.rejected": "Ditolak",
-  "request.revised": "Direvisi",
-  "request.cancelled": "Dibatalkan",
-  "request.queued": "Masuk antrean eksekusi",
-  "request.scheduled": "Dijadwalkan",
+/** Audit actions to dictionary keys — the words live with the page's words. */
+const AUDIT_LABEL: Record<string, keyof Dictionary["detail"]> = {
+  "request.drafted": "auditDrafted",
+  "request.submitted": "auditSubmitted",
+  "request.approved": "auditApproved",
+  "request.rejected": "auditRejected",
+  "request.revised": "auditRevised",
+  "request.cancelled": "auditCancelled",
+  "request.queued": "auditQueued",
+  "request.scheduled": "auditScheduled",
 };
 
 /**
@@ -58,11 +61,12 @@ export default async function RequestDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t } = await getTranslations();
   const { id } = await params;
   const session = await requirePageSession(`/pengajuan/${id}`);
 
   if (!hasPermission(session.roles, "request.read")) {
-    return <AccessDenied roles={session.roles} need="Izin membaca pengajuan" />;
+    return <AccessDenied roles={session.roles} need={t.requests.needRead} />;
   }
 
   let request;
@@ -106,15 +110,19 @@ export default async function RequestDetailPage({
           className="inline-flex items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink"
         >
           <span aria-hidden>←</span>
-          Kembali ke daftar pengajuan
+          {t.detail.back}
         </Link>
         <div className="mt-2">
           <PageHeader
-            eyebrow="Pengajuan"
+            eyebrow={t.detail.eyebrow}
             badge={<LifecycleTypeBadge type={request.type} />}
             title={request.subject.displayName}
-            description={`Diajukan ${request.requester.name} pada ${formatDate(request.createdAt)}${
-              request.version > 1 ? ` · versi ${request.version}` : ""
+            description={`${t.detail.raised
+              .replace("{name}", request.requester.name)
+              .replace("{date}", formatDate(request.createdAt))}${
+              request.version > 1
+                ? ` · ${t.detail.version.replace("{version}", String(request.version))}`
+                : ""
             }`}
             actions={<LifecycleStatusBadge status={request.status} />}
           />
@@ -125,20 +133,11 @@ export default async function RequestDetailPage({
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-info/30 bg-info/10 px-3.5 py-2.5 text-xs leading-relaxed text-info">
           <p className="min-w-0">
             {request.status === "FAILED" ? (
-              <>
-                Eksekusi berhenti sebelum selesai. Akun berada pada keadaan yang tercatat di bawah —
-                periksa dulu sebelum mencoba lagi.
-              </>
+              t.detail.failedNotice
             ) : request.status === "SCHEDULED" ? (
-              <>
-                Sah dan menunggu waktu efektif. Belum ada perubahan pada akun.
-              </>
+              t.detail.scheduledNotice
             ) : (
-              <>
-                Kedua approval sudah masuk dan perubahan ini sah. Perubahannya{" "}
-                <strong>belum dijalankan</strong> sampai worker menjalankannya, jadi akun masih
-                dalam keadaan semula.
-              </>
+              t.detail.approvedNotice
             )}
           </p>
           {canRun ? (
@@ -154,9 +153,9 @@ export default async function RequestDetailPage({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-6">
           <Card className="p-6">
-            <h2 className="text-sm font-semibold text-ink">Isi pengajuan</h2>
+            <h2 className="text-sm font-semibold text-ink">{t.detail.payloadTitle}</h2>
             <p className="mt-1 text-xs text-ink-muted">
-              Dikunci sejak dikirim. Sidik jari:{" "}
+              {t.detail.payloadLocked.split("{hash}")[0]}
               <span className="font-mono">{request.payloadHash.slice(0, 16) || "—"}</span>
             </p>
             <div className="mt-4">
@@ -167,7 +166,7 @@ export default async function RequestDetailPage({
           <ExecutionTimeline jobs={jobs} />
 
           <Card className="p-6">
-            <h2 className="text-sm font-semibold text-ink">Jejak audit</h2>
+            <h2 className="text-sm font-semibold text-ink">{t.detail.auditTitle}</h2>
             <ol className="mt-4 space-y-4 border-l border-hairline-strong pl-5">
               {audit.map((event) => (
                 <li key={event.id} className="relative">
@@ -176,7 +175,7 @@ export default async function RequestDetailPage({
                     aria-hidden
                   />
                   <p className="text-sm font-medium text-ink">
-                    {AUDIT_LABEL[event.action] ?? event.action}
+                    {AUDIT_LABEL[event.action] ? t.detail[AUDIT_LABEL[event.action]] : event.action}
                   </p>
                   <p className="text-xs text-ink-faint">
                     {event.actorName} · {formatDate(event.at)}
@@ -184,7 +183,7 @@ export default async function RequestDetailPage({
                 </li>
               ))}
               {audit.length === 0 ? (
-                <li className="text-sm text-ink-muted">Belum ada peristiwa tercatat.</li>
+                <li className="text-sm text-ink-muted">{t.detail.auditEmpty}</li>
               ) : null}
             </ol>
           </Card>
@@ -192,12 +191,12 @@ export default async function RequestDetailPage({
 
         <div className="space-y-6">
           <Card className="p-5">
-            <h2 className="text-sm font-semibold text-ink">Persetujuan</h2>
+            <h2 className="text-sm font-semibold text-ink">{t.detail.approvalsTitle}</h2>
             <ol className="mt-4 space-y-4">
               {request.approvals.map((step) => (
                 <li key={`${step.stage}-${step.version}`} className="space-y-1">
                   <p className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
-                    {step.stage === "MANAGER" ? "1. Manager" : "2. CISO"}
+                    {step.stage === "MANAGER" ? t.detail.stageManager : t.detail.stageCiso}
                   </p>
                   <p className="text-sm font-medium text-ink">{step.approver.name}</p>
                   {step.pool?.length ? (
@@ -218,23 +217,25 @@ export default async function RequestDetailPage({
                     <p
                       className={`text-xs ${step.decision === "APPROVED" ? "text-ok" : "text-danger"}`}
                     >
-                      {step.decision === "APPROVED" ? "Disetujui" : "Ditolak"}
-                      {step.pool?.length && step.decidedBy ? ` oleh ${step.decidedBy.name}` : ""}
+                      {step.decision === "APPROVED" ? t.detail.approved : t.detail.rejected}
+                      {step.pool?.length && step.decidedBy
+                        ? t.detail.decidedBy.replace("{name}", step.decidedBy.name)
+                        : ""}
                       {step.decidedAt ? ` · ${formatDate(step.decidedAt)}` : ""}
                       {step.reason ? ` — ${step.reason}` : ""}
                     </p>
                   ) : (
                     <p className="text-xs text-ink-faint">
                       {step.pool?.length
-                        ? "Menunggu — keputusan pertama dari anggota tim yang berlaku"
-                        : "Belum memutuskan"}
+                        ? t.detail.waitingTeam
+                        : t.detail.waiting}
                     </p>
                   )}
                 </li>
               ))}
               {request.approvals.length === 0 ? (
                 <li className="text-sm text-ink-muted">
-                  Belum dirutekan — pengajuan masih berupa draf.
+                  {t.detail.notRoutedYet}
                 </li>
               ) : null}
             </ol>
@@ -247,14 +248,17 @@ export default async function RequestDetailPage({
           />
 
           <Card className="p-5">
-            <h2 className="text-sm font-semibold text-ink">Rincian</h2>
+            <h2 className="text-sm font-semibold text-ink">{t.detail.detailsTitle}</h2>
             <dl className="mt-3 space-y-2 text-sm">
               {[
-                ["Nomor", request.id],
-                ["Versi", String(request.version)],
-                ["Waktu efektif", request.effectiveAt ? formatDate(request.effectiveAt) : "Segera"],
-                ["Kebijakan", request.policyVersion],
-                ...(request.closedReason ? [["Alasan penutupan", request.closedReason]] : []),
+                [t.detail.number, request.id],
+                [t.detail.versionLabel, String(request.version)],
+                [
+                  t.detail.effectiveAt,
+                  request.effectiveAt ? formatDate(request.effectiveAt) : t.detail.immediately,
+                ],
+                [t.detail.policy, request.policyVersion],
+                ...(request.closedReason ? [[t.detail.closedReason, request.closedReason]] : []),
               ].map(([label, value]) => (
                 <div key={label} className="flex gap-3">
                   <dt className="w-28 shrink-0 text-xs text-ink-faint">{label}</dt>
@@ -269,11 +273,10 @@ export default async function RequestDetailPage({
                   href={`/pengajuan/${request.id}/revisi`}
                   className={buttonClasses("secondary")}
                 >
-                  Revisi pengajuan
+                  {t.detail.revise}
                 </Link>
                 <p className="text-xs text-ink-faint">
-                  Revisi membatalkan persetujuan yang sudah ada dan otomatis mengirim email
-                  persetujuan baru ke manager.
+                  {t.detail.reviseHint}
                 </p>
               </div>
             ) : null}

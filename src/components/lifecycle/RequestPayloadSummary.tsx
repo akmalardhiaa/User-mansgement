@@ -1,3 +1,7 @@
+"use client";
+
+import { useT } from "@/components/i18n/LocaleProvider";
+import type { Dictionary } from "@/lib/i18n/dictionaries/id";
 import { accessProfileLabel } from "@/lib/lifecycle/accessProfiles";
 import type {
   LifecyclePayload,
@@ -5,12 +9,12 @@ import type {
   TerminationReason,
 } from "@/lib/lifecycle/types";
 
-const REASON_LABEL: Record<TerminationReason, string> = {
-  RESIGN: "Mengundurkan diri",
-  CONTRACT_END: "Kontrak berakhir",
-  RETIREMENT: "Pensiun",
-  TERMINATION: "Pemutusan hubungan kerja",
-  OTHER: "Lainnya",
+const REASON_LABEL: Record<TerminationReason, keyof Dictionary["forms"]> = {
+  RESIGN: "reasonResign",
+  CONTRACT_END: "reasonContractEnd",
+  RETIREMENT: "reasonRetire",
+  TERMINATION: "reasonDismissal",
+  OTHER: "reasonOther",
 };
 
 /**
@@ -27,48 +31,53 @@ const REASON_LABEL: Record<TerminationReason, string> = {
  * than they must.
  */
 export function RequestPayloadSummary({ payload }: { payload: LifecyclePayload }) {
+  const t = useT();
   if (payload.kind === "PROFILE_UPDATE") return <ProfileChanges payload={payload} />;
 
   const rows: Array<[string, string]> =
     payload.kind === "ONBOARDING"
       ? [
-          ["Nama", payload.displayName],
-          ["Email", payload.email],
-          ["Jabatan", payload.jobTitle],
-          ["Departemen", payload.department],
+          [t.summary.name, payload.displayName],
+          [t.summary.email, payload.email],
+          [t.summary.jobTitle, payload.jobTitle],
+          [t.summary.department, payload.department],
           [
-            "Status kepegawaian",
+            t.summary.employmentType,
             payload.employmentType === "CONTRACT"
-              ? `Kontrak · berakhir ${payload.expiredDate ?? "—"}`
-              : "Karyawan tetap",
+              ? t.summary.contractUntil.replace("{date}", payload.expiredDate ?? "—")
+              : t.summary.permanent,
           ],
           [
-            "Lokasi",
+            t.summary.location,
             payload.locationType === "CABANG"
-              ? `Cabang · ${payload.branchName ?? "—"}`
-              : "Kantor pusat",
+              ? t.summary.branchNamed.replace("{name}", payload.branchName ?? "—")
+              : t.summary.headOffice,
           ],
-          ["Manager", `${payload.managerName} · ${payload.managerEmail}`],
-          ["Mulai bekerja", payload.startDate],
-          ["Profil akses", accessProfileLabel(payload.accessProfileId)],
-          ...(payload.jobDescription ? [["Keterangan jabatan", payload.jobDescription] as [string, string]] : []),
+          [t.summary.manager, `${payload.managerName} · ${payload.managerEmail}`],
+          [t.summary.startDate, payload.startDate],
+          [t.summary.accessProfile, accessProfileLabel(payload.accessProfileId)],
+          ...(payload.jobDescription
+            ? [[t.summary.jobDescription, payload.jobDescription] as [string, string]]
+            : []),
         ]
       : payload.kind === "MOVEMENT"
         ? [
-            ["Departemen tujuan", payload.toDepartment],
-            ["Jabatan tujuan", payload.toJobTitle],
-            ["Manager tujuan", `${payload.toManagerName} · ${payload.toManagerEmail}`],
-            ["Profil akses baru", accessProfileLabel(payload.accessProfileId)],
-            ["Alasan", payload.reason],
+            [t.summary.toDepartment, payload.toDepartment],
+            [t.summary.toJobTitle, payload.toJobTitle],
+            [t.summary.toManager, `${payload.toManagerName} · ${payload.toManagerEmail}`],
+            [t.summary.newAccessProfile, accessProfileLabel(payload.accessProfileId)],
+            [t.summary.reason, payload.reason],
             ...(payload.toJobDescription
-              ? [["Keterangan jabatan", payload.toJobDescription] as [string, string]]
+              ? [[t.summary.jobDescription, payload.toJobDescription] as [string, string]]
               : []),
           ]
         : [
-            ["Kategori alasan", REASON_LABEL[payload.reasonCategory]],
-            ["Tanggal terakhir bekerja", payload.lastWorkingDate],
-            ...(payload.handoverTo ? [["Serah terima kepada", payload.handoverTo] as [string, string]] : []),
-            ["Tindakan", "Nonaktifkan dan karantina akun — bukan hapus permanen"],
+            [t.summary.reasonCategory, t.forms[REASON_LABEL[payload.reasonCategory]]],
+            [t.summary.lastWorkingDate, payload.lastWorkingDate],
+            ...(payload.handoverTo
+              ? [[t.summary.handoverTo, payload.handoverTo] as [string, string]]
+              : []),
+            [t.summary.action, t.summary.terminationAction],
           ];
 
   return (
@@ -90,15 +99,17 @@ export function RequestPayloadSummary({ payload }: { payload: LifecyclePayload }
  * column is the server's reading of the record at submit, not the browser's.
  */
 function ProfileChanges({ payload }: { payload: ProfileUpdatePayload }) {
+  const t = useT();
+
   return (
     <div className="space-y-3">
       <div className="overflow-x-auto rounded-xl border border-hairline">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-hairline bg-elevated/40 text-xs tracking-wide text-ink-faint uppercase">
-              <th className="px-3 py-2.5 font-medium sm:px-4">Isian</th>
-              <th className="px-3 py-2.5 font-medium sm:px-4">Sebelum</th>
-              <th className="px-3 py-2.5 font-medium sm:px-4">Sesudah</th>
+              <th className="px-3 py-2.5 font-medium sm:px-4">{t.summary.field}</th>
+              <th className="px-3 py-2.5 font-medium sm:px-4">{t.summary.before}</th>
+              <th className="px-3 py-2.5 font-medium sm:px-4">{t.summary.after}</th>
             </tr>
           </thead>
           <tbody>
@@ -114,7 +125,7 @@ function ProfileChanges({ payload }: { payload: ProfileUpdatePayload }) {
             {payload.changes.length === 0 ? (
               <tr>
                 <td colSpan={3} className="px-3 py-4 text-center text-ink-muted sm:px-4">
-                  Perubahan dihitung saat pengajuan dikirim.
+                  {t.summary.changesComputed}
                 </td>
               </tr>
             ) : null}
@@ -122,7 +133,7 @@ function ProfileChanges({ payload }: { payload: ProfileUpdatePayload }) {
         </table>
       </div>
       <p className="text-xs text-ink-faint">
-        Email, manager, dan hak akses (group) tidak berubah lewat pengajuan ini.
+        {t.summary.profileScopeNote}
       </p>
     </div>
   );
