@@ -24,12 +24,25 @@ services:
     # read the same way whatever the directory is called.
     container_name: hc-portal
 
-    # Published on the same port it listens on, and that matters beyond
-    # convenience: APP_BASE_URL is baked into every approval link an email
-    # carries. Publish this on 8080 without changing APP_BASE_URL to match and
-    # the links in those emails point at a port nothing is serving.
+    # Bound to 127.0.0.1, not to every interface, and that is the security
+    # setting in this file.
+    #
+    # `"3000:3000"` publishes on 0.0.0.0: anybody on the same office or café
+    # network can then open http://<this-machine>:3000 and sign in with the demo
+    # accounts, whose passwords are in the README. This portal runs in
+    # development mode with no TLS and a simulated directory, so it is meant for
+    # the machine it runs on — nothing about it is ready to be a service other
+    # people reach.
+    #
+    # To demonstrate from a phone or another laptop, change this to
+    # "0.0.0.0:3000:3000" AND set APP_BASE_URL to that address, because every
+    # approval link in every email is built from it. Change it back afterwards.
+    #
+    # The port number itself stays 3000 on both sides for the same reason:
+    # publishing on 8080 without matching APP_BASE_URL produces mail whose
+    # buttons point at a port nothing is serving.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
 
     # Two layers, and the order is the point. The example file is committed and
     # holds the demo defaults — mock directory, email written to files, nothing

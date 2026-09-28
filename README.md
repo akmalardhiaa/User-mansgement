@@ -220,6 +220,25 @@ Container dan `npm run dev` **tidak boleh jalan bersamaan**. Keduanya menulis
 tidak bisa menengahi dua proses — dan dua penjadwal outbox yang menyapu antrean
 yang sama berarti satu email persetujuan bisa terkirim dua kali.
 
+**Portal hanya menerima koneksi dari komputernya sendiri.** `docker-compose.yml`
+mempublikasikan port ke `127.0.0.1:3000`, bukan ke `0.0.0.0`. Alasannya bukan
+kerapian: aplikasi ini berjalan dalam mode development, tanpa TLS, dengan
+direktori simulasi dan akun demo yang kata sandinya tertulis di README ini —
+begitu port-nya terbuka ke jaringan, siapa pun di jaringan yang sama bisa masuk
+sebagai HC. Untuk mendemokan dari ponsel atau laptop lain, ubah ke
+`"0.0.0.0:3000:3000"` **dan** sesuaikan `APP_BASE_URL` ke alamat itu, karena
+setiap tautan persetujuan di email dibangun dari nilai tersebut; kembalikan
+setelah selesai.
+
+**Kunci enkripsi outbox sebaiknya diisi, meski di demo.** Tanpa
+`OUTBOX_ENCRYPTION_KEY`, di luar production kunci diturunkan dari string tetap
+yang ada di dalam kode — jadi payload tersegel di `data/` bisa dibuka siapa pun
+yang punya repositori ini. Isi dengan `openssl rand -base64 32` (atau
+`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`).
+Mengganti kunci membuat payload yang **masih menunggu kirim** tidak bisa dibuka,
+jadi lakukan saat antrean outbox kosong; payload dihapus begitu pesannya
+terkirim, sehingga riwayat lama tidak terpengaruh.
+
 **Satu proses pun punya beberapa salinan modul.** Next mengompilasi `store.ts`
 terpisah untuk route handler, halaman, dan `instrumentation.ts` (penjadwal
 outbox & worker), sehingga kunci yang disimpan di variabel modul sebenarnya
