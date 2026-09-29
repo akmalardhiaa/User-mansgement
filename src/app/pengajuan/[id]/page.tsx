@@ -103,7 +103,7 @@ export default async function RequestDetailPage({
     (request.status === "DRAFT" || canTransition(request.status, "DRAFT"));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div>
         <Link
           href="/pengajuan"
@@ -112,8 +112,9 @@ export default async function RequestDetailPage({
           <span aria-hidden>←</span>
           {t.detail.back}
         </Link>
-        <div className="mt-2">
+        <div className="mt-1.5">
           <PageHeader
+            compact
             eyebrow={t.detail.eyebrow}
             badge={<LifecycleTypeBadge type={request.type} />}
             title={request.subject.displayName}
@@ -150,9 +151,9 @@ export default async function RequestDetailPage({
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="space-y-6">
-          <Card className="p-6">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="space-y-4">
+          <Card className="p-4">
             <h2 className="text-sm font-semibold text-ink">{t.detail.payloadTitle}</h2>
             <p className="mt-1 text-xs text-ink-muted">
               {t.detail.payloadLocked.split("{hash}")[0]}
@@ -165,9 +166,11 @@ export default async function RequestDetailPage({
 
           <ExecutionTimeline jobs={jobs} />
 
-          <Card className="p-6">
+          <Card className="p-4">
             <h2 className="text-sm font-semibold text-ink">{t.detail.auditTitle}</h2>
-            <ol className="mt-4 space-y-4 border-l border-hairline-strong pl-5">
+            {/* Bounded: this list grows for the life of the request, and the
+                page around it has no reason to grow with it. */}
+            <ol className="mt-3 max-h-[22rem] space-y-3 overflow-y-auto border-l border-hairline-strong pl-5">
               {audit.map((event) => (
                 <li key={event.id} className="relative">
                   <span
@@ -189,7 +192,7 @@ export default async function RequestDetailPage({
           </Card>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           <Card className="p-5">
             <h2 className="text-sm font-semibold text-ink">{t.detail.approvalsTitle}</h2>
             <ol className="mt-4 space-y-4">

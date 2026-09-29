@@ -192,7 +192,7 @@ export const id = {
     eyebrow: "Pengajuan",
     title: "Pengajuan baru",
     description:
-      "Setiap pengajuan melewati persetujuan manager lalu CISO. Tidak ada perubahan pada akun sampai keduanya menyetujui dan perubahannya dijalankan.",
+      "Untuk karyawan baru yang belum punya akun. Untuk karyawan yang sudah ada, buka Edit profil. Disetujui manager lalu CISO sebelum akunnya dibuat.",
     submittedTitle: "Pengajuan terkirim",
     /** {name} is who the request is about. */
     submittedBody: "Pengajuan untuk {name} sudah dikunci dan diteruskan ke approver pertama.",
@@ -216,13 +216,13 @@ export const id = {
     submitting: "Mengirim…",
 
     sectionIdentity: "Identitas karyawan",
-    sectionPlacement: "Penempatan",
-    sectionManagerAccess: "Atasan langsung dan profil akses",
+    sectionPlacement: "Penempatan dan atasan",
+    sectionManagerAccess: "Atasan langsung",
 
     firstName: "Nama depan",
     lastName: "Nama belakang",
     fullName: "Nama lengkap",
-    fullNameHint: "Terisi otomatis dari nama depan dan belakang; bisa diubah.",
+    fullNameHint: "Terisi otomatis; bisa diubah.",
     email: "Email perusahaan",
     emailDomain: "Domain",
     jobTitle: "Jabatan",
@@ -236,21 +236,18 @@ export const id = {
     intern: "Magang",
     /** Shown under the employment type field, as the company's own convention. */
     employmentCodeHint:
-      "Kode angka perusahaan: 1-2 permanent, 3-4 temporary, 5-6 vendor, 7-8 magang.",
+      "1-2 permanent, 3-4 temporary, 5-6 vendor, 7-8 magang.",
     contractEnd: "Tanggal berakhir",
-    contractEndHint: "Wajib untuk temporary, vendor, dan magang. Tanpa tanggal berakhir, aksesnya terbaca sebagai permanent.",
-    emailHint:
-      "Gabungan nama depan dan belakang, lalu angka status di akhir — misalnya nadiakusuma3 untuk temporary. 1-2 permanent, 3-4 temporary, 5-6 vendor, 7-8 magang.",
+    contractEndHint: "Wajib untuk temporary, vendor, dan magang.",
+    emailHint: "Nama depan + belakang, lalu angka status di akhir. Misalnya nadiakusuma3.",
     location: "Lokasi penempatan",
     headOffice: "Kantor pusat",
     branch: "Cabang",
     branchName: "Nama cabang",
     startDate: "Tanggal mulai bekerja",
-    startDateHint:
-      "Dicatat sebagai hari pertama kerja. Akun langsung dibuat begitu kedua persetujuan masuk, apa pun tanggalnya.",
+    startDateHint: "Hari pertama kerja. Akun dibuat begitu kedua persetujuan masuk.",
     jobDescription: "Keterangan jabatan (opsional)",
     manager: "Manager",
-    accessProfile: "Profil akses",
 
     employee: "Karyawan",
     chooseEmployee: "Pilih karyawan…",
@@ -260,13 +257,12 @@ export const id = {
     toDepartment: "Departemen tujuan",
     toJobTitle: "Jabatan tujuan",
     toManager: "Manager divisi tujuan",
-    newAccessProfile: "Profil akses baru",
     newJobDescription: "Keterangan jabatan baru (opsional)",
     movementReason: "Alasan pemindahan",
     movementReasonPlaceholder: "Rotasi internal, pengisian posisi kosong, …",
     readByApprovers: "Dibaca kedua approver.",
     effectiveAt: "Waktu efektif (opsional)",
-    effectiveAtHint: "Kosongkan agar dijalankan segera setelah kedua approval masuk.",
+    effectiveAtHint: "Kosongkan agar langsung dijalankan.",
 
     reasonCategory: "Kategori alasan",
     reasonCategoryHint: "Kategori saja — detailnya tidak dikirim ke approver.",
@@ -437,7 +433,7 @@ export const id = {
     reviseEyebrow: "Revisi pengajuan",
     /** {from} and {to} are version numbers. */
     reviseDescription:
-      "Versi {from} → versi {to}. Setelah dikirim, persetujuan yang sudah ada dibatalkan, tautan di email lama tidak berlaku lagi, dan email persetujuan baru langsung dikirim ke manager.",
+      "Versi {from} → {to}. Persetujuan lama dibatalkan, tautan email lama mati, dan email baru dikirim ke manager.",
 
     choosePlaceholder: "Pilih…",
     searchPlaceholder: "Cari…",
@@ -451,16 +447,17 @@ export const id = {
     eyebrow: "Manajemen Akun",
     title: "Edit User & Profil Karyawan",
     description:
-      "Ajukan perubahan profil, keterangan jabatan, status karyawan (Permanent/Kontrak), dan lokasi penempatan kerja. Perubahan dikirim ke manager lalu CISO lewat email, dan baru berlaku setelah keduanya menyetujui.",
+      "Setiap perubahan disetujui manager lalu CISO lewat email sebelum berlaku.",
 
     searchEmployee: "Cari karyawan",
     searchPlaceholder: "Nama, email, departemen…",
     noMatch: "Tidak ada yang cocok.",
+    showAll: "Tampilkan seluruh karyawan ({count})",
+    showFewer: "Tampilkan lebih sedikit",
     pickSomeone: "Pilih karyawan di sebelah kiri untuk mengedit.",
 
-    displayNameHint: "Nama yang tampil di seluruh dashboard dan email persetujuan.",
-    departmentHint:
-      "Hanya mengubah nama divisi di profil — manager dan hak akses (group) tetap. Untuk pindah divisi lengkap dengan akses baru, gunakan Movement.",
+    displayNameHint: "Tampil di dashboard dan email persetujuan.",
+    departmentHint: "Nama divisi saja; hak akses tetap.",
     jobDescription: "Keterangan jabatan",
     jobDescriptionPlaceholder: "Ruang lingkup pekerjaan, tanggung jawab utama…",
     notSet: "Belum ditentukan",
@@ -473,11 +470,11 @@ export const id = {
     changesTitle: "Perubahan yang akan diajukan",
     noChanges: "Belum ada perubahan. Ubah minimal satu isian untuk mengajukan.",
     submit: "Ajukan perubahan",
-    afterSubmit:
-      "Profil belum berubah saat diajukan. Email persetujuan dikirim otomatis ke manager karyawan, lalu CISO; perubahan baru berlaku setelah keduanya menyetujui dan worker menjalankannya.",
+    afterSubmit: "Profil baru berubah setelah manager dan CISO menyetujui lewat email.",
+    emailManagerLocked: "Email dan manager tidak bisa diubah di sini.",
+    seeRequests: "Lihat daftar pengajuan",
 
-    managerHint:
-      "Hanya karyawan aktif di direktori yang bisa dipilih — email persetujuan dikirim ke orang ini.",
+    managerHint: "Penerima email persetujuan pertama.",
     chooseManager: "Pilih manager…",
 
     actionsLabel: "Tindakan untuk karyawan ini",
@@ -547,6 +544,12 @@ export const id = {
     approvalRequest: "Permintaan persetujuan",
     resultNotice: "Pemberitahuan hasil",
     rejectionNotice: "Pemberitahuan penolakan",
+    attempt: "Percobaan",
+    acceptedAtPrefix: "diterima provider",
+    failedAtPrefix: "gagal",
+    retryAfter: "Dicoba lagi setelah {when}.",
+    disclaimer:
+      "“Diterima provider” berarti pesan sudah diantrekan untuk dikirim — bukan bukti sudah masuk kotak masuk. Tidak ada di sistem ini yang mengetahui hal itu.",
   },
 
   profile: {
@@ -581,14 +584,25 @@ export const id = {
       "Karyawan tidak bisa diganti lewat revisi. Batalkan dan buat pengajuan baru bila salah orang.",
     subjectInFlight: "Karyawan yang sedang memiliki pengajuan berjalan tidak muncul di sini.",
     timelineTitle: "Eksekusi ke direktori",
+    sectionWhoMoves: "Karyawan yang dipindahkan",
+    sectionBeforeAfter: "Sebelum dan sesudah",
+    sectionTargetPosition: "Posisi tujuan dan manager",
+    toManagerNote:
+      "Persetujuan tahap pertama diminta ke manager divisi tujuan — merekalah yang menerima karyawan ini.",
+    notCreatedYet: "Akun belum dibuat. Pengajuan dikirim ke manager, lalu CISO.",
+    notMovedYet:
+      "Posisi belum berubah. Direktori tetap menampilkan posisi sekarang sampai perubahan dijalankan.",
+    notRevokedYet: "Akses belum dicabut. Pengajuan dikirim ke manager, lalu CISO.",
+    profileLockedNote:
+      "Karyawan ini sedang punya pengajuan yang berjalan, jadi profilnya dikunci sampai pengajuan itu selesai atau dibatalkan. Untuk mengubah isinya, revisi pengajuan tersebut dari halaman detailnya.",
     sectionWhoLeaves: "Karyawan yang dinonaktifkan",
     sectionAffected: "Akun yang terdampak",
-    sectionReasonSchedule: "Alasan dan jadwal",
+    sectionReasonSchedule: "Jadwal penonaktifan",
     quarantineStrong: "menonaktifkan dan mengarantina",
     quarantineBefore: "Tindakan default adalah ",
     quarantineAfter: " akun, bukan menghapusnya. Penghapusan permanen memerlukan proses terpisah.",
     sessionsNote:
-      "Menonaktifkan akun di direktori tidak otomatis memutus sesi yang sudah berjalan — tiket Kerberos, VPN, dan sesi Microsoft 365 punya masa hidup sendiri. Pencabutan menyeluruh memerlukan integrasi tambahan yang belum ada.",
+      "Sesi yang sudah berjalan (Kerberos, VPN, Microsoft 365) tidak otomatis terputus.",
     /** {name} is the current manager, asked first. */
     firstApproverIs: "Persetujuan tahap pertama diminta ke {name}, manager saat ini.",
     hcNoteLabel: "Catatan HC:",

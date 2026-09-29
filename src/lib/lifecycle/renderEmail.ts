@@ -108,7 +108,9 @@ function payloadRows(payload: LifecyclePayload): Array<[string, string]> {
       ],
       ["Manager", `${payload.managerName} · ${payload.managerEmail}`],
       ["Mulai bekerja", payload.startDate],
-      ["Profil akses", accessProfileLabel(payload.accessProfileId)],
+      ...(payload.accessProfileId
+        ? [["Profil akses", accessProfileLabel(payload.accessProfileId)] as [string, string]]
+        : []),
       ...(payload.jobDescription
         ? [["Keterangan jabatan", payload.jobDescription] as [string, string]]
         : []),
@@ -129,7 +131,9 @@ function payloadRows(payload: LifecyclePayload): Array<[string, string]> {
       ["Departemen tujuan", payload.toDepartment],
       ["Jabatan tujuan", payload.toJobTitle],
       ["Manager tujuan", `${payload.toManagerName} · ${payload.toManagerEmail}`],
-      ["Profil akses baru", accessProfileLabel(payload.accessProfileId)],
+      ...(payload.accessProfileId
+        ? [["Profil akses baru", accessProfileLabel(payload.accessProfileId)] as [string, string]]
+        : []),
       ...(payload.reason ? [["Alasan", payload.reason] as [string, string]] : []),
       ...(payload.toJobDescription
         ? [["Keterangan jabatan", payload.toJobDescription] as [string, string]]
@@ -138,7 +142,9 @@ function payloadRows(payload: LifecyclePayload): Array<[string, string]> {
   }
 
   return [
-    ["Kategori alasan", REASON_LABEL[payload.reasonCategory]],
+    ...(payload.reasonCategory
+      ? [["Kategori alasan", REASON_LABEL[payload.reasonCategory]] as [string, string]]
+      : []),
     ["Tanggal terakhir bekerja", payload.lastWorkingDate],
     ...(payload.handoverTo
       ? [["Serah terima kepada", payload.handoverTo] as [string, string]]

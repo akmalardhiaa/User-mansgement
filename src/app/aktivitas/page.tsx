@@ -24,7 +24,7 @@ export default async function ActivityPage() {
   const activity = await listActivity();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         eyebrow={t.activity.eyebrow}
         title={t.activity.title}

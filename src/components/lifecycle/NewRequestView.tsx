@@ -3,7 +3,6 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 
-import { useT } from "@/components/i18n/LocaleProvider";
 import { OnboardingForm } from "@/components/lifecycle/OnboardingForm";
 import { RequestSubmitted } from "@/components/lifecycle/RequestSubmitted";
 import type { LifecycleRequest } from "@/lib/lifecycle/types";
@@ -24,7 +23,6 @@ import type { Employee } from "@/lib/types";
  * from, and a new hire's approving manager is somebody who already works here.
  */
 export function NewRequestView({ employees }: { employees: Employee[] }) {
-  const t = useT();
   const [submitted, setSubmitted] = useState<LifecycleRequest | null>(null);
 
   if (submitted) {
@@ -33,9 +31,6 @@ export function NewRequestView({ employees }: { employees: Employee[] }) {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={TRANSITION}>
-      <p className="mb-4 rounded-lg border border-hairline bg-elevated/40 px-3.5 py-2.5 text-xs leading-relaxed text-ink-muted">
-        {t.newRequest.existingEmployeeNote}
-      </p>
       <OnboardingForm employees={employees} onSubmitted={setSubmitted} />
     </motion.div>
   );

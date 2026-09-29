@@ -1,6 +1,8 @@
-import { useT } from "@/components/i18n/LocaleProvider";
 import { SendPendingMailButton } from "@/components/lifecycle/SendPendingMailButton";
 import { Card } from "@/components/ui/Field";
+import type { Dictionary } from "@/lib/i18n/dictionaries/id";
+import { getTranslations } from "@/lib/i18n/server";
+import type { Locale } from "@/lib/i18n/locale";
 import type { EmailDelivery, OutboxEvent } from "@/lib/lifecycle/outboxTypes";
 
 /**
@@ -11,29 +13,43 @@ import type { EmailDelivery, OutboxEvent } from "@/lib/lifecycle/outboxTypes";
  * "diterima provider" and never "terkirim". Nothing in this system ever learns
  * whether a message reached an inbox, and a screen that implies otherwise is
  * where somebody concludes an approver was told when they were not.
+ *
+ * A server component, and it has to be one: it renders inside the request
+ * detail page, which is server-rendered, and it holds no state and no handler.
+ * It briefly called `useT()` — the client hook — which threw at runtime rather
+ * than at build, because a hook is only wrong once something renders it. The
+ * words come from `getTranslations()` instead, which is the server half of the
+ * same dictionary.
  */
 
-const STATE_LABEL: Record<OutboxEvent["state"], { label: string; className: string }> = {
-  PENDING: { label: "Menunggu dikirim", className: "border-warn/30 bg-warn/10 text-warn" },
-  SENT: { label: "Diterima provider", className: "border-ok/30 bg-ok/10 text-ok" },
-  DEAD: { label: "Gagal dikirim", className: "border-danger/30 bg-danger/10 text-danger" },
+const STATE_STYLE: Record<OutboxEvent["state"], string> = {
+  PENDING: "border-warn/30 bg-warn/10 text-warn",
+  SENT: "border-ok/30 bg-ok/10 text-ok",
+  DEAD: "border-danger/30 bg-danger/10 text-danger",
 };
 
-const KIND_LABEL: Record<OutboxEvent["kind"], string> = {
-  "approval.request": "Permintaan persetujuan",
-  "approval.result": "Pemberitahuan hasil",
-  "request.rejected": "Pemberitahuan penolakan",
-};
+function stateLabel(t: Dictionary, state: OutboxEvent["state"]): string {
+  if (state === "PENDING") return t.email.queued;
+  if (state === "SENT") return t.email.accepted;
+  return t.email.failed;
+}
 
-function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("id-ID", {
+function kindLabel(t: Dictionary, kind: OutboxEvent["kind"]): string {
+  if (kind === "approval.request") return t.email.approvalRequest;
+  if (kind === "approval.result") return t.email.resultNotice;
+  return t.email.rejectionNotice;
+}
+
+/** Jakarta time in the reader's language. The timezone is the company's, always. */
+function formatDate(iso: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "id-ID", {
     dateStyle: "medium",
     timeStyle: "short",
     timeZone: "Asia/Jakarta",
   }).format(new Date(iso));
 }
 
-export function EmailDeliveryPanel({
+export async function EmailDeliveryPanel({
   events,
   deliveries,
   canDispatch = false,
@@ -43,7 +59,7 @@ export function EmailDeliveryPanel({
   /** Whether the viewer holds `execution.run` and may send what is queued. */
   canDispatch?: boolean;
 }) {
-  const t = useT();
+  const { t, locale } = await getTranslations();
   if (events.length === 0) return null;
 
   // Offered only when there is something to send. A button that runs the
@@ -60,18 +76,19 @@ export function EmailDeliveryPanel({
       <ol className="mt-4 space-y-4">
         {events.map((event) => {
           const attempts = deliveries.filter((delivery) => delivery.eventId === event.eventId);
-          const state = STATE_LABEL[event.state];
 
           return (
             <li key={event.eventId} className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
                 <span
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${state.className}`}
+                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                    STATE_STYLE[event.state]
+                  }`}
                 >
-                  {state.label}
+                  {stateLabel(t, event.state)}
                 </span>
                 <span className="text-xs text-ink-muted">
-                  {KIND_LABEL[event.kind]}
+                  {kindLabel(t, event.kind)}
                   {event.stage ? ` · ${event.stage === "MANAGER" ? "Manager" : "CISO"}` : ""}
                 </span>
               </div>
@@ -79,17 +96,22 @@ export function EmailDeliveryPanel({
               <p className="font-mono text-[11px] break-all text-ink-muted">{event.recipient}</p>
 
               {attempts.map((attempt) => (
-                <p key={`${attempt.eventId}-${attempt.attempt}`} className="text-[11px] text-ink-faint">
-                  Percobaan {attempt.attempt}:{" "}
+                <p
+                  key={`${attempt.eventId}-${attempt.attempt}`}
+                  className="text-[11px] text-ink-faint"
+                >
+                  {t.email.attempt} {attempt.attempt}:{" "}
                   {attempt.acceptedAt
-                    ? `diterima provider ${formatDate(attempt.acceptedAt)}`
-                    : `gagal ${attempt.failedAt ? formatDate(attempt.failedAt) : ""} — ${attempt.errorMessage ?? attempt.errorKind}`}
+                    ? `${t.email.acceptedAtPrefix} ${formatDate(attempt.acceptedAt, locale)}`
+                    : `${t.email.failedAtPrefix} ${
+                        attempt.failedAt ? formatDate(attempt.failedAt, locale) : ""
+                      } — ${attempt.errorMessage ?? attempt.errorKind}`}
                 </p>
               ))}
 
               {event.state === "PENDING" && event.attempt > 0 ? (
                 <p className="text-[11px] text-warn">
-                  Dicoba lagi setelah {formatDate(event.nextAttemptAt)}.
+                  {t.email.retryAfter.replace("{when}", formatDate(event.nextAttemptAt, locale))}
                 </p>
               ) : null}
             </li>
@@ -98,8 +120,7 @@ export function EmailDeliveryPanel({
       </ol>
 
       <p className="mt-4 border-t border-hairline pt-3 text-[11px] leading-relaxed text-ink-faint">
-        &ldquo;Diterima provider&rdquo; berarti pesan sudah diantrekan untuk dikirim — bukan bukti
-        sudah masuk kotak masuk. Tidak ada yang di sistem ini mengetahui hal itu.
+        {t.email.disclaimer}
       </p>
     </Card>
   );

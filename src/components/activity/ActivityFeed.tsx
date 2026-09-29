@@ -13,6 +13,7 @@ import {
   IconCheck,
   IconClock,
   IconDownload,
+  IconFilter,
   IconPower,
   IconSearch,
   IconSwap,
@@ -145,11 +146,14 @@ export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
           aria-label={t.activity.searchLabel}
           className="w-full rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm placeholder:text-ink-faint focus:border-accent focus:outline-none sm:max-w-xs"
         />
+        {/* A width only: SelectField draws its own control, and the border
+            classes this used to carry boxed it inside a second border. */}
         <SelectField
           value={action}
           onChange={(event) => setAction(event.target.value as ActivityAction | "ALL")}
           aria-label={t.activity.filterKind}
-          className="rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+          icon={<IconFilter className="size-3.5" />}
+          className="w-full sm:w-52"
         >
           <option value="ALL">{t.activity.allKinds}</option>
           {ACTIVITY_ACTIONS.map((value) => (
@@ -189,11 +193,18 @@ export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
           </p>
         </div>
       ) : (
-        <motion.div variants={stagger(0.03)} initial="hidden" animate="visible">
+        /* Bounded and scrollable, so the feed fits a screen however long it is. */
+        <motion.div
+          variants={stagger(0.03)}
+          initial="hidden"
+          animate="visible"
+          className="max-h-[calc(100vh-23rem)] overflow-y-auto"
+        >
           {days.map(([day, dayEntries]) => (
             <section key={day}>
               {/* Sticky so the date stays visible while a long day scrolls past. */}
-              <h2 className="sticky top-[4.5rem] z-10 border-y border-hairline bg-surface/95 px-4 py-2 text-xs font-medium tracking-wide text-ink-faint uppercase backdrop-blur-sm">
+              {/* Sticky to the feed's own scroll box now, not to the page. */}
+              <h2 className="sticky top-0 z-10 border-y border-hairline bg-surface/95 px-4 py-2 text-xs font-medium tracking-wide text-ink-faint uppercase backdrop-blur-sm">
                 {day}
               </h2>
               <ul>

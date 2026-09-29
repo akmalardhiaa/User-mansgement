@@ -185,7 +185,7 @@ export const en: Dictionary = {
     eyebrow: "Requests",
     title: "New request",
     description:
-      "Every request goes to the manager first and then to CISO. Nothing about the account changes until both have approved and the change has been carried out.",
+      "For a new hire with no account yet. For somebody already in the directory, use Edit profil. The manager and then CISO approve before the account is created.",
     submittedTitle: "Request sent",
     submittedBody: "The request for {name} is locked and on its way to the first approver.",
     whoApproves: "Who has to approve",
@@ -207,13 +207,13 @@ export const en: Dictionary = {
     submitting: "Sending…",
 
     sectionIdentity: "Employee identity",
-    sectionPlacement: "Placement",
-    sectionManagerAccess: "Manager and access profile",
+    sectionPlacement: "Placement and manager",
+    sectionManagerAccess: "Reporting manager",
 
     firstName: "First name",
     lastName: "Last name",
     fullName: "Full name",
-    fullNameHint: "Filled in from the first and last name; you can change it.",
+    fullNameHint: "Filled in automatically; you can change it.",
     email: "Company email",
     emailDomain: "Domain",
     jobTitle: "Job title",
@@ -226,21 +226,20 @@ export const en: Dictionary = {
     vendor: "Vendor",
     intern: "Intern",
     employmentCodeHint:
-      "The company's number codes: 1-2 permanent, 3-4 temporary, 5-6 vendor, 7-8 intern.",
+      "1-2 permanent, 3-4 temporary, 5-6 vendor, 7-8 intern.",
     contractEnd: "End date",
-    contractEndHint: "Required for temporary, vendor and intern. With no end date, the access reads as permanent.",
+    contractEndHint: "Required for temporary, vendor and intern.",
     emailHint:
-      "First and last name run together, then the status digit at the end — nadiakusuma3 for a temporary, say. 1-2 permanent, 3-4 temporary, 5-6 vendor, 7-8 intern.",
+      "First and last name joined, then the status digit — nadiakusuma3, say.",
     location: "Place of work",
     headOffice: "Head office",
     branch: "Branch",
     branchName: "Branch name",
     startDate: "Start date",
     startDateHint:
-      "Recorded as the first day of work. The account is created as soon as both approvals are in, whatever the date says.",
+      "The first day of work. The account is created once both approvals are in.",
     jobDescription: "Job description (optional)",
     manager: "Manager",
-    accessProfile: "Access profile",
 
     employee: "Employee",
     chooseEmployee: "Choose an employee…",
@@ -250,13 +249,12 @@ export const en: Dictionary = {
     toDepartment: "New department",
     toJobTitle: "New job title",
     toManager: "Manager of the new division",
-    newAccessProfile: "New access profile",
     newJobDescription: "New job description (optional)",
     movementReason: "Reason for the move",
     movementReasonPlaceholder: "Internal rotation, filling a vacancy, …",
     readByApprovers: "Both approvers read this.",
     effectiveAt: "Effective from (optional)",
-    effectiveAtHint: "Leave empty to run it as soon as both approvals are in.",
+    effectiveAtHint: "Leave empty to run it straight away.",
 
     reasonCategory: "Reason",
     reasonCategoryHint: "The category only — the details are not sent to approvers.",
@@ -413,7 +411,7 @@ export const en: Dictionary = {
     reviseRequesterOnly: "Only the person who raised this request can revise it.",
     reviseEyebrow: "Revise request",
     reviseDescription:
-      "Version {from} → version {to}. Once sent, the approvals already given are voided, the links in the old emails stop working, and a fresh approval email goes to the manager.",
+      "Version {from} → {to}. The approvals given are voided, the old email links die, and a fresh one goes to the manager.",
 
     choosePlaceholder: "Choose…",
     searchPlaceholder: "Search…",
@@ -427,16 +425,17 @@ export const en: Dictionary = {
     eyebrow: "Account management",
     title: "Edit user & employee profile",
     description:
-      "Raise a change to a profile, job description, employment type (permanent or contract) and place of work. The change goes to the manager and then to CISO by email, and only takes effect once both have approved.",
+      "The manager and then CISO approve by email before anything takes effect.",
 
     searchEmployee: "Search employees",
     searchPlaceholder: "Name, email, department…",
     noMatch: "Nothing matches.",
+    showAll: "Show all employees ({count})",
+    showFewer: "Show fewer",
     pickSomeone: "Pick somebody on the left to edit.",
 
-    displayNameHint: "The name shown across the dashboard and in approval emails.",
-    departmentHint:
-      "This only changes the division name on the profile — the manager and access groups stay as they are. For a full move with new access, use Movement.",
+    displayNameHint: "Shown on the dashboard and in approval emails.",
+    departmentHint: "The division name only; access stays.",
     jobDescription: "Job description",
     jobDescriptionPlaceholder: "Scope of the work, main responsibilities…",
     notSet: "Not set",
@@ -449,11 +448,11 @@ export const en: Dictionary = {
     changesTitle: "What will be raised",
     noChanges: "Nothing has changed yet. Edit at least one field to raise a request.",
     submit: "Raise the change",
-    afterSubmit:
-      "The profile does not change when you raise this. An approval email goes to the employee's manager and then to CISO; the change takes effect once both have approved and the worker has carried it out.",
+    afterSubmit: "The profile changes once the manager and CISO have approved by email.",
+    emailManagerLocked: "Email and manager cannot be changed here.",
+    seeRequests: "See the request list",
 
-    managerHint:
-      "Only active employees in the directory can be picked — the approval email goes to this person.",
+    managerHint: "Gets the first approval email.",
     chooseManager: "Choose a manager…",
 
     actionsLabel: "What to do with this employee",
@@ -519,6 +518,12 @@ export const en: Dictionary = {
     approvalRequest: "Approval request",
     resultNotice: "Result notice",
     rejectionNotice: "Rejection notice",
+    attempt: "Attempt",
+    acceptedAtPrefix: "accepted by the provider",
+    failedAtPrefix: "failed",
+    retryAfter: "Will be tried again after {when}.",
+    disclaimer:
+      "“Accepted by the provider” means the message has been queued for delivery — it is not evidence that it reached an inbox. Nothing in this system knows that.",
   },
 
   profile: {
@@ -552,14 +557,25 @@ export const en: Dictionary = {
       "The employee cannot be changed by revising. Cancel and raise a new request if this is the wrong person.",
     subjectInFlight: "Anyone with a request already in progress is not listed here.",
     timelineTitle: "Execution against the directory",
+    sectionWhoMoves: "Who is moving",
+    sectionBeforeAfter: "Before and after",
+    sectionTargetPosition: "The new position and manager",
+    toManagerNote:
+      "The first approval is asked of the receiving division's manager — they are the one taking this employee on.",
+    notCreatedYet: "No account is created yet. The request goes to the manager, then to CISO.",
+    notMovedYet:
+      "Nothing has moved yet. The directory keeps showing the current position until the change has been carried out.",
+    notRevokedYet: "No access is revoked yet. The request goes to the manager, then to CISO.",
+    profileLockedNote:
+      "This employee already has a request in flight, so the profile is locked until that request finishes or is cancelled. To change what it proposes, revise it from its own detail page.",
     sectionWhoLeaves: "Who is being disabled",
     sectionAffected: "The account affected",
-    sectionReasonSchedule: "Reason and timing",
+    sectionReasonSchedule: "When the account closes",
     quarantineStrong: "disable and quarantine",
     quarantineBefore: "The default action is to ",
     quarantineAfter: " the account, not delete it. Permanent deletion is a separate process.",
     sessionsNote:
-      "Disabling an account in the directory does not end sessions that are already open — Kerberos tickets, VPN and Microsoft 365 sessions have lives of their own. Cutting those off needs an integration that does not exist yet.",
+      "Sessions already open (Kerberos, VPN, Microsoft 365) do not end by themselves.",
     firstApproverIs: "The first approval is asked of {name}, the current manager.",
     hcNoteLabel: "HC note:",
     requestInProgress: "Request in progress",

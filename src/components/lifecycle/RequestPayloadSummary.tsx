@@ -57,7 +57,14 @@ export function RequestPayloadSummary({ payload }: { payload: LifecyclePayload }
           ],
           [t.summary.manager, `${payload.managerName} · ${payload.managerEmail}`],
           [t.summary.startDate, payload.startDate],
-          [t.summary.accessProfile, accessProfileLabel(payload.accessProfileId)],
+          ...(payload.accessProfileId
+            ? [
+                [t.summary.accessProfile, accessProfileLabel(payload.accessProfileId)] as [
+                  string,
+                  string,
+                ],
+              ]
+            : []),
           ...(payload.jobDescription
             ? [[t.summary.jobDescription, payload.jobDescription] as [string, string]]
             : []),
@@ -67,14 +74,28 @@ export function RequestPayloadSummary({ payload }: { payload: LifecyclePayload }
             [t.summary.toDepartment, payload.toDepartment],
             [t.summary.toJobTitle, payload.toJobTitle],
             [t.summary.toManager, `${payload.toManagerName} · ${payload.toManagerEmail}`],
-            [t.summary.newAccessProfile, accessProfileLabel(payload.accessProfileId)],
+            ...(payload.accessProfileId
+              ? [
+                  [
+                    t.summary.newAccessProfile,
+                    accessProfileLabel(payload.accessProfileId),
+                  ] as [string, string],
+                ]
+              : []),
             ...(payload.reason ? [[t.summary.reason, payload.reason] as [string, string]] : []),
             ...(payload.toJobDescription
               ? [[t.summary.jobDescription, payload.toJobDescription] as [string, string]]
               : []),
           ]
         : [
-            [t.summary.reasonCategory, t.forms[REASON_LABEL[payload.reasonCategory]]],
+            ...(payload.reasonCategory
+              ? [
+                  [
+                    t.summary.reasonCategory,
+                    t.forms[REASON_LABEL[payload.reasonCategory]],
+                  ] as [string, string],
+                ]
+              : []),
             [t.summary.lastWorkingDate, payload.lastWorkingDate],
             ...(payload.handoverTo
               ? [[t.summary.handoverTo, payload.handoverTo] as [string, string]]

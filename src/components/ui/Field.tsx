@@ -49,17 +49,17 @@ export interface FieldShellProps {
 export function FieldShell({ label, name, error, hint, className = "", children }: FieldShellProps) {
   return (
     <div className={className}>
-      <label htmlFor={name} className="mb-1.5 block text-sm font-medium text-ink">
+      <label htmlFor={name} className="mb-0.5 block text-sm font-medium text-ink">
         {label}
       </label>
       {/* `group` so the icon inside can react to focus anywhere in the control. */}
       <div className="group relative">{children}</div>
       {error ? (
-        <p id={`${name}-error`} className="mt-1.5 text-xs text-danger">
+        <p id={`${name}-error`} className="mt-0.5 text-xs text-danger">
           {error}
         </p>
       ) : hint ? (
-        <p id={`${name}-hint`} className="mt-1.5 text-xs text-ink-faint">
+        <p id={`${name}-hint`} className="mt-0.5 text-xs leading-tight text-ink-faint">
           {hint}
         </p>
       ) : null}

@@ -41,7 +41,7 @@ export function RequestSubmitted({
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={TRANSITION}>
-      <Card className="p-6">
+      <Card className="p-4">
         <div className="flex items-start gap-3">
           <motion.span
             initial={{ scale: 0.4, opacity: 0 }}

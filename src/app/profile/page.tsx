@@ -46,16 +46,16 @@ export default async function ProfilePage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         eyebrow={t.profile.eyebrow}
         title={t.profile.title}
         description={t.profile.description}
       />
-      <Card className="p-6">
+      <Card className="p-4">
         <dl className="divide-y divide-hairline">
           {rows.map(([label, value]) => (
-            <div key={label} className="grid gap-1 py-3 sm:grid-cols-[10rem_1fr] sm:gap-3">
+            <div key={label} className="grid gap-1 py-2 sm:grid-cols-[10rem_1fr] sm:gap-3">
               <dt className="text-sm text-ink-muted">{label}</dt>
               <dd className="text-sm font-medium break-words text-ink">{value}</dd>
             </div>
@@ -64,7 +64,7 @@ export default async function ProfilePage() {
       </Card>
 
       {session.roles.length === 0 ? (
-        <Card className="p-6">
+        <Card className="p-4">
           <h2 className="text-sm font-semibold text-ink">{t.profile.noRole}</h2>
           <p className="mt-2 max-w-prose text-sm text-ink-muted">
             Akun Active Directory Anda dikenali, tetapi belum termasuk group mana pun yang

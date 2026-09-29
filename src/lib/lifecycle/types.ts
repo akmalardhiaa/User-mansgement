@@ -137,7 +137,14 @@ export interface OnboardingPayload {
   managerName: string;
   managerEmail: string;
   startDate: string;
-  accessProfileId: string;
+  /**
+   * The catalogue profile whose groups and OU the account gets. No longer
+   * asked for — HC took the field off the form — so a new request leaves it
+   * unset and execution falls back to the standard profile: an account has to
+   * land in some OU and hold the base group to be an account at all. Requests
+   * raised before this keep theirs, and it is still honoured.
+   */
+  accessProfileId?: string;
 }
 
 /** Moving somebody who already has an account into a different position. */
@@ -149,7 +156,13 @@ export interface MovementPayload {
   toJobDescription?: string;
   toManagerName: string;
   toManagerEmail: string;
-  accessProfileId: string;
+  /**
+   * Unset on a request raised now, and that is a behaviour change worth being
+   * explicit about: a move no longer touches access groups or the OU at all.
+   * It updates division, job title and manager. Where an older request named a
+   * profile, the move still applies it.
+   */
+  accessProfileId?: string;
   /**
    * Why the move was asked for. Optional since the field was taken off the
    * form: requests raised before that still carry one, and it is still shown
@@ -168,7 +181,12 @@ export interface MovementPayload {
 export interface TerminationPayload {
   kind: "TERMINATION";
   employeeId: string;
-  reasonCategory: TerminationReason;
+  /**
+   * Why the account is being closed. No longer asked for — HC took the field
+   * off the form — but still carried and still shown where a request has one,
+   * so the requests raised before that keep saying what they said.
+   */
+  reasonCategory?: TerminationReason;
   lastWorkingDate: string;
   /** Who picks up the work. Free text, optional. */
   handoverTo?: string;
