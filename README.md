@@ -171,6 +171,14 @@ karena portal ini memang hanya untuk Human Capital.
 keduanya bersamaan: dua penjadwal outbox pada data yang sama berarti satu email
 persetujuan terkirim dua kali.
 
+**Folder per karyawan baru mengikuti konfigurasi, bukan nama komputer.** Setiap
+akun yang selesai dibuat mendapat satu folder berisi ringkasan data yang
+disetujui, di bawah `USER_FOLDER_ROOT`. Lewat Docker itu sudah diatur:
+`docker-compose.yml` memetakan folder **di atas** proyek, jadi di komputer mana
+pun foldernya muncul di sebelah folder proyek tanpa mengubah apa-apa. Tanpa
+Docker, isi `USER_FOLDER_ROOT` di `.env.local` dengan path Windows biasa.
+Dibiarkan kosong, fiturnya mati dan tidak ada yang dicatat.
+
 `.env.docker` **opsional**. Tanpa berkas itu email ditulis sebagai berkas ke
 `data/outbox-mail/` dan tidak ada yang keluar dari mesin — cukup untuk
 mendemokan seluruh alur. Untuk mengirim email sungguhan, salin `.env.docker`

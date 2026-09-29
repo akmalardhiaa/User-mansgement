@@ -1,6 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 
 import { getAdDriver } from "@/lib/ad";
 import { AdError, type AdAccountState, type AdDriver } from "@/lib/ad/types";
@@ -437,7 +435,17 @@ async function finishSucceeded(
    * what makes the request succeed — see userFolder.ts.
    */
   if (claim.request.payload.kind === "ONBOARDING") {
-    const folder = await createUserFolder(claim.request.payload.displayName);
+    const payload = claim.request.payload;
+    const folder = await createUserFolder({
+      displayName: payload.displayName,
+      email: payload.email,
+      department: payload.department,
+      jobTitle: payload.jobTitle,
+      employmentType: payload.employmentType,
+      startDate: payload.startDate,
+      expiredDate: payload.expiredDate,
+      managerName: payload.managerName,
+    });
     if (folder) console.log(`[user-folder] dibuat: ${folder}`);
   }
 }
@@ -648,38 +656,6 @@ async function runOne(claim: Claim, driver: AdDriver, workerId: string): Promise
     step.stepKey === "verify" ? { ...step, observedAfter: JSON.stringify(observed) } : step,
   );
   await finishSucceeded(claim, observed, verified, workerId);
-
-  if (request.payload.kind === "ONBOARDING") {
-    try {
-      // Sementara menggunakan folder ini sampai link asli diberikan
-      const TARGET_FOLDER = "C:\\Users\\Asus\\Documents\\KaryawanBaru"; 
-      
-      await mkdir(TARGET_FOLDER, { recursive: true });
-
-      const employeeData = request.payload;
-      const dateStr = new Date().toISOString().split("T")[0];
-      const fileName = `${employeeData.firstName.toLowerCase()}-${dateStr}.txt`;
-      
-      const filePath = path.join(TARGET_FOLDER, fileName);
-      
-      const fileContent = `
-========================================
-DATA KARYAWAN BARU
-========================================
-Nama         : ${employeeData.displayName}
-Email        : ${employeeData.email}
-Departemen   : ${employeeData.department}
-Jabatan      : ${employeeData.jobTitle}
-Tipe Karyawan: ${employeeData.employmentType}
-${employeeData.expiredDate ? `Berakhir     : ${employeeData.expiredDate}\n` : ""}========================================
-`;
-
-      await writeFile(filePath, fileContent.trim() + "\n", "utf8");
-      console.log(`[WORKER] Berhasil menyimpan file karyawan baru ke: ${filePath}`);
-    } catch (err) {
-      console.error("[WORKER] Gagal membuat file di folder lokal:", err);
-    }
-  }
 
   return {
     ...base,
