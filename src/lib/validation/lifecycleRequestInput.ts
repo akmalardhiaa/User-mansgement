@@ -78,10 +78,21 @@ function email(errors: LifecycleErrors, field: string, value: string, label: str
   return value.toLowerCase();
 }
 
-function accessProfile(errors: LifecycleErrors, body: Record<string, unknown>): string {
+/**
+ * Optional since the field left the forms, and still checked when it is there.
+ *
+ * Absent means "this request does not decide access": an onboarding then gets
+ * the standard profile and a movement leaves groups alone. An unknown id is
+ * still refused rather than stored — a profile nothing can resolve would fail
+ * in the worker, halfway through, instead of here.
+ */
+function accessProfile(
+  errors: LifecycleErrors,
+  body: Record<string, unknown>,
+): string | undefined {
   const value = asString(body.accessProfileId);
-  if (!value) errors.accessProfileId = "Profil akses wajib dipilih.";
-  else if (!isAccessProfileId(value)) errors.accessProfileId = "Profil akses tidak dikenal.";
+  if (!value) return undefined;
+  if (!isAccessProfileId(value)) errors.accessProfileId = "Profil akses tidak dikenal.";
   return value;
 }
 
@@ -232,10 +243,16 @@ export function parseLifecycleRequestInput(payload: unknown, now = new Date()): 
     const employeeId = requireField(errors, body, "employeeId", "Karyawan", 1, 120);
     const lastWorkingDate = date(errors, body, "lastWorkingDate", "Tanggal terakhir bekerja", true, DATE_BOUNDS.lastWorkingDate, now);
 
-    const reasonCategory = asString(body.reasonCategory).toUpperCase();
-    if (!(TERMINATION_REASONS as readonly string[]).includes(reasonCategory)) {
+    /*
+     * Optional now, and validated only when it is there: the form no longer
+     * asks. An unknown value is still refused rather than stored — a category
+     * nothing can render is worse than none at all.
+     */
+    const givenReason = asString(body.reasonCategory).toUpperCase();
+    if (givenReason && !(TERMINATION_REASONS as readonly string[]).includes(givenReason)) {
       errors.reasonCategory = "Kategori alasan tidak dikenal.";
     }
+    const reasonCategory = givenReason ? (givenReason as TerminationReason) : undefined;
 
     const handoverTo = optional(errors, body, "handoverTo", "Serah terima kepada", 160);
     // Kept internal on purpose: this never travels into an approval email.
@@ -245,7 +262,7 @@ export function parseLifecycleRequestInput(payload: unknown, now = new Date()): 
       built = {
         kind: "TERMINATION",
         employeeId,
-        reasonCategory: reasonCategory as TerminationReason,
+        reasonCategory,
         lastWorkingDate: lastWorkingDate!,
         handoverTo,
         note,

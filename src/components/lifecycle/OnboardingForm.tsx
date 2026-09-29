@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/Button";
 import { Card, Field, SelectField } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
 import {
-  IconApprovals,
   IconBriefcase,
   IconBuilding,
   IconClock,
@@ -25,7 +24,6 @@ import {
 } from "@/lib/lifecycle/companyEmail";
 import { EMPLOYMENT_TYPES, isFixedTerm } from "@/lib/lifecycle/employment";
 import { employmentOptionLabel } from "@/lib/i18n/labels";
-import { ACCESS_PROFILES } from "@/lib/lifecycle/accessProfiles";
 import type { EmploymentType, LifecycleRequest } from "@/lib/lifecycle/types";
 import { ComboField } from "@/components/ui/ComboField";
 import { DEPARTMENT_GROUPS, JOB_TITLE_GROUPS } from "@/lib/db/seed";
@@ -33,7 +31,7 @@ import type { Employee } from "@/lib/types";
 import { DATE_BOUNDS, dateInputBounds } from "@/lib/validation/dates";
 
 const SECTION =
-  "mb-4 flex items-center gap-2 text-xs font-medium tracking-[0.14em] text-ink-faint uppercase";
+  "mb-1.5 flex items-center gap-2 text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase";
 
 const EMPTY = {
   firstName: "",
@@ -51,7 +49,6 @@ const EMPTY = {
   managerName: "",
   managerEmail: "",
   startDate: "",
-  accessProfileId: "standard",
 };
 
 /**
@@ -81,7 +78,6 @@ function fromRequest(request: LifecycleRequest | undefined): typeof EMPTY {
     managerName: payload.managerName,
     managerEmail: payload.managerEmail,
     startDate: payload.startDate.slice(0, 10),
-    accessProfileId: payload.accessProfileId,
   };
 }
 
@@ -173,16 +169,25 @@ export function OnboardingForm({
   }
 
   return (
-    <Card className="p-6">
-      <form onSubmit={handleSubmit} noValidate className="space-y-8">
+    <Card className="p-3.5">
+      <form onSubmit={handleSubmit} noValidate className="space-y-3">
         <FormAlert tone="error">{formError}</FormAlert>
 
+        {/*
+         * Identity and placement side by side, not stacked.
+         *
+         * Stacked they are two blocks of two rows each and the submit button
+         * ends up below the fold; beside each other the form is as tall as its
+         * taller half. The fields inside stay two across, which is the width a
+         * name or a division actually needs.
+         */}
+        <div className="grid gap-x-5 gap-y-3 lg:grid-cols-2">
         <div>
           <p className={SECTION}>
             <IconUser className="size-3.5" />
             {t.forms.sectionIdentity}
           </p>
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-x-4 gap-y-2.5 sm:grid-cols-2">
             <Field
               label={t.forms.firstName}
               name="firstName"
@@ -209,7 +214,6 @@ export function OnboardingForm({
               onChange={(event) => update("displayName", event.target.value)}
               error={fieldErrors.displayName}
               hint={t.forms.fullNameHint}
-              className="sm:col-span-2"
             />
             {/*
              * The address in two controls: the part HC may adjust, and the
@@ -250,7 +254,7 @@ export function OnboardingForm({
             <IconBriefcase className="size-3.5" />
             {t.forms.sectionPlacement}
           </p>
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-x-4 gap-y-2.5 sm:grid-cols-2">
             <ComboField
               label={t.forms.jobTitle}
               name="jobTitle"
@@ -336,56 +340,35 @@ export function OnboardingForm({
               hint={t.forms.startDateHint}
             />
 
-          </div>
-        </div>
-
-        <div>
-          <p className={SECTION}>
-            <IconApprovals className="size-3.5" />
-            {t.forms.sectionManagerAccess}
-          </p>
-
-          <ManagerPicker
-            employees={employees}
-            value={{ managerName: values.managerName, managerEmail: values.managerEmail }}
-            onChange={(next) =>
-              setValues((current) => ({
-                ...current,
-                managerName: next.managerName,
-                managerEmail: next.managerEmail,
-              }))
-            }
-            nameError={fieldErrors.managerName}
-            emailError={fieldErrors.managerEmail}
-          />
-
-          <div className="mt-5">
-            <SelectField
-              label={t.forms.accessProfile}
-              name="accessProfileId"
-              value={values.accessProfileId}
-              onChange={(event) => update("accessProfileId", event.target.value)}
-              error={fieldErrors.accessProfileId}
-              hint={
-                ACCESS_PROFILES.find((profile) => profile.id === values.accessProfileId)
-                  ?.description
+            {/*
+             * The approving manager, in the same grid as the placement it
+             * belongs to. It had a section and a heading of its own for one
+             * field, which is a heading's worth of screen for nothing.
+             */}
+            <ManagerPicker
+              employees={employees}
+              value={{ managerName: values.managerName, managerEmail: values.managerEmail }}
+              onChange={(next) =>
+                setValues((current) => ({
+                  ...current,
+                  managerName: next.managerName,
+                  managerEmail: next.managerEmail,
+                }))
               }
-            >
-              {ACCESS_PROFILES.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.label}
-                </option>
-              ))}
-            </SelectField>
+              nameError={fieldErrors.managerName}
+              emailError={fieldErrors.managerEmail}
+            />
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-3">
           <Button type="submit" loading={submitting}>
             {submitting ? t.forms.submitting : revise ? t.forms.submitRevision : t.forms.submit}
           </Button>
           <p className="text-xs text-ink-faint">
-            Akun belum dibuat. Pengajuan dikirim ke manager, lalu CISO.
+            {t.execution.notCreatedYet}
           </p>
         </div>
       </form>

@@ -47,8 +47,9 @@ export default async function EditUserPage({
   const initialAction = ACTIONS.find((candidate) => candidate === action);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <PageHeader
+        compact
         eyebrow={t.editProfile.eyebrow}
         title={t.editProfile.title}
         description={t.editProfile.description}

@@ -40,7 +40,7 @@ export function ExecutionTimeline({ jobs }: { jobs: ExecutionJob[] }) {
   if (jobs.length === 0) return null;
 
   return (
-    <Card className="p-6">
+    <Card className="p-4">
       <h2 className="text-sm font-semibold text-ink">{t.execution.timelineTitle}</h2>
 
       {jobs.map((job) => (

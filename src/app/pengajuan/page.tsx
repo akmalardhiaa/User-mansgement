@@ -7,7 +7,7 @@ import {
 } from "@/components/lifecycle/LifecycleStatusBadge";
 import { buttonClasses } from "@/components/ui/Button";
 import { Card, SelectField } from "@/components/ui/Field";
-import { IconApprovals, IconUserPlus } from "@/components/ui/Icons";
+import { IconApprovals, IconFilter, IconUserPlus } from "@/components/ui/Icons";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { requirePageSession } from "@/lib/auth/current";
 import { lifecycleStatusLabel, lifecycleTypeLabel as typeLabel } from "@/lib/i18n/labels";
@@ -82,7 +82,7 @@ export default async function RequestListPage({
   const canCreate = hasPermission(session.roles, "request.create");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         eyebrow={t.requests.eyebrow}
         title={t.requests.title}
@@ -98,50 +98,60 @@ export default async function RequestListPage({
       />
 
       <Card className="overflow-hidden">
-        <form method="get" className="flex flex-wrap items-end gap-3 border-b border-hairline p-4">
-          <label className="flex flex-col gap-1.5 text-xs text-ink-muted">
-            {t.requests.filterType}
-            <SelectField
-              name="type"
-              defaultValue={type ?? ""}
-              className="rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
-            >
-              <option value="">{t.requests.allTypes}</option>
-              {LIFECYCLE_TYPES.map((value) => (
-                <option key={value} value={value}>
-                  {typeLabel(t, value)}
-                </option>
-              ))}
-            </SelectField>
-          </label>
+        {/*
+         * One row of equal-height controls.
+         *
+         * The two pickers carried the old native select's border classes, and
+         * SelectField puts a caller's className on its WRAPPER — so each one
+         * drew a rounded box around a control that already had one, and the
+         * stacked labels then pushed the Apply button out of line with both.
+         * The control says "All types"; it does not also need a caption.
+         */}
+        <form
+          method="get"
+          className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-3"
+        >
+          <SelectField
+            name="type"
+            defaultValue={type ?? ""}
+            aria-label={t.requests.filterType}
+            icon={<IconFilter className="size-3.5" />}
+            className="w-full sm:w-48"
+          >
+            <option value="">{t.requests.allTypes}</option>
+            {LIFECYCLE_TYPES.map((value) => (
+              <option key={value} value={value}>
+                {typeLabel(t, value)}
+              </option>
+            ))}
+          </SelectField>
 
-          <label className="flex flex-col gap-1.5 text-xs text-ink-muted">
-            {t.requests.filterStatus}
-            <SelectField
-              name="status"
-              defaultValue={params.status ?? ""}
-              className="rounded-lg border border-hairline-strong bg-canvas/60 px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
-            >
-              <option value="">{t.requests.allStatuses}</option>
-              {LIFECYCLE_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {lifecycleStatusLabel(t, value)}
-                </option>
-              ))}
-            </SelectField>
-          </label>
+          <SelectField
+            name="status"
+            defaultValue={params.status ?? ""}
+            aria-label={t.requests.filterStatus}
+            icon={<IconFilter className="size-3.5" />}
+            className="w-full sm:w-52"
+          >
+            <option value="">{t.requests.allStatuses}</option>
+            {LIFECYCLE_STATUSES.map((value) => (
+              <option key={value} value={value}>
+                {lifecycleStatusLabel(t, value)}
+              </option>
+            ))}
+          </SelectField>
 
-          <button type="submit" className={buttonClasses("secondary", "sm")}>
+          <button type="submit" className={buttonClasses("secondary")}>
             {t.requests.apply}
           </button>
           <Link
             href="/pengajuan"
-            className="self-center text-xs text-ink-muted transition-colors hover:text-ink"
+            className="px-1 text-xs text-ink-muted transition-colors hover:text-ink"
           >
             {t.requests.reset}
           </Link>
 
-          <span className="ml-auto text-xs text-ink-faint">
+          <span className="ml-auto text-xs whitespace-nowrap text-ink-faint">
             <span className="tnum text-ink">{requests.length}</span> {t.directory.countOf}{" "}
             <span className="tnum">{total}</span>
           </span>
@@ -155,7 +165,8 @@ export default async function RequestListPage({
             <p className="text-sm text-ink-muted">{t.requests.empty}</p>
           </div>
         ) : (
-          <ul className="divide-y divide-hairline/60">
+          /* The list scrolls, not the page: the filters and the paging stay put. */
+          <ul className="max-h-[calc(100vh-26rem)] divide-y divide-hairline/60 overflow-y-auto">
             {requests.map((request) => {
               const awaiting = stageAwaiting(request.status);
               const step = awaiting
@@ -170,9 +181,14 @@ export default async function RequestListPage({
                 <li key={request.id}>
                   <Link
                     href={`/pengajuan/${request.id}`}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 transition-colors hover:bg-elevated/50"
+                    className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 transition-colors hover:bg-elevated/50"
                   >
-                    <LifecycleTypeBadge type={request.type} />
+                    {/* A column, not a badge that pushes the name along with it:
+                        "Perubahan Profil" is twice the width of "Onboarding",
+                        and every name in the list sat at a different margin. */}
+                    <span className="w-32 shrink-0">
+                      <LifecycleTypeBadge type={request.type} />
+                    </span>
 
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium text-ink">

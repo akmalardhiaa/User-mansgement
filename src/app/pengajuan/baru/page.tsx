@@ -46,23 +46,22 @@ export default async function NewRequestPage({
   const employees = await listEmployees();
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/pengajuan"
-          className="inline-flex items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink"
-        >
-          <span aria-hidden>←</span>
-          {t.newRequest.backToList}
-        </Link>
-        <div className="mt-2">
-          <PageHeader
-            eyebrow={t.newRequest.eyebrow}
-            title={t.newRequest.title}
-            description={t.newRequest.description}
-          />
-        </div>
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        compact
+        eyebrow={t.newRequest.eyebrow}
+        title={t.newRequest.title}
+        description={t.newRequest.description}
+        actions={
+          <Link
+            href="/pengajuan"
+            className="inline-flex items-center gap-1.5 text-sm text-ink-muted transition-colors hover:text-ink"
+          >
+            <span aria-hidden>←</span>
+            {t.newRequest.backToList}
+          </Link>
+        }
+      />
 
       <NewRequestView employees={employees} />
     </div>

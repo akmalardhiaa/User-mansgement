@@ -6,10 +6,10 @@ import { useEffect, useMemo, useRef } from "react";
 import { useT } from "@/components/i18n/LocaleProvider";
 import { Button } from "@/components/ui/Button";
 import { ChoiceField, type ChoiceGroup } from "@/components/ui/ChoiceField";
-import { SelectField } from "@/components/ui/Field";
 
 import {
   IconArrowUp,
+  IconBuilding,
   IconClose,
   IconDownload,
   IconFilter,
@@ -25,12 +25,6 @@ import { DEPARTMENT_GROUPS } from "@/lib/db/seed";
 import { sortLabel } from "@/lib/i18n/labels";
 import { TRANSITION_FAST } from "@/lib/motion";
 import { EMPLOYEE_STATUSES, type EmployeeStatus } from "@/lib/types";
-
-// `w-full` so a select fills the stacked wrapper on narrow screens; on `sm` and
-// up the wrapper is `w-auto`, which shrink-wraps to the select's own width.
-const SELECT_CLASSES =
-  "w-full appearance-none rounded-lg border border-hairline-strong bg-canvas/60 py-2 pr-8 pl-8 " +
-  "text-sm text-ink transition-colors duration-200 focus:border-accent focus:outline-none";
 
 interface DirectoryToolbarProps {
   filters: DirectoryFilters;
@@ -99,6 +93,23 @@ export function DirectoryToolbar({
     ];
   }, [departments, t]);
 
+  /** The status options, in the same shape the two pickers beside it take. */
+  const statusGroups = useMemo<ChoiceGroup[]>(
+    () => [
+      {
+        items: [
+          { value: "ALL", label: t.directory.allStatus },
+          { value: "PENDING", label: t.directory.inApproval },
+          ...EMPLOYEE_STATUSES.map((status: EmployeeStatus) => ({
+            value: status,
+            label: status === "ACTIVE" ? t.directory.statusActive : t.directory.statusDisabled,
+          })),
+        ],
+      },
+    ],
+    [t],
+  );
+
   /*
    * The sort options as the same shape the department picker takes. The prefix
    * stays in each label: without it the closed control reads "Nama" beside
@@ -133,17 +144,19 @@ export function DirectoryToolbar({
   }, []);
 
   return (
-    <div className="border-b border-hairline p-4">
+    <div className="space-y-2 border-b border-hairline p-3">
       {/*
-       * One wrapping row rather than nested flex groups. Nesting a wrap inside a
-       * row meant the controls broke onto a second line while the search box
-       * still had space beside it — the sort control ended up under the search
-       * field with a gap to its right.
+       * Two deliberate rows: the controls, then what the controls did.
+       *
+       * It was one wrapping row, which is why it looked the way it did — the
+       * count and the export button were pushed right by `ml-auto` and wrapped
+       * onto a line of their own anyway, leaving the sort control stranded
+       * beside a gap. Saying where the break goes costs nothing and the row
+       * stops rearranging itself at every width.
        */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* A fixed width, not flex-1: letting the search box grow ate the space
-            the sort control needed and pushed it onto a second line. */}
-        <div className="relative w-full sm:w-60">
+        {/* The search field takes the slack, so the row has no ragged end. */}
+        <div className="relative w-full min-w-0 flex-1 sm:basis-56">
           <IconSearch className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-faint" />
           <input
             ref={searchRef}
@@ -189,36 +202,27 @@ export function DirectoryToolbar({
           </AnimatePresence>
         </div>
 
-        <div className="relative w-full sm:w-auto">
-          <IconFilter className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-faint" />
-          <SelectField
-            value={filters.status}
-            onChange={(event) =>
-              onChange({ status: event.target.value as DirectoryFilters["status"] })
-            }
-            aria-label={t.directory.filterStatus}
-            className={SELECT_CLASSES}
-          >
-            <option value="ALL">{t.directory.allStatus}</option>
-            <option value="PENDING">{t.directory.inApproval}</option>
-            {EMPLOYEE_STATUSES.map((status: EmployeeStatus) => (
-              <option key={status} value={status}>
-                {status === "ACTIVE" ? t.directory.statusActive : t.directory.statusDisabled}
-              </option>
-            ))}
-          </SelectField>
-          
-        </div>
+        {/* The same control as the two beside it. It was the one native select
+            left in the row, and it was the one control that looked wrong. */}
+        <ChoiceField
+          label={t.directory.filterStatus}
+          name="directory-status"
+          value={filters.status}
+          onChange={(status) => onChange({ status: status as DirectoryFilters["status"] })}
+          groups={statusGroups}
+          icon={<IconFilter className="size-3.5" />}
+          className="w-full shrink-0 sm:w-44 [&>label]:sr-only"
+        />
 
         <ChoiceField
-          label="Saring berdasarkan departemen"
+          label={t.directory.filterDepartment}
           name="directory-department"
           value={filters.department}
           onChange={(department) => onChange({ department })}
           groups={departmentGroups}
           placeholder={t.directory.allDepartments}
-          icon={<IconFilter className="size-3.5" />}
-          className="w-full sm:w-60 [&>label]:sr-only"
+          icon={<IconBuilding className="size-3.5" />}
+          className="w-full shrink-0 sm:w-56 [&>label]:sr-only"
         />
 
         {/*
@@ -227,8 +231,8 @@ export function DirectoryToolbar({
          * two kinds of thing. The direction toggle stays welded to its right —
          * a gap between them reads as two unrelated controls.
          */}
-        <div className="flex w-full items-center sm:w-auto">
-          <div className="flex-1 sm:flex-none">
+        <div className="flex w-full shrink-0 items-center sm:w-auto">
+          <div className="min-w-0 flex-1 sm:flex-none">
             <ChoiceField
               label={t.directory.sortBy}
               name="directory-sort"
@@ -236,7 +240,7 @@ export function DirectoryToolbar({
               onChange={(sort) => onChange({ sort: sort as DirectoryFilters["sort"] })}
               groups={sortGroups}
               icon={<IconSort className="size-3.5" />}
-              className="w-full sm:w-56 [&>label]:sr-only [&_[role=combobox]]:rounded-r-none [&_[role=combobox]]:border-r-0"
+              className="w-full sm:w-60 [&>label]:sr-only [&_[role=combobox]]:rounded-r-none [&_[role=combobox]]:border-r-0"
             />
           </div>
           <button
@@ -267,7 +271,7 @@ export function DirectoryToolbar({
               animate={{ opacity: 1, width: "auto" }}
               exit={{ opacity: 0, width: 0 }}
               transition={TRANSITION_FAST}
-              className="overflow-hidden"
+              className="shrink-0 overflow-hidden"
             >
               <Button variant="ghost" size="sm" onClick={onReset} icon={<IconClose />}>
                 Reset
@@ -275,22 +279,25 @@ export function DirectoryToolbar({
             </motion.div>
           ) : null}
         </AnimatePresence>
+      </div>
 
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-xs whitespace-nowrap text-ink-faint">
-            <span className="tnum text-ink">{shown}</span> {t.directory.countOf}{" "}
-            <span className="tnum">{total}</span>
+      {/* What the row above did, and the one action that acts on it. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="text-xs whitespace-nowrap text-ink-faint">
+          <span className="tnum text-ink">{shown}</span> {t.directory.countOf}{" "}
+          <span className="tnum">{total}</span>
+        </span>
+        {/* Said out loud, because a roster quietly missing half its rows reads
+            as data loss rather than as a default. */}
+        {hiddenInactive > 0 ? (
+          <span
+            title={t.directory.hiddenInactiveHint}
+            className="cursor-help text-xs whitespace-nowrap text-ink-faint underline decoration-dotted decoration-ink-faint/50 underline-offset-2"
+          >
+            {t.directory.hiddenInactive.replace("{count}", String(hiddenInactive))}
           </span>
-          {/* Said out loud, because a roster quietly missing half its rows reads
-              as data loss rather than as a default. */}
-          {hiddenInactive > 0 ? (
-            <span
-              title={t.directory.hiddenInactiveHint}
-              className="cursor-help text-xs whitespace-nowrap text-ink-faint underline decoration-dotted decoration-ink-faint/50 underline-offset-2"
-            >
-              {t.directory.hiddenInactive.replace("{count}", String(hiddenInactive))}
-            </span>
-          ) : null}
+        ) : null}
+        <div className="ml-auto">
           <Button
             variant="ghost"
             size="sm"

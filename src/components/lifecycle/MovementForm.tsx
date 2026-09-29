@@ -7,15 +7,8 @@ import { useT } from "@/components/i18n/LocaleProvider";
 import { Button } from "@/components/ui/Button";
 import { Card, Field, SelectField } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
-import {
-  IconBriefcase,
-  IconBuilding,
-  IconClock,
-  IconSwap,
-  IconUser,
-} from "@/components/ui/Icons";
+import { IconBriefcase, IconBuilding, IconClock, IconSwap, IconUser } from "@/components/ui/Icons";
 import { ManagerPicker } from "@/components/users/ManagerPicker";
-import { ACCESS_PROFILES } from "@/lib/lifecycle/accessProfiles";
 import type { LifecycleRequest } from "@/lib/lifecycle/types";
 import { ComboField } from "@/components/ui/ComboField";
 import { DEPARTMENT_GROUPS, JOB_TITLE_GROUPS } from "@/lib/db/seed";
@@ -23,7 +16,7 @@ import type { Employee } from "@/lib/types";
 import { DATE_BOUNDS, dateInputBounds } from "@/lib/validation/dates";
 
 const SECTION =
-  "mb-4 flex items-center gap-2 text-xs font-medium tracking-[0.14em] text-ink-faint uppercase";
+  "mb-1.5 flex items-center gap-2 text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase";
 
 /**
  * Moving somebody between divisions.
@@ -37,6 +30,7 @@ export function MovementForm({
   employees,
   managerCandidates,
   initialEmployeeId,
+  subjectChosenElsewhere = false,
   revise,
   onSubmitted,
 }: {
@@ -50,6 +44,15 @@ export function MovementForm({
    */
   managerCandidates?: Employee[];
   initialEmployeeId?: string;
+  /**
+   * Whether the subject was already chosen on the page around this form.
+   *
+   * Opened from Edit profil it always is — the roster on the left IS the
+   * choice — and repeating it as a dropdown with exactly one option asks the
+   * same question twice and answers it the same way. The revision screen has
+   * no roster, so there it stays.
+   */
+  subjectChosenElsewhere?: boolean;
   /** The request being revised. Its subject is fixed; everything else starts from it. */
   revise?: LifecycleRequest;
   onSubmitted: (request: LifecycleRequest) => void;
@@ -63,7 +66,6 @@ export function MovementForm({
     toJobDescription: previous?.toJobDescription ?? "",
     toManagerName: previous?.toManagerName ?? "",
     toManagerEmail: previous?.toManagerEmail ?? "",
-    accessProfileId: previous?.accessProfileId ?? "standard",
     reason: previous?.reason ?? "",
     effectiveAt: revise?.effectiveAt?.slice(0, 10) ?? "",
   });
@@ -109,91 +111,105 @@ export function MovementForm({
     }
   }
 
+  /**
+   * Only the attributes this move actually changes.
+   *
+   * It used to list all three unconditionally, so an untouched form showed a
+   * table of three dashes — a preview of nothing, in the space the fields and
+   * the submit button needed. Filled in, it says exactly what will change and
+   * nothing else.
+   */
   const diff: Array<[string, string, string]> = employee
-    ? [
-        [t.forms.department, employee.department, values.toDepartment || "—"],
-        [t.forms.jobTitle, employee.jobTitle, values.toJobTitle || "—"],
-        [t.forms.manager, employee.managerName, values.toManagerName || "—"],
-      ]
+    ? (
+        [
+          [t.forms.department, employee.department, values.toDepartment],
+          [t.forms.jobTitle, employee.jobTitle, values.toJobTitle],
+          [t.forms.manager, employee.managerName, values.toManagerName],
+        ] as Array<[string, string, string]>
+      ).filter(([, before, after]) => after.trim() !== "" && after.trim() !== before)
     : [];
 
   return (
-    <Card className="p-6">
-      <form onSubmit={handleSubmit} noValidate className="space-y-8">
+    <Card className="p-3.5">
+      <form onSubmit={handleSubmit} noValidate className="space-y-3">
         <FormAlert tone="error">{formError}</FormAlert>
 
-        <div>
-          <p className={SECTION}>
-            <IconUser className="size-3.5" />
-            Karyawan yang dipindahkan
-          </p>
-          <SelectField
-            label={t.forms.employee}
-            name="employeeId"
-            icon={<IconUser className="size-4" />}
-            value={employeeId}
-            onChange={(event) => setEmployeeId(event.target.value)}
-            error={fieldErrors.employeeId}
-            disabled={Boolean(revise)}
-            hint={
-              revise
-                ? t.execution.subjectLocked
-                : t.execution.subjectInFlight
-            }
-          >
-            <option value="">{t.forms.chooseEmployee}</option>
-            {employees.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.displayName} · {candidate.department}
-              </option>
-            ))}
-          </SelectField>
-        </div>
-
-        {employee ? (
+        {/*
+         * Who is moving, and what that changes, side by side. Stacked they
+         * cost two rows to say one thing, and the form fell off the screen.
+         */}
+        <div className={subjectChosenElsewhere ? "" : "grid gap-x-4 gap-y-4 lg:grid-cols-2"}>
+          {subjectChosenElsewhere ? null : (
           <div>
             <p className={SECTION}>
-              <IconSwap className="size-3.5" />
-              Sebelum dan sesudah
+              <IconUser className="size-3.5" />
+              {t.execution.sectionWhoMoves}
             </p>
-            <div className="overflow-hidden rounded-xl border border-hairline">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-hairline bg-elevated/40 text-xs tracking-wide text-ink-faint uppercase">
-                    <th className="px-3 py-2.5 sm:px-4 font-medium">{t.forms.attribute}</th>
-                    <th className="px-3 py-2.5 sm:px-4 font-medium">{t.forms.now}</th>
-                    <th className="px-3 py-2.5 sm:px-4 font-medium">{t.forms.becomes}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {diff.map(([label, before, after]) => {
-                    const changed = after !== "—" && before !== after;
-                    return (
-                      <tr key={label} className="border-b border-hairline/60 last:border-0">
-                        <td className="px-3 py-2.5 sm:px-4 text-ink-muted">{label}</td>
-                        <td className="px-3 py-2.5 sm:px-4 text-ink-muted line-through decoration-ink-faint/60">
-                          {before}
-                        </td>
-                        <td
-                          className={`px-3 py-2.5 sm:px-4 font-medium ${changed ? "text-accent" : "text-ink-faint"}`}
-                        >
-                          {after}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <SelectField
+              label={t.forms.employee}
+              name="employeeId"
+              icon={<IconUser className="size-4" />}
+              value={employeeId}
+              onChange={(event) => setEmployeeId(event.target.value)}
+              error={fieldErrors.employeeId}
+              disabled={Boolean(revise)}
+              hint={revise ? t.execution.subjectLocked : t.execution.subjectInFlight}
+            >
+              <option value="">{t.forms.chooseEmployee}</option>
+              {employees.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.displayName} · {candidate.department}
+                </option>
+              ))}
+            </SelectField>
           </div>
-        ) : null}
+          )}
+
+          {employee && diff.length > 0 ? (
+            <div>
+              <p className={SECTION}>
+                <IconSwap className="size-3.5" />
+                {t.execution.sectionBeforeAfter}
+              </p>
+              <div className="overflow-hidden rounded-xl border border-hairline">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-hairline bg-elevated/40 text-xs tracking-wide text-ink-faint uppercase">
+                      <th className="px-3 py-1 sm:px-4 font-medium">{t.forms.attribute}</th>
+                      <th className="px-3 py-1 sm:px-4 font-medium">{t.forms.now}</th>
+                      <th className="px-3 py-1 sm:px-4 font-medium">{t.forms.becomes}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {diff.map(([label, before, after]) => {
+                      const changed = after !== "—" && before !== after;
+                      return (
+                        <tr key={label} className="border-b border-hairline/60 last:border-0">
+                          <td className="px-3 py-1 sm:px-4 text-ink-muted">{label}</td>
+                          <td className="px-3 py-1 sm:px-4 text-ink-muted line-through decoration-ink-faint/60">
+                            {before}
+                          </td>
+                          <td
+                            className={`px-3 py-1 sm:px-4 font-medium ${changed ? "text-accent" : "text-ink-faint"}`}
+                          >
+                            {after}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         <div>
           <p className={SECTION}>
             <IconBriefcase className="size-3.5" />
-            Posisi tujuan
+            {t.execution.sectionTargetPosition}
           </p>
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-x-4 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-3">
             <ComboField
               label={t.forms.toDepartment}
               name="toDepartment"
@@ -229,55 +245,36 @@ export function MovementForm({
               hint={t.forms.effectiveAtHint}
             />
 
-            <SelectField
-              label={t.forms.newAccessProfile}
-              name="accessProfileId"
-              value={values.accessProfileId}
-              onChange={(event) => update("accessProfileId", event.target.value)}
-              error={fieldErrors.accessProfileId}
-              hint={
-                ACCESS_PROFILES.find((profile) => profile.id === values.accessProfileId)
-                  ?.description
+            {/*
+             * The receiving manager belongs to the position being moved into,
+             * so it sits in that grid. Its own section put one select across
+             * the full width of the card and cost a heading to do it.
+             */}
+            <ManagerPicker
+              employees={managerCandidates ?? employees}
+              value={{
+                managerName: values.toManagerName,
+                managerEmail: values.toManagerEmail,
+              }}
+              onChange={(next) =>
+                setValues((current) => ({
+                  ...current,
+                  toManagerName: next.managerName,
+                  toManagerEmail: next.managerEmail,
+                }))
               }
-            >
-              {ACCESS_PROFILES.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.label}
-                </option>
-              ))}
-            </SelectField>
-
+              nameError={fieldErrors.toManagerName}
+              emailError={fieldErrors.toManagerEmail}
+            />
           </div>
         </div>
 
-        <div>
-          <p className={SECTION}>{t.forms.toManager}</p>
-          <ManagerPicker
-            employees={managerCandidates ?? employees}
-            value={{ managerName: values.toManagerName, managerEmail: values.toManagerEmail }}
-            onChange={(next) =>
-              setValues((current) => ({
-                ...current,
-                toManagerName: next.managerName,
-                toManagerEmail: next.managerEmail,
-              }))
-            }
-            nameError={fieldErrors.toManagerName}
-            emailError={fieldErrors.toManagerEmail}
-          />
-          <p className="mt-2 text-xs text-ink-faint">
-            Persetujuan tahap pertama diminta ke manager divisi tujuan — merekalah yang menerima
-            karyawan ini.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
+        <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-3">
           <Button type="submit" loading={submitting} disabled={!employeeId}>
             {submitting ? t.forms.submitting : revise ? t.forms.submitRevision : t.forms.submit}
           </Button>
           <p className="text-xs text-ink-faint">
-            Posisi belum berubah. Direktori tetap menampilkan posisi sekarang sampai perubahan
-            dijalankan.
+            {t.execution.notMovedYet}
           </p>
         </div>
       </form>

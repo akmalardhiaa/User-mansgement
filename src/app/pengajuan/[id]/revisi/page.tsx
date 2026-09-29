@@ -82,23 +82,20 @@ export default async function ReviseRequestPage({
     : undefined;
 
   return (
-    <div className="space-y-6">
-      <div>
-        {back}
-        <div className="mt-2">
-          <PageHeader
-            eyebrow={t.actions.reviseEyebrow}
-            badge={<LifecycleTypeBadge type={request.type} />}
-            title={request.subject.displayName}
-            description={t.actions.reviseDescription
-              .replace("{from}", String(request.version))
-              .replace(
-                "{to}",
-                String(request.status === "DRAFT" ? request.version : request.version + 1),
-              )}
-          />
-        </div>
-      </div>
+    <div className="space-y-3">
+      <PageHeader
+        compact
+        eyebrow={t.actions.reviseEyebrow}
+        badge={<LifecycleTypeBadge type={request.type} />}
+        title={request.subject.displayName}
+        actions={back}
+        description={t.actions.reviseDescription
+          .replace("{from}", String(request.version))
+          .replace(
+            "{to}",
+            String(request.status === "DRAFT" ? request.version : request.version + 1),
+          )}
+      />
 
       <ReviseRequestView request={request} employees={employees} subject={subject} />
     </div>

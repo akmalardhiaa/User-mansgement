@@ -228,7 +228,7 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
        * and HC scrolls to find a field they already know is there.
        */}
       <div
-        className={`mx-auto flex w-full flex-1 flex-col gap-8 px-5 py-8 md:flex-row ${
+        className={`mx-auto flex w-full flex-1 flex-col gap-6 px-5 py-4 md:flex-row ${
           isWide(pathname) ? "max-w-none" : "max-w-7xl"
         }`}
       >
@@ -297,7 +297,7 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
         </main>
       </div>
 
-      <footer className="border-t border-hairline px-5 py-5 text-center text-xs text-ink-faint">
+      <footer className="border-t border-hairline px-5 py-3 text-center text-[11px] text-ink-faint">
         {t.common.footer}
       </footer>
     </div>
