@@ -493,6 +493,123 @@ Demo memakai `AD_DRIVER=mock` — direktori simulasi di berkas terpisah, dengan
 injeksi kegagalan lewat `AD_MOCK_FAULT` untuk melatih jalur yang justru paling
 perlu dibuktikan. **Production menolak driver mock.**
 
+### Active Directory sungguhan (`AD_DRIVER=ldap`)
+
+Driver LDAPS (`src/lib/ad/ldapAd.ts`) mengimplementasikan `AdDriver` apa adanya,
+jadi tidak ada satu pun perubahan pada pengajuan, persetujuan, email, atau
+urutan langkah worker. Yang ditambahkan hanya penerjemahan: objectGUID biner ke
+string kanonik, bit `ACCOUNTDISABLE` ke `enabled`, DN manager ke
+sAMAccountName, `distinguishedName` ke OU, dan `memberOf` disaring menjadi hanya
+group yang diterbitkan katalog akses.
+
+Keamanannya bukan opsi yang bisa dimatikan:
+
+- **Hanya `ldaps://` port 636**, rantai sertifikat diverifikasi terhadap CA di
+  `LDAP_CA_CERT_PATH`, verifikasi hostname menyala. Tidak ada
+  `rejectUnauthorized: false` dan tidak ada fallback plaintext — kata sandi akun
+  layanan melewati koneksi ini pada setiap operasi.
+- **Akun layanan terpisah** (`AD_BIND_DN`) dari bind login pengguna. Yang satu
+  boleh menonaktifkan akun, yang lain hanya membuktikan identitas.
+- **`AD_MANAGED_OUS` membatasi semua penulisan.** Objek atau OU tujuan di luar
+  daftar itu ditolak tanpa menulis apa pun. Keanggotaan group dibatasi lebih
+  ketat lagi: hanya DN group yang diterbitkan katalog akses, sehingga driver ini
+  tidak bisa menambahkan siapa pun ke group yang tidak pernah dikenalkan
+  kepadanya.
+- **`AD_LDAP_WRITE_ENABLED` default mati.** Selama mati, setiap operasi tulis
+  ditolak dengan pesan jelas — bahkan sebelum koneksi dibuka — sementara
+  pembacaan tetap jalan. Itu keadaan untuk memverifikasi koneksi, hak, dan OU
+  sebelum ada yang berubah di direktori:
+
+  ```bash
+  npm run ad:service-check -- <sAMAccountName> [<group DN>]
+  ```
+
+  Skrip itu hanya membaca: bind akun layanan, baca satu akun, baca satu group.
+  Aman diarahkan ke domain controller production sebelum yang lain.
+- **Filter selalu di-escape** (RFC 4515), termasuk pencarian objectGUID dalam
+  bentuk biner byte demi byte. Nama akun `*` tidak pernah menjadi "semua objek".
+- **Password tidak pernah disentuh.** Driver ini tidak menulis `unicodePwd`,
+  tidak mengarang kata sandi, dan tidak memakai `PASSWD_NOTREQD`. Konsekuensinya
+  jujur: akun baru dibuat nonaktif tanpa password, dan bila kebijakan domain
+  mewajibkan password sebelum akun boleh aktif, langkah `enable-account` ditolak
+  direktori — pengajuan berakhir `FAILED` dengan alasan aslinya, akunnya sudah
+  ada dalam keadaan nonaktif dan tidak bisa dipakai. Yang memegang penerbitan
+  password mengisinya, lalu langkah itu diulang dari titik yang sama.
+
+#### Mencoba ke Active Directory sungguhan
+
+Driver ini sudah dijalankan terhadap **Samba AD DC** — implementasi Active
+Directory yang sungguhan, lengkap dengan `sAMAccountName`, `objectGUID`,
+`userAccountControl`, dan LDAPS — di sebuah container sekali pakai. Resepnya
+ditulis di sini karena satu putaran terhadap direktori sungguhan menemukan hal
+yang tidak bisa ditemukan tes unit mana pun (lihat catatan `<GUID=...>` di
+[ldapFilter.ts](src/lib/ad/ldapFilter.ts)).
+
+```bash
+docker network create hc-ad-demo
+docker run -d --name samba-ad --hostname dc1 --privileged \
+  --network hc-ad-demo --network-alias dc1.corp.example.com \
+  -e REALM=CORP.EXAMPLE.COM -e DOMAIN=CORP \
+  -e ADMIN_PASS='<kata-sandi-administrator>' -e DNS_FORWARDER=8.8.8.8 \
+  diegogslomp/samba-ad-dc:latest
+```
+
+Satu hal yang perlu diperbaiki setelah provisioning: skrip image itu salah
+membaca nama interface (`eth0@ifNN`), sehingga Samba hanya mendengar di
+loopback. Perbaiki lalu mulai ulang:
+
+```bash
+docker exec samba-ad sed -i 's/interfaces = lo eth0@if[0-9]*/interfaces = lo eth0/' \
+  /usr/local/samba/etc/smb.conf
+docker restart samba-ad
+```
+
+Lalu buat OU dan group yang sama dengan katalog akses (`OU=Karyawan`,
+`OU=Engineering,OU=Karyawan`, `OU=Karantina`, `OU=Groups` berisi `HC-Base` dan
+kawan-kawan), satu akun manager, dan akun layanan `svc-hc-portal` — semuanya
+lewat `samba-tool`. Delegasikan haknya dengan `samba-tool dsacl set` pada OU
+yang dikelola saja, jangan dengan memasukkannya ke Domain Admins: itu justru
+yang sedang ditunjukkan oleh `AD_MANAGED_OUS`.
+
+Sertifikat CA-nya diambil dari direktorinya sendiri:
+
+```bash
+docker cp samba-ad:/usr/local/samba/private/tls/ca.pem ./ca.pem
+```
+
+Nama host harus cocok dengan sertifikat (`dc1.corp.example.com`) — itulah guna
+`--network-alias` di atas, dan alasan pemeriksaan dijalankan dari dalam
+container di jaringan yang sama. Baca dulu, tulis belakangan:
+
+```bash
+npm run ad:service-check -- bagus.nugroho "CN=IT Security Approvers,OU=Groups,DC=corp,DC=example,DC=com"
+AD_LIVE_TEST=true AD_LDAP_WRITE_ENABLED=true npx vitest run src/lib/ad/ldapLive.test.ts
+```
+
+[ldapLive.test.ts](src/lib/ad/ldapLive.test.ts) mati secara default dan tidak
+ikut `npm test`. Ia membuat satu akun, memberi dan mencabut group,
+memindahkannya ke karantina, lalu menonaktifkannya — dan tidak menghapusnya,
+karena driver ini memang tidak punya operasi hapus.
+
+Hasil putaran pertama: **11/11 lolos**, dan `enable-account` **berhasil** di
+Samba dengan kebijakan bawaannya. Itu bukan jaminan untuk AD Windows: di domain
+yang mewajibkan password sebelum akun boleh aktif, langkah itu akan ditolak —
+jalur tersebut sudah ditangani dan diuji, tetapi yang menentukan adalah
+kebijakan domain tujuan, bukan kode ini.
+
+Kegagalan LDAP dipetakan ke klasifikasi yang sudah dipakai worker
+(`src/lib/ad/ldapErrors.ts`): busy/unavailable → `TRANSIENT`,
+insufficientAccessRights → `PERMISSION`, entryAlreadyExists → `CONFLICT`,
+noSuchObject → `NOT_FOUND`. Koneksi yang mati **setelah** permintaan tulis
+dikirim menjadi `TIMEOUT_AFTER_WRITE` — tidak pernah diulang otomatis — sedangkan
+koneksi yang ditolak sejak awal tetap `TRANSIENT`, karena permintaannya belum
+pernah keluar. Kode yang tidak dikenali menjadi `UNKNOWN` dan tidak diulang.
+
+Satu koneksi dibuka, di-bind, dan ditutup per operasi. Client yang dikumpulkan
+akan menghemat satu handshake per langkah, dan juga berarti socket yang mati
+diam-diam di antara dua langkah menggagalkan langkah kedua karena alasan yang
+tidak ada hubungannya dengan langkah itu.
+
 ### Menyiapkan direktori simulasi
 
 Demo bermula dari daftar karyawan dengan direktori kosong — keadaan yang tidak
@@ -646,8 +763,15 @@ Production memerlukan ini di ingress bersama.
 Portal ini sedang diarahkan menjadi portal pengajuan lifecycle karyawan sesuai
 implementation plan. Yang **belum** dikerjakan, dan tidak boleh dianggap ada:
 
-- **Driver AD sungguhan.** `AD_DRIVER=ldap` sengaja melempar error, bukan diam-diam
-  jatuh ke mock. Login membaca AD; belum ada yang menulis ke AD nyata.
+- **Driver AD sungguhan sudah jalan ke Samba AD DC, belum ke AD Windows
+  perusahaan.** `AD_DRIVER=ldap` mengembalikan driver LDAPS sungguhan
+  ([ldapAd.ts](src/lib/ad/ldapAd.ts)), dan seluruh siklusnya — buat, atribut,
+  group, aktifkan, pindah OU, nonaktifkan — sudah dijalankan terhadap domain
+  controller sungguhan (lihat "Mencoba ke Active Directory sungguhan"). Yang
+  belum: domain perusahaan yang asli, dengan kebijakan password, struktur OU,
+  dan hak akun layanan miliknya sendiri. Ketiganya hanya bisa dijawab di sana,
+  dan urutannya tetap sama: `npm run ad:service-check` dulu dengan sakelar tulis
+  masih mati.
 - **Worker production.** Di luar production worker kini berjalan otomatis: dipicu
   tepat setelah persetujuan terakhir (lewat `after()` di `/api/approval-actions`)
   dan menyapu antrean tiap `WORKER_POLL_SECONDS` (default 30, `0` mematikan).
