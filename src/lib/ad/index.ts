@@ -1,3 +1,6 @@
+import { AdConfigurationError } from "./configError";
+import { LdapAdDriver } from "./ldapAd";
+import { readLdapAdConfig } from "./ldapConnection";
 import { MockAdDriver, type FaultMode } from "./mockAd";
 import type { AdDriver } from "./types";
 
@@ -33,12 +36,7 @@ function parseFault(): FaultMode {
   );
 }
 
-export class AdConfigurationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "AdConfigurationError";
-  }
-}
+export { AdConfigurationError } from "./configError";
 
 export function getAdDriver(): AdDriver {
   if (cached) return cached;
@@ -47,12 +45,22 @@ export function getAdDriver(): AdDriver {
   const production = process.env.NODE_ENV === "production";
 
   if (configured === "ldap") {
-    // The real driver arrives with the on-premise worker. Failing loudly beats
-    // silently falling back to the mock, which is the one outcome that must
-    // never happen.
-    throw new AdConfigurationError(
-      "AD_DRIVER=ldap belum tersedia. Worker Active Directory on-premise belum diimplementasikan.",
-    );
+    /*
+     * The real directory.
+     *
+     * The configuration is read here rather than inside the driver so a
+     * deployment that is missing a variable fails when the driver is asked for
+     * — at the first submit or the first sweep, with every missing name in one
+     * message — instead of at the first write, halfway through executing an
+     * approved request.
+     *
+     * Note what this does NOT check: whether the domain controller answers.
+     * That is not knowable at construction time, and pretending otherwise
+     * would replace a clear runtime failure with a startup one that says the
+     * same thing less usefully.
+     */
+    cached = new LdapAdDriver(readLdapAdConfig());
+    return cached;
   }
 
   if (configured === "mock") {
