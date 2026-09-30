@@ -458,6 +458,13 @@ export const id = {
     noMatch: "Tidak ada yang cocok.",
     showAll: "Tampilkan seluruh karyawan ({count})",
     showFewer: "Tampilkan lebih sedikit",
+    submitProfile: "Ajukan perubahan profil",
+    submitMovement: "Ajukan pindah divisi",
+    submitTermination: "Ajukan penonaktifan",
+    deactivateNote:
+      "Isi tanggal ini hanya bila karyawan keluar. Akun dinonaktifkan dan dipindah ke karantina sehari setelahnya.",
+    mixedNote:
+      "Dua jenis perubahan sekaligus. Divisi, jabatan, dan manager diajukan sebagai pindah divisi; status kepegawaian dan lokasi sebagai perubahan profil; tanggal terakhir bekerja sebagai penonaktifan. Ajukan satu per satu.",
     pickSomeone: "Pilih karyawan di sebelah kiri untuk mengedit.",
 
     displayNameHint: "Tampil di dashboard dan email persetujuan.",
@@ -478,7 +485,6 @@ export const id = {
     emailManagerLocked: "Email dan manager tidak bisa diubah di sini.",
     seeRequests: "Lihat daftar pengajuan",
 
-    managerHint: "Penerima email persetujuan pertama.",
     chooseManager: "Pilih manager…",
 
     actionsLabel: "Tindakan untuk karyawan ini",

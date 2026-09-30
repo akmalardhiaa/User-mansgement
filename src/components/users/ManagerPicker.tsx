@@ -66,7 +66,6 @@ export function ManagerPicker({
         value={matched?.email ?? ""}
         onChange={(event) => select(event.target.value)}
         error={nameError ?? emailError}
-        hint={t.editProfile.managerHint}
       >
         <option value="">{t.editProfile.chooseManager}</option>
         {candidates.map((employee) => (
