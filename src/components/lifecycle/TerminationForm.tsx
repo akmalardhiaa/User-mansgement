@@ -89,7 +89,9 @@ export function TerminationForm({
       ...values,
       handoverTo: values.handoverTo || undefined,
       note: values.note || undefined,
-      effectiveAt: values.effectiveAt || undefined,
+      // One date only: the server switches the account off the day after the
+      // last working day. See parseLifecycleRequestInput.
+      effectiveAt: undefined,
     };
     const result = revise
       ? await reviseAndResubmit(revise.id, revise.version, body)
@@ -180,21 +182,10 @@ export function TerminationForm({
               value={values.lastWorkingDate}
               onChange={(event) => update("lastWorkingDate", event.target.value)}
               error={fieldErrors.lastWorkingDate}
+              hint={t.forms.lastWorkingDateHint}
             />
 
-            <Field
-              label={t.forms.disableAt}
-              name="effectiveAt"
-              type="date"
-              {...dateInputBounds(DATE_BOUNDS.effectiveAt)}
-              icon={<IconClock className="size-4" />}
-              value={values.effectiveAt}
-              onChange={(event) => update("effectiveAt", event.target.value)}
-              error={fieldErrors.effectiveAt}
-              hint={t.forms.effectiveAtHint}
-            />
-
-          </div>
+            </div>
         </div>
 
         <div className="flex items-start gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs leading-snug text-warn">

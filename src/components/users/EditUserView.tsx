@@ -419,37 +419,19 @@ export function ProfileForm({
          * left empty, so nine fields took six rows and the page scrolled past
          * its own save button. One grid lets the fields flow — three across on
          * a wide screen — and the whole profile fits on a screen.
+         *
+         * The three name fields are not here, and not because they were in the
+         * way: a person does not change their name, and an edit screen that
+         * offers to rename somebody offers a typo the chance to travel through
+         * two approvals into the directory. A genuine change — a marriage, a
+         * correction — is rare enough to be worth a conversation, and the name
+         * is still carried through the values below unchanged, so the diff
+         * approvers read never says the name was cleared.
          */}
         <fieldset
           disabled={locked || saving}
           className="grid gap-x-4 gap-y-2.5 disabled:opacity-60 sm:grid-cols-2 lg:grid-cols-3"
         >
-          <Field
-            label={t.forms.firstName}
-            name="firstName"
-            icon={<IconUser className="size-4" />}
-            value={values.firstName}
-            onChange={(event) => update("firstName", event.target.value)}
-            error={errors.firstName}
-            required
-          />
-          <Field
-            label={t.forms.lastName}
-            name="lastName"
-            value={values.lastName}
-            onChange={(event) => update("lastName", event.target.value)}
-            error={errors.lastName}
-            required
-          />
-          <Field
-            label={t.forms.fullName}
-            name="displayName"
-            value={values.displayName}
-            onChange={(event) => update("displayName", event.target.value)}
-            error={errors.displayName}
-            hint={t.editProfile.displayNameHint}
-            required
-          />
           <Field
             label={t.forms.jobTitle}
             name="jobTitle"

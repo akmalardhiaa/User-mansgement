@@ -41,6 +41,9 @@ export function RequestPayloadSummary({ payload }: { payload: LifecyclePayload }
       ? [
           [t.summary.name, payload.displayName],
           [t.summary.email, payload.email],
+          ...(payload.userId
+            ? [[t.summary.userId, payload.userId] as [string, string]]
+            : []),
           [t.summary.jobTitle, payload.jobTitle],
           [t.summary.department, payload.department],
           [
