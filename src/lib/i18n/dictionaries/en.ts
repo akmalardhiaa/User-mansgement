@@ -231,6 +231,9 @@ export const en: Dictionary = {
     contractEndHint: "Required for temporary, vendor and intern.",
     emailHint:
       "First and last name joined, then the status digit — nadiakusuma3, say.",
+    userId: "User ID",
+    userIdHint: "The name used to sign in to company computers and apps. Filled in from the address.",
+    lastWorkingDateHint: "The account is switched off the day after this date.",
     location: "Place of work",
     headOffice: "Head office",
     branch: "Branch",
@@ -272,6 +275,7 @@ export const en: Dictionary = {
   },
 
   summary: {
+    userId: "User ID",
     name: "Name",
     email: "Company email",
     emailDomain: "Domain",

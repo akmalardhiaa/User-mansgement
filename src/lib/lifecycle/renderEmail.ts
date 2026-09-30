@@ -92,6 +92,7 @@ function payloadRows(payload: LifecyclePayload): Array<[string, string]> {
     return [
       ["Nama", payload.displayName],
       ["Email", payload.email],
+      ...(payload.userId ? [["User ID", payload.userId] as [string, string]] : []),
       ["Jabatan", payload.jobTitle],
       ["Departemen", payload.department],
       [

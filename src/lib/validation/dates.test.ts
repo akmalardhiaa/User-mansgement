@@ -23,6 +23,7 @@ const ONBOARDING = {
   lastName: "Afaafw",
   displayName: "Aad Afaafw",
   email: "aad.afaafw@example.com",
+  userId: "aad.afaafw",
   jobTitle: "Backend",
   department: "IT — Security",
   employmentType: "PERMANENT",

@@ -240,6 +240,9 @@ export const id = {
     contractEnd: "Tanggal berakhir",
     contractEndHint: "Wajib untuk temporary, vendor, dan magang.",
     emailHint: "Nama depan + belakang, lalu angka status di akhir. Misalnya nadiakusuma3.",
+    userId: "User ID",
+    userIdHint: "Nama untuk login ke komputer dan aplikasi kantor. Terisi dari email.",
+    lastWorkingDateHint: "Akun dinonaktifkan sehari setelah tanggal ini.",
     location: "Lokasi penempatan",
     headOffice: "Kantor pusat",
     branch: "Cabang",
@@ -281,6 +284,7 @@ export const id = {
   },
 
   summary: {
+    userId: "User ID",
     name: "Nama",
     email: "Email perusahaan",
     emailDomain: "Domain",

@@ -439,6 +439,7 @@ async function finishSucceeded(
     const folder = await createUserFolder({
       displayName: payload.displayName,
       email: payload.email,
+      userId: payload.userId,
       department: payload.department,
       jobTitle: payload.jobTitle,
       employmentType: payload.employmentType,

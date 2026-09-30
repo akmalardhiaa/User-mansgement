@@ -40,6 +40,8 @@ const EMPTY = {
   /** The address in the two halves the form shows; joined on submit. */
   emailLocal: "",
   emailDomain: DEFAULT_EMAIL_DOMAIN as string,
+  /** The login name. Follows the address until somebody types one. */
+  userId: "",
   jobTitle: "",
   department: "",
   employmentType: "PERMANENT",
@@ -69,6 +71,7 @@ function fromRequest(request: LifecycleRequest | undefined): typeof EMPTY {
     displayName: payload.displayName,
     emailLocal: splitCompanyEmail(payload.email).local,
     emailDomain: splitCompanyEmail(payload.email).domain,
+    userId: payload.userId ?? splitCompanyEmail(payload.email).local,
     jobTitle: payload.jobTitle,
     department: payload.department,
     employmentType: payload.employmentType,
@@ -100,6 +103,8 @@ export function OnboardingForm({
   const nameEdited = useRef(Boolean(revise));
   // Same rule for the address: a revision starts from one somebody chose.
   const emailEdited = useRef(Boolean(revise));
+  // And for the login, which follows the address until it is typed over.
+  const userIdEdited = useRef(Boolean(revise));
 
   function update(field: keyof typeof EMPTY, value: string) {
     setValues((current) => {
@@ -127,6 +132,15 @@ export function OnboardingForm({
         );
       }
       if (field === "emailLocal") emailEdited.current = value.trim().length > 0;
+
+      /*
+       * The login follows the address, because in this company they are the
+       * same string — until they are not. A second person with the same name
+       * gets the other digit of their range, and the login has to be able to
+       * differ from the mailbox without HC editing two fields in lockstep.
+       */
+      if (!userIdEdited.current) next.userId = next.emailLocal;
+      if (field === "userId") userIdEdited.current = value.trim().length > 0;
       return next;
     });
     setFieldErrors((current) => {
@@ -148,6 +162,7 @@ export function OnboardingForm({
       ...values,
       // The two halves are a form concern; the request carries one address.
       email: `${values.emailLocal.trim()}${values.emailDomain}`,
+      userId: values.userId.trim().toLowerCase(),
       // Empty strings would fail date validation. There is no effective date for
       // an onboarding: the account is made as soon as both approvals are in.
       expiredDate: isFixedTerm(values.employmentType as EmploymentType)
@@ -222,6 +237,17 @@ export function OnboardingForm({
              * second person with the same name needs the other digit of the
              * range and no rule can guess which.
              */}
+            <Field
+              label={t.forms.userId}
+              name="userId"
+              icon={<IconIdCard className="size-4" />}
+              value={values.userId}
+              onChange={(event) => update("userId", event.target.value)}
+              error={fieldErrors.userId}
+              placeholder="nadiakusuma1"
+              hint={t.forms.userIdHint}
+            />
+
             <div className="grid gap-3 sm:col-span-2 sm:grid-cols-[1fr_auto]">
               <Field
                 label={t.forms.email}

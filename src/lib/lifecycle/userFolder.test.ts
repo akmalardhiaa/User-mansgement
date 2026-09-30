@@ -24,6 +24,7 @@ const NOW = new Date("2026-09-29T05:00:00.000Z");
 const NADIA: NewEmployeeDetails = {
   displayName: "Nadia Kusuma",
   email: "nadiakusuma1@mandirisekuritas.co.id",
+  userId: "nadiakusuma1",
   department: "IT — Engineering",
   jobTitle: "Backend Engineer",
   employmentType: "PERMANENT",
@@ -65,6 +66,8 @@ describe("the summary", () => {
     const text = employeeSummary(NADIA, NOW);
 
     expect(text).toContain("Nama          : Nadia Kusuma");
+    // The login name is the thing HC looks this file up for.
+    expect(text).toContain("User ID       : nadiakusuma1");
     expect(text).toContain("Email         : nadiakusuma1@mandirisekuritas.co.id");
     expect(text).toContain("Status        : PERMANENT (1-2)");
     expect(text).toContain("Manager       : Bagus Nugroho");

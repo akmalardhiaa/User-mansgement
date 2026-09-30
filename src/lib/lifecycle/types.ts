@@ -126,6 +126,17 @@ export interface OnboardingPayload {
   lastName: string;
   displayName: string;
   email: string;
+  /**
+   * The account name this person signs in with.
+   *
+   * Asked for rather than derived. It used to be taken from the address, which
+   * is the same string often enough to look like a rule and not often enough
+   * to be one: a second person with the same name gets a different digit in
+   * their address, and some companies keep the login shorter than the mailbox.
+   * Optional on the type because requests raised before this have none, and
+   * execution still falls back to the address for those.
+   */
+  userId?: string;
   jobTitle: string;
   jobDescription?: string;
   department: string;

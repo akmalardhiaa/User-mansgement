@@ -130,7 +130,9 @@ export function buildPlan(payload: LifecyclePayload, before?: PlanBefore): Execu
           key: "create-account",
           label: "Membuat objek akun dalam keadaan nonaktif",
           params: {
-            sAMAccountName: accountNameFor(payload.email),
+            // The login HC typed, or the address it used to be derived from
+            // for a request raised before that field existed.
+            sAMAccountName: payload.userId ?? accountNameFor(payload.email),
             displayName: payload.displayName,
             mail: payload.email,
             ou,

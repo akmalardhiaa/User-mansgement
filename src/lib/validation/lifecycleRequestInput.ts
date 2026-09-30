@@ -1,6 +1,12 @@
 import { isAccessProfileId } from "@/lib/lifecycle/accessProfiles";
 import { EMPLOYMENT_TYPES, isFixedTerm } from "@/lib/lifecycle/employment";
-import { DATE_BOUNDS, checkDate, startOfJakartaDay, type DateBounds } from "@/lib/validation/dates";
+import {
+  DATE_BOUNDS,
+  checkDate,
+  nextJakartaDay,
+  startOfJakartaDay,
+  type DateBounds,
+} from "@/lib/validation/dates";
 import { parseEmployeeProfileInput } from "@/lib/validation/employeeProfileInput";
 import {
   LIFECYCLE_TYPES,
@@ -97,6 +103,25 @@ function accessProfile(
 }
 
 /**
+ * The login name, checked against what a directory will actually accept.
+ *
+ * Lower-cased rather than rejected for case: a sAMAccountName is compared
+ * case-insensitively by the directory, so "Nadia" and "nadia" are the same
+ * account, and storing whichever was typed would make two records look
+ * different while naming one thing.
+ */
+function accountName(errors: LifecycleErrors, body: Record<string, unknown>): string {
+  const value = asString(body.userId).toLowerCase();
+  if (!value) {
+    errors.userId = "User ID wajib diisi.";
+  } else if (!/^[a-z0-9][a-z0-9._-]{1,19}$/.test(value)) {
+    errors.userId =
+      "User ID hanya boleh huruf kecil, angka, titik, garis bawah, dan tanda hubung, 2-20 karakter, diawali huruf atau angka.";
+  }
+  return value;
+}
+
+/**
  * A date that is real and plausible for what it means — see validation/dates.ts
  * for why "parses" was not enough.
  */
@@ -153,6 +178,7 @@ export function parseLifecycleRequestInput(payload: unknown, now = new Date()): 
     const lastName = requireField(errors, body, "lastName", "Nama belakang", 1, 80);
     const displayName = requireField(errors, body, "displayName", "Nama lengkap", 2, 160);
     const address = email(errors, "email", requireField(errors, body, "email", "Email", 5, 200), "Email");
+    const userId = accountName(errors, body);
     const jobTitle = requireField(errors, body, "jobTitle", "Jabatan", 2, 120);
     const department = requireField(errors, body, "department", "Departemen", 2, 120);
     const managerName = requireField(errors, body, "managerName", "Nama manager", 2, 120);
@@ -192,6 +218,7 @@ export function parseLifecycleRequestInput(payload: unknown, now = new Date()): 
         lastName,
         displayName,
         email: address,
+        userId,
         jobTitle,
         jobDescription,
         department,
@@ -289,8 +316,23 @@ export function parseLifecycleRequestInput(payload: unknown, now = new Date()): 
 
   if (Object.keys(errors).length > 0 || !built) return { ok: false, errors };
 
+  /*
+   * A termination needs one date, not two.
+   *
+   * The form used to ask for the last working day AND the day to switch the
+   * account off, which is one fact asked twice and two ways to get it wrong:
+   * a gap where somebody has left and can still sign in, or an account taken
+   * away on the morning of the day they were told they still had. So the
+   * effective moment is derived — the start of the day AFTER the last working
+   * day — and an explicit one is still honoured, because requests raised
+   * before this carry theirs.
+   */
+  const runAt =
+    effectiveAt ??
+    (built.kind === "TERMINATION" ? nextJakartaDay(built.lastWorkingDate) : undefined);
+
   return {
     ok: true,
-    value: { payload: built, effectiveAt: effectiveAt ? startOfJakartaDay(effectiveAt) : undefined },
+    value: { payload: built, effectiveAt: runAt ? startOfJakartaDay(runAt) : undefined },
   };
 }

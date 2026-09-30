@@ -39,6 +39,8 @@ import type { EmploymentType } from "./types";
 export interface NewEmployeeDetails {
   displayName: string;
   email: string;
+  /** The login name. Absent on a request raised before the field existed. */
+  userId?: string;
   department: string;
   jobTitle: string;
   employmentType: EmploymentType;
@@ -93,6 +95,7 @@ function jakartaStamp(now: Date): string {
 export function employeeSummary(employee: NewEmployeeDetails, now = new Date()): string {
   const rows: Array<[string, string | undefined]> = [
     ["Nama", employee.displayName],
+    ["User ID", employee.userId],
     ["Email", employee.email],
     ["Departemen", employee.department],
     ["Jabatan", employee.jobTitle],
