@@ -23,7 +23,7 @@ import {
   splitCompanyEmail,
 } from "@/lib/lifecycle/companyEmail";
 import { EMPLOYMENT_TYPES, isFixedTerm } from "@/lib/lifecycle/employment";
-import { employmentOptionLabel } from "@/lib/i18n/labels";
+import { employmentLabel } from "@/lib/i18n/labels";
 import type { EmploymentType, LifecycleRequest } from "@/lib/lifecycle/types";
 import { ComboField } from "@/components/ui/ComboField";
 import { DEPARTMENT_GROUPS, JOB_TITLE_GROUPS } from "@/lib/db/seed";
@@ -313,7 +313,7 @@ export function OnboardingForm({
             >
               {EMPLOYMENT_TYPES.map((type) => (
                 <option key={type} value={type}>
-                  {employmentOptionLabel(t, type)}
+                  {employmentLabel(t, type)}
                 </option>
               ))}
             </SelectField>

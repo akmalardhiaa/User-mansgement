@@ -4,45 +4,24 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { useT } from "@/components/i18n/LocaleProvider";
-import { MovementForm } from "@/components/lifecycle/MovementForm";
 import { RequestSubmitted } from "@/components/lifecycle/RequestSubmitted";
-import { TerminationForm } from "@/components/lifecycle/TerminationForm";
 import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
 import { FormAlert } from "@/components/ui/FormAlert";
 import { Button } from "@/components/ui/Button";
 import { Card, Field, SelectField } from "@/components/ui/Field";
-import {
-  IconBriefcase,
-  IconBuilding,
-  IconPower,
-  IconSearch,
-  IconSwap,
-  IconUser,
-} from "@/components/ui/Icons";
+import { IconBriefcase, IconBuilding, IconSearch } from "@/components/ui/Icons";
+import { ManagerPicker } from "@/components/users/ManagerPicker";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { editIntent, type EditIntent } from "@/lib/lifecycle/editIntent";
 import { diffProfile, profileOf } from "@/lib/lifecycle/profileUpdate";
 import { EMPLOYMENT_TYPES, isFixedTerm } from "@/lib/lifecycle/employment";
-import { employmentOptionLabel } from "@/lib/i18n/labels";
+import { employmentLabel } from "@/lib/i18n/labels";
 import type { EmploymentType, LifecycleRequest, ProfileFields } from "@/lib/lifecycle/types";
 import type { Employee } from "@/lib/types";
 import { DATE_BOUNDS, dateInputBounds } from "@/lib/validation/dates";
 
 /** How many names the roster shows before HC has searched for one. */
 const VISIBLE_WITHOUT_SEARCH = 3;
-
-/** The three things that can be asked for about somebody already on the roster. */
-export type EditAction = "profile" | "movement" | "termination";
-
-const ACTIONS: ReadonlyArray<{
-  action: EditAction;
-  label: "actionProfile" | "actionMovement" | "actionTermination";
-  /** The same glyph the request type carries everywhere else in the portal. */
-  icon: typeof IconUser;
-}> = [
-  { action: "profile", label: "actionProfile", icon: IconUser },
-  { action: "movement", label: "actionMovement", icon: IconSwap },
-  { action: "termination", label: "actionTermination", icon: IconPower },
-];
 
 /**
  * Edit an employee's profile — by asking for it.
@@ -58,7 +37,6 @@ const ACTIONS: ReadonlyArray<{
 export function EditUserView({
   employees,
   pendingIds = [],
-  initialAction,
   initialEmployeeId,
 }: {
   employees: Employee[];
@@ -69,9 +47,7 @@ export function EditUserView({
    * was raised from.
    */
   pendingIds?: string[];
-  /** Which action to open on, for links that arrive asking for one. */
-  initialAction?: EditAction;
-  /** Who to select on arrival, for the same links. */
+  /** Who to select on arrival, for a link that arrives naming somebody. */
   initialEmployeeId?: string;
 }) {
   const t = useT();
@@ -79,7 +55,6 @@ export function EditUserView({
   const [selectedId, setSelectedId] = useState<string | null>(
     initialEmployeeId ?? employees[0]?.id ?? null,
   );
-  const [action, setAction] = useState<EditAction>(initialAction ?? "profile");
   // The roster itself never changes here: nothing is written until the request
   // is approved and executed. What changes is who now has a request in flight.
   const [pending, setPending] = useState<string[]>(pendingIds);
@@ -197,80 +172,27 @@ export function EditUserView({
         <RequestSubmitted request={submitted} onRaiseAnother={() => setSubmitted(null)} />
       ) : selected ? (
         <div className="space-y-3">
-          {/*
-           * The three things that can be asked for about somebody who already
-           * has a record. They used to live on two different pages — a profile
-           * change here, a Movement and a Termination on the new-request page,
-           * each with its own employee picker — so doing two of them to one
-           * person meant choosing that person twice.
-           */}
-          <div
-            role="tablist"
-            aria-label={t.editProfile.actionsLabel}
-            className="flex flex-wrap gap-1.5"
-          >
-            {ACTIONS.map((item) => {
-              const current = action === item.action;
-              const Glyph = item.icon;
-              return (
-                <button
-                  key={item.action}
-                  type="button"
-                  role="tab"
-                  aria-selected={current}
-                  onClick={() => setAction(item.action)}
-                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                    current
-                      ? "border-accent/50 bg-accent/10 text-ink"
-                      : "border-hairline text-ink-muted hover:border-hairline-strong hover:text-ink"
-                  }`}
-                >
-                  <Glyph className={`size-4 ${current ? "text-accent" : "text-ink-faint"}`} />
-                  {t.editProfile[item.label]}
-                </button>
-              );
-            })}
-          </div>
-
           {locked ? (
             <p className="rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs leading-snug text-warn">
               {t.editProfile.lockedNote}
             </p>
           ) : null}
 
-          {action === "profile" ? (
-            <ProfileForm
-              key={`profile-${selected.id}`}
-              employee={selected}
-              locked={locked}
-              onSubmitted={raised}
-            />
-          ) : null}
           {/*
-           * Neither form asks who again. The roster beside them is the answer,
-           * and a dropdown holding exactly one option is the same question
-           * twice. When the person is locked the forms are handed an empty
-           * roster, and then the picker has to come back to say so.
+           * One form for everything that can be asked about one person.
+           *
+           * It was three tabs, and the tab was how HC told the portal which
+           * request they meant — a question the portal can answer itself from
+           * what was changed. See lifecycle/editIntent.ts for the rule, and for
+           * why two kinds of change at once is refused rather than guessed.
            */}
-          {action === "movement" ? (
-            <MovementForm
-              key={`movement-${selected.id}`}
-              employees={locked ? [] : [selected]}
-              managerCandidates={employees}
-              initialEmployeeId={selected.id}
-              subjectChosenElsewhere={!locked}
-              onSubmitted={raised}
-            />
-          ) : null}
-          {action === "termination" ? (
-            <TerminationForm
-              key={`termination-${selected.id}`}
-              employees={locked ? [] : [selected]}
-              initialEmployeeId={selected.id}
-              subjectChosenElsewhere={!locked}
-              onSubmitted={raised}
-            />
-          ) : null}
+          <EmployeeEditForm
+            key={selected.id}
+            employee={selected}
+            managerCandidates={employees}
+            locked={locked}
+            onSubmitted={raised}
+          />
         </div>
       ) : (
         <Card className="grid place-items-center p-10">
@@ -462,7 +384,7 @@ export function ProfileForm({
             <option value="">{t.editProfile.notSet}</option>
             {EMPLOYMENT_TYPES.map((type) => (
               <option key={type} value={type}>
-                {employmentOptionLabel(t, type)}
+                {employmentLabel(t, type)}
               </option>
             ))}
           </SelectField>
@@ -569,4 +491,346 @@ export function ProfileForm({
       </form>
     </Card>
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/* One form for everything                                                    */
+/* -------------------------------------------------------------------------- */
+
+/** What the submit button says, per request the edits add up to. */
+const SUBMIT_LABEL: Record<
+  Exclude<EditIntent, "NONE" | "MIXED">,
+  "submitProfile" | "submitMovement" | "submitTermination"
+> = {
+  PROFILE_UPDATE: "submitProfile",
+  MOVEMENT: "submitMovement",
+  TERMINATION: "submitTermination",
+};
+
+/**
+ * Everything that can be asked about one employee, on one screen.
+ *
+ * There is no "what do you want to do" step. You change what is true about
+ * somebody — their division, their employment, or the day they leave — and the
+ * request that gets raised follows from that (lifecycle/editIntent.ts). The
+ * submit button says which one it will be before it is pressed, so the
+ * derivation is never a surprise.
+ *
+ * The three separate forms this replaces still exist and are still used: the
+ * revision screen has no roster and no diff to derive from, so it goes on
+ * showing the one form that matches the request being revised.
+ */
+export function EmployeeEditForm({
+  employee,
+  managerCandidates,
+  locked,
+  onSubmitted,
+}: {
+  employee: Employee;
+  /** The roster a new manager is picked from. Everybody, not just this person. */
+  managerCandidates: Employee[];
+  locked: boolean;
+  onSubmitted: (request: LifecycleRequest) => void;
+}) {
+  const t = useT();
+  const start = profileOf(employee);
+
+  const [values, setValues] = useState({
+    jobTitle: start.jobTitle,
+    department: start.department,
+    managerName: employee.managerName,
+    managerEmail: employee.managerEmail,
+    employmentType: start.employmentType ?? "",
+    // <input type="date"> only understands yyyy-MM-dd, so an ISO timestamp has
+    // to be trimmed or the field renders empty.
+    expiredDate: start.expiredDate ? start.expiredDate.slice(0, 10) : "",
+    locationType: start.locationType ?? "",
+    branchName: start.branchName ?? "",
+    /** Empty unless this account is being closed. */
+    lastWorkingDate: "",
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  function update(field: keyof typeof values, value: string) {
+    setValues((current) => ({ ...current, [field]: value }));
+    setErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
+  const intent = editIntent(employee, values);
+  const isContract = isFixedTerm(values.employmentType as EmploymentType);
+  const isBranch = values.locationType === "CABANG";
+
+  /**
+   * What the approvers will be shown, as this screen understands it.
+   *
+   * Built per request kind rather than from one diff: a Movement and a profile
+   * update change different things, and a preview that listed both would be
+   * describing a request nobody is about to raise.
+   */
+  const preview: Array<[string, string, string]> =
+    intent === "TERMINATION"
+      ? [[t.forms.lastWorkingDate, "—", values.lastWorkingDate]]
+      : intent === "MOVEMENT"
+        ? (
+            [
+              [t.forms.department, employee.department, values.department],
+              [t.forms.jobTitle, employee.jobTitle, values.jobTitle],
+              [t.forms.manager, employee.managerName, values.managerName],
+            ] as Array<[string, string, string]>
+          ).filter(([, before, after]) => after.trim() !== before.trim())
+        : intent === "PROFILE_UPDATE"
+          ? diffProfile(start, toProfile({ ...values, ...namesOf(employee) })).map(
+              (change) => [change.label, change.from, change.to] as [string, string, string],
+            )
+          : [];
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (intent === "NONE" || intent === "MIXED") return;
+
+    setSaving(true);
+    setError(null);
+    setErrors({});
+
+    const body =
+      intent === "TERMINATION"
+        ? {
+            type: "TERMINATION",
+            employeeId: employee.id,
+            lastWorkingDate: values.lastWorkingDate,
+          }
+        : intent === "MOVEMENT"
+          ? {
+              type: "MOVEMENT",
+              employeeId: employee.id,
+              toDepartment: values.department,
+              toJobTitle: values.jobTitle,
+              toManagerName: values.managerName,
+              toManagerEmail: values.managerEmail,
+            }
+          : {
+              type: "PROFILE_UPDATE",
+              employeeId: employee.id,
+              ...toProfile({ ...values, ...namesOf(employee) }),
+            };
+
+    const result = await createAndSubmit(body);
+    if (result.ok) {
+      onSubmitted(result.request);
+      return;
+    }
+
+    setErrors(result.failure.fieldErrors ?? {});
+    setError(result.failure.fieldErrors ? null : result.failure.message);
+    setSaving(false);
+  }
+
+  return (
+    <Card className="p-3.5">
+      <form onSubmit={handleSubmit} noValidate className="space-y-3">
+        {/* Name, address and state on one line: three short facts do not need
+            three rows, and the rows are what pushed the form off the screen. */}
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline pb-2">
+          <h2 className="truncate text-base font-semibold text-ink">{employee.displayName}</h2>
+          <p className="min-w-0 flex-1 truncate font-mono text-xs text-ink-muted">
+            {employee.email}
+          </p>
+          <StatusBadge status={employee.status} />
+        </div>
+
+        <FormAlert tone="error">{error}</FormAlert>
+
+        {locked ? <FormAlert tone="info">{t.execution.profileLockedNote}</FormAlert> : null}
+
+        <fieldset
+          disabled={locked || saving}
+          className="grid gap-x-4 gap-y-2.5 disabled:opacity-60 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          <Field
+            label={t.forms.jobTitle}
+            name="jobTitle"
+            icon={<IconBriefcase className="size-4" />}
+            value={values.jobTitle}
+            onChange={(event) => update("jobTitle", event.target.value)}
+            error={errors.toJobTitle ?? errors.jobTitle}
+            required
+          />
+          <Field
+            label={t.forms.department}
+            name="department"
+            icon={<IconBuilding className="size-4" />}
+            value={values.department}
+            onChange={(event) => update("department", event.target.value)}
+            error={errors.toDepartment ?? errors.department}
+            required
+          />
+
+          {/* The manager is editable here, and that is the whole reason a
+              division change is a Movement: it changes who approves the next
+              thing this person asks for. */}
+          <ManagerPicker
+            employees={managerCandidates}
+            value={{ managerName: values.managerName, managerEmail: values.managerEmail }}
+            onChange={(next) =>
+              setValues((current) => ({
+                ...current,
+                managerName: next.managerName,
+                managerEmail: next.managerEmail,
+              }))
+            }
+            nameError={errors.toManagerName}
+            emailError={errors.toManagerEmail}
+          />
+
+          <SelectField
+            label={t.forms.employmentType}
+            name="employmentType"
+            value={values.employmentType}
+            onChange={(event) => update("employmentType", event.target.value)}
+            error={errors.employmentType}
+            hint={t.forms.employmentCodeHint}
+          >
+            <option value="">{t.editProfile.notSet}</option>
+            {EMPLOYMENT_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {employmentLabel(t, type)}
+              </option>
+            ))}
+          </SelectField>
+
+          {isContract ? (
+            <Field
+              label={t.forms.contractEnd}
+              name="expiredDate"
+              type="date"
+              {...dateInputBounds(DATE_BOUNDS.contractEnd)}
+              value={values.expiredDate}
+              onChange={(event) => update("expiredDate", event.target.value)}
+              error={errors.expiredDate}
+              required
+            />
+          ) : null}
+
+          <SelectField
+            label={t.forms.location}
+            name="locationType"
+            value={values.locationType}
+            onChange={(event) => update("locationType", event.target.value)}
+            error={errors.locationType}
+          >
+            <option value="">{t.editProfile.notSet}</option>
+            <option value="PUSAT">{t.editProfile.headOffice}</option>
+            <option value="CABANG">{t.editProfile.branch}</option>
+          </SelectField>
+
+          {isBranch ? (
+            <Field
+              label={t.forms.branchName}
+              name="branchName"
+              value={values.branchName}
+              onChange={(event) => update("branchName", event.target.value)}
+              error={errors.branchName}
+              placeholder="Cabang Surabaya"
+              required
+            />
+          ) : null}
+        </fieldset>
+
+        {/*
+         * Closing the account, kept visually apart from the rest.
+         *
+         * One field, and filling it is the whole decision — so it sits in its
+         * own bordered block rather than among the others, where a stray click
+         * on a date picker could end somebody's access.
+         */}
+        <fieldset
+          disabled={locked || saving}
+          className="grid gap-x-4 gap-y-1 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 disabled:opacity-60 sm:grid-cols-[14rem_1fr] sm:items-center"
+        >
+          <Field
+            label={t.forms.lastWorkingDate}
+            name="lastWorkingDate"
+            type="date"
+            {...dateInputBounds(DATE_BOUNDS.lastWorkingDate)}
+            value={values.lastWorkingDate}
+            onChange={(event) => update("lastWorkingDate", event.target.value)}
+            error={errors.lastWorkingDate}
+          />
+          <p className="text-xs leading-snug text-ink-muted">{t.editProfile.deactivateNote}</p>
+        </fieldset>
+
+        {intent === "MIXED" ? (
+          <FormAlert tone="warn">{t.editProfile.mixedNote}</FormAlert>
+        ) : null}
+
+        {preview.length > 0 ? (
+          <div className="overflow-hidden rounded-xl border border-hairline">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-hairline bg-elevated/40 text-xs tracking-wide text-ink-faint uppercase">
+                  <th className="px-3 py-1 font-medium">{t.summary.field}</th>
+                  <th className="px-3 py-1 font-medium">{t.forms.now}</th>
+                  <th className="px-3 py-1 font-medium">{t.forms.becomes}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.map(([label, before, after]) => (
+                  <tr key={label} className="border-b border-hairline/60 last:border-0">
+                    <td className="px-3 py-1 text-ink-muted">{label}</td>
+                    <td className="px-3 py-1 break-words text-ink-muted line-through decoration-ink-faint/60">
+                      {before}
+                    </td>
+                    <td className="px-3 py-1 font-medium break-words text-accent">{after}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-3">
+          <Button
+            type="submit"
+            variant={intent === "TERMINATION" ? "danger" : "primary"}
+            loading={saving}
+            disabled={locked || intent === "NONE" || intent === "MIXED"}
+          >
+            {saving
+              ? t.forms.submitting
+              : intent === "NONE" || intent === "MIXED"
+                ? t.editProfile.submit
+                : t.editProfile[SUBMIT_LABEL[intent]]}
+          </Button>
+          <p className="min-w-0 flex-1 text-xs leading-snug text-ink-muted">
+            {intent === "NONE" ? `${t.editProfile.noChanges} ` : ""}
+            {t.editProfile.afterSubmit} {t.editProfile.emailManagerLocked}{" "}
+            <Link href="/pengajuan" className="text-accent hover:underline">
+              {t.editProfile.seeRequests}
+            </Link>
+            .
+          </p>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+/** The name fields, carried through untouched — nobody is renamed here. */
+function namesOf(employee: Employee): Pick<
+  Record<string, string>,
+  "firstName" | "lastName" | "displayName"
+> {
+  return {
+    firstName: employee.firstName,
+    lastName: employee.lastName,
+    displayName: employee.displayName,
+  };
 }

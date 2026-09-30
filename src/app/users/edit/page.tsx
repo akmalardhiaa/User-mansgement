@@ -1,6 +1,6 @@
 import { AccessDenied } from "@/components/auth/AccessDenied";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { EditUserView, type EditAction } from "@/components/users/EditUserView";
+import { EditUserView } from "@/components/users/EditUserView";
 import { requirePageSession } from "@/lib/auth/current";
 import { getTranslations } from "@/lib/i18n/server";
 import { hasPermission } from "@/lib/auth/roles";
@@ -13,9 +13,6 @@ export async function generateMetadata() {
   const { t } = await getTranslations();
   return { title: t.editProfile.metaTitle };
 }
-
-/** The action names the URL may ask for, matching EditUserView's own. */
-const ACTIONS: readonly EditAction[] = ["profile", "movement", "termination"];
 
 export default async function EditUserPage({
   searchParams,
@@ -37,14 +34,15 @@ export default async function EditUserPage({
   const [employees, pendingIds] = await Promise.all([listEmployees(), loadPendingEmployeeIds()]);
 
   /*
-   * Which action to open on, and about whom. Both arrive in the URL — from the
-   * directory's "raise a request" button, and from the old /pengajuan/baru
-   * links that now redirect here. Matched against the closed list rather than
-   * trusted: an unknown action opens the profile form, which is the harmless
-   * one, and an unknown employee id simply selects nobody.
+   * Who to open on. It arrives in the URL — from the directory's "raise a
+   * request" button, and from the old /pengajuan/baru links that redirect
+   * here. An unknown id simply selects nobody.
+   *
+   * `action` is still accepted and ignored: the three tabs became one form, so
+   * there is no longer an action to open on, and links that still name one
+   * must keep working rather than 404.
    */
-  const { action, employeeId } = await searchParams;
-  const initialAction = ACTIONS.find((candidate) => candidate === action);
+  const { employeeId } = await searchParams;
 
   return (
     <div className="space-y-3">
@@ -58,7 +56,6 @@ export default async function EditUserPage({
       <EditUserView
         employees={employees}
         pendingIds={[...pendingIds]}
-        initialAction={initialAction}
         initialEmployeeId={employeeId}
       />
     </div>

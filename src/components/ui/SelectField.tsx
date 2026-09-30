@@ -88,14 +88,24 @@ export function SelectField({
     }
   }
 
+  /**
+   * Opens the list with the current value highlighted, so the first arrow key
+   * moves from there rather than from the top.
+   *
+   * Its own function because the keyboard path used to call `setOpen(true)`
+   * directly and skip the highlighting: ArrowDown then Enter therefore picked
+   * the SECOND option in the list rather than the next one after the current
+   * value, silently, for anybody not using a mouse.
+   */
+  function openList() {
+    const chosen = options.findIndex((option) => option.value === currentValue);
+    setActive(chosen >= 0 ? chosen : 0);
+    setOpen(true);
+  }
+
   function toggleList() {
-    // Opening highlights what is currently chosen, so the first arrow key moves
-    // from there rather than from the top of the list.
-    if (!open) {
-      const chosen = options.findIndex((option) => option.value === currentValue);
-      setActive(chosen >= 0 ? chosen : 0);
-    }
-    setOpen((curr) => !curr);
+    if (open) setOpen(false);
+    else openList();
   }
 
   function onKeyDown(event: React.KeyboardEvent) {
@@ -107,7 +117,7 @@ export function SelectField({
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       if (!open) {
-        setOpen(true);
+        openList();
         return;
       }
       if (options.length === 0) return;
@@ -118,7 +128,7 @@ export function SelectField({
 
     if ((event.key === "Enter" || event.key === " ") && !open) {
       event.preventDefault();
-      setOpen(true);
+      openList();
       return;
     }
 

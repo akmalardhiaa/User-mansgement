@@ -436,6 +436,13 @@ export const en: Dictionary = {
     noMatch: "Nothing matches.",
     showAll: "Show all employees ({count})",
     showFewer: "Show fewer",
+    submitProfile: "Raise the profile change",
+    submitMovement: "Raise the division move",
+    submitTermination: "Raise the deactivation",
+    deactivateNote:
+      "Only fill this in when somebody is leaving. The account is disabled and moved to quarantine the day after.",
+    mixedNote:
+      "Two kinds of change at once. Division, job title and manager are raised as a move; employment type and place of work as a profile change; a last working day as a deactivation. Raise them one at a time.",
     pickSomeone: "Pick somebody on the left to edit.",
 
     displayNameHint: "Shown on the dashboard and in approval emails.",
@@ -456,7 +463,6 @@ export const en: Dictionary = {
     emailManagerLocked: "Email and manager cannot be changed here.",
     seeRequests: "See the request list",
 
-    managerHint: "Gets the first approval email.",
     chooseManager: "Choose a manager…",
 
     actionsLabel: "What to do with this employee",
