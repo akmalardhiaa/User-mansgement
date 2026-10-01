@@ -45,15 +45,12 @@ echo  ==========================================================
 echo.
 
 REM Portal yang sedang menulis ke data\ bisa menghasilkan salinan setengah
-REM jadi. Dimatikan dulu bila Podman ada; kalau tidak ada, dilewati.
-where podman >nul 2>&1
-if %errorlevel%==0 (
-  echo  [1/4] Menghentikan portal supaya tidak ada yang sedang menulis...
-  podman compose down >nul 2>&1
-) else (
-  echo  [1/4] Podman tidak ada di komputer ini, dilewati.
-  echo        Pastikan portal tidak sedang berjalan sebelum lanjut.
-)
+REM jadi. Dimatikan lewat hentikan-podman.bat - bukan "podman compose down"
+REM dari Windows, karena jembatan SSH Windows ke mesin Podman tidak bisa
+REM diandalkan dan kegagalannya diam. "<nul" melewati pause di skrip itu.
+echo  [1/4] Menghentikan portal supaya tidak ada yang sedang menulis...
+call hentikan-podman.bat <nul >nul 2>&1
+echo        Kalau portal dijalankan dengan jalankan.bat, tutup dulu jendelanya.
 
 echo  [2/4] Menyalin berkas ^(bisa beberapa menit untuk node_modules^)...
 robocopy "." "%TUJUAN%" /MIR /NFL /NDL /NJH /NJS /NP ^
@@ -114,7 +111,7 @@ echo  ==========================================================
 echo   Selesai. Di komputer tujuan:
 echo  ==========================================================
 echo.
-echo   Dengan Podman          ^>  podman compose up
+echo   Dengan Podman          ^>  klik dua kali jalankan-podman.bat
 echo   Tanpa container        ^>  klik dua kali jalankan.bat
 echo.
 echo   Node.js belum ada dan tidak punya hak admin? Unduh Node 22 versi
