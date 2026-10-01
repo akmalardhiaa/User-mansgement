@@ -431,11 +431,7 @@ export const en: Dictionary = {
     description:
       "The manager and then CISO approve by email before anything takes effect.",
 
-    searchEmployee: "Search employees",
-    searchPlaceholder: "Name, email, department…",
-    noMatch: "Nothing matches.",
-    showAll: "Show all employees ({count})",
-    showFewer: "Show fewer",
+    inFlight: "in a request",
     submitProfile: "Raise the profile change",
     submitMovement: "Raise the division move",
     submitTermination: "Raise the deactivation",

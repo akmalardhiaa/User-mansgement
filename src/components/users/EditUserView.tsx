@@ -8,8 +8,9 @@ import { RequestSubmitted } from "@/components/lifecycle/RequestSubmitted";
 import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
 import { FormAlert } from "@/components/ui/FormAlert";
 import { Button } from "@/components/ui/Button";
+import { ChoiceField, type ChoiceGroup } from "@/components/ui/ChoiceField";
 import { Card, Field, SelectField } from "@/components/ui/Field";
-import { IconBriefcase, IconBuilding, IconSearch } from "@/components/ui/Icons";
+import { IconBriefcase, IconBuilding, IconUser } from "@/components/ui/Icons";
 import { ManagerPicker } from "@/components/users/ManagerPicker";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { editIntent, type EditIntent } from "@/lib/lifecycle/editIntent";
@@ -19,9 +20,6 @@ import { employmentLabel } from "@/lib/i18n/labels";
 import type { EmploymentType, LifecycleRequest, ProfileFields } from "@/lib/lifecycle/types";
 import type { Employee } from "@/lib/types";
 import { DATE_BOUNDS, dateInputBounds } from "@/lib/validation/dates";
-
-/** How many names the roster shows before HC has searched for one. */
-const VISIBLE_WITHOUT_SEARCH = 3;
 
 /**
  * Edit an employee's profile — by asking for it.
@@ -51,15 +49,12 @@ export function EditUserView({
   initialEmployeeId?: string;
 }) {
   const t = useT();
-  const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(
     initialEmployeeId ?? employees[0]?.id ?? null,
   );
   // The roster itself never changes here: nothing is written until the request
   // is approved and executed. What changes is who now has a request in flight.
   const [pending, setPending] = useState<string[]>(pendingIds);
-  // Whether the roster is showing everybody rather than the short default list.
-  const [showAll, setShowAll] = useState(false);
   const [submitted, setSubmitted] = useState<LifecycleRequest | null>(null);
 
   const selected = employees.find((employee) => employee.id === selectedId);
@@ -71,129 +66,67 @@ export function EditUserView({
     setSubmitted(request);
   };
 
-  const matches = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return employees;
-    return employees.filter((employee) =>
-      [employee.displayName, employee.email, employee.department, employee.jobTitle]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle),
-    );
-  }, [employees, query]);
-
   /*
-   * Without a search, a handful of names — not the whole roster.
+   * Choosing the person is one control, not a column.
    *
-   * A list of everybody is what made this column taller than the screen, and
-   * scrolling through twenty names is slower than typing three letters. The
-   * selected person is always among them, because a list that hides who you
-   * are currently editing is worse than a short one.
+   * It was a list down the left side with its own search box, which on a
+   * laptop spent a third of the working width showing three names — and the
+   * form, which is what this page is for, got whatever was left. The picker
+   * below searches the whole roster and sits in the header of the form
+   * itself, so the form opens at full width with its fields already visible.
    *
-   * "Show everybody" is one click away and stays a click away: the short list
-   * is a default, not a restriction, and somebody who wants to browse rather
-   * than search should not have to invent a query to do it.
+   * Somebody with a request in flight is still listed and still says so: they
+   * are exactly who you go looking for when you want to know why.
    */
-  const listed = useMemo(() => {
-    if (query.trim() || showAll) return matches;
-    const head = matches.slice(0, VISIBLE_WITHOUT_SEARCH);
-    if (!selectedId || head.some((employee) => employee.id === selectedId)) return head;
-    const chosen = matches.find((employee) => employee.id === selectedId);
-    return chosen ? [chosen, ...head.slice(0, VISIBLE_WITHOUT_SEARCH - 1)] : head;
-  }, [matches, query, selectedId, showAll]);
+  const employeeOptions = useMemo<ChoiceGroup[]>(
+    () => [
+      {
+        items: employees.map((employee) => ({
+          value: employee.id,
+          label: employee.displayName,
+          meta: pending.includes(employee.id)
+            ? `${employee.department} · ${t.editProfile.inFlight}`
+            : employee.department,
+        })),
+      },
+    ],
+    [employees, pending, t],
+  );
 
-  const hidden = matches.length - listed.length;
+  return submitted ? (
+    <RequestSubmitted request={submitted} onRaiseAnother={() => setSubmitted(null)} />
+  ) : (
+    <div className="space-y-3">
+      {locked ? (
+        <p className="rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs leading-snug text-warn">
+          {t.editProfile.lockedNote}
+        </p>
+      ) : null}
 
-  return (
-    <div className="grid gap-4 lg:grid-cols-[13.5rem_1fr] 2xl:grid-cols-[17rem_1fr]">
-      {/* Sticky, and never taller than the screen — see `listed` above. */}
-      <Card className="flex h-fit flex-col p-3 lg:sticky lg:top-[4.5rem] lg:max-h-[calc(100vh-14rem)]">
-        <Field
-          label={t.editProfile.searchEmployee}
-          name="employeeSearch"
-          type="search"
-          icon={<IconSearch className="size-4" />}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={t.editProfile.searchPlaceholder}
+      {/*
+       * One form for everything that can be asked about one person.
+       *
+       * It was three tabs, and the tab was how HC told the portal which
+       * request they meant — a question the portal can answer itself from what
+       * was changed. See lifecycle/editIntent.ts for the rule, and for why two
+       * kinds of change at once is refused rather than guessed.
+       *
+       * Keyed on the person, so picking somebody else remounts the form with
+       * their values rather than leaving half of the last one behind.
+       */}
+      {selected ? (
+        <EmployeeEditForm
+          key={selected.id}
+          employee={selected}
+          employeeOptions={employeeOptions}
+          onPick={(id) => {
+            setSelectedId(id);
+            setSubmitted(null);
+          }}
+          managerCandidates={employees}
+          locked={locked}
+          onSubmitted={raised}
         />
-
-        <ul className="mt-2 min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1">
-          {listed.map((employee) => {
-            const active = employee.id === selectedId;
-            return (
-              <li key={employee.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedId(employee.id);
-                    setSubmitted(null);
-                  }}
-                  aria-current={active || undefined}
-                  className={`w-full rounded-lg border px-2.5 py-1.5 text-left transition-colors ${
-                    active
-                      ? "border-accent/50 bg-accent/10"
-                      : "border-transparent hover:border-hairline hover:bg-elevated/50"
-                  }`}
-                >
-                  <p className="truncate text-sm font-medium text-ink">{employee.displayName}</p>
-                  <p className="truncate text-xs text-ink-muted">
-                    {employee.department}
-                    {pending.includes(employee.id) ? " · dalam pengajuan" : ""}
-                  </p>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-
-        {matches.length === 0 ? (
-          <p className="py-6 text-center text-sm text-ink-muted">{t.editProfile.noMatch}</p>
-        ) : hidden > 0 ? (
-          <button
-            type="button"
-            onClick={() => setShowAll(true)}
-            className="mt-1.5 w-full rounded-lg px-2.5 py-1.5 text-left text-xs leading-snug text-accent transition-colors hover:bg-elevated/50"
-          >
-            {t.editProfile.showAll.replace("{count}", String(matches.length))}
-          </button>
-        ) : showAll && !query.trim() ? (
-          <button
-            type="button"
-            onClick={() => setShowAll(false)}
-            className="mt-1.5 w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-ink-faint transition-colors hover:bg-elevated/50 hover:text-ink"
-          >
-            {t.editProfile.showFewer}
-          </button>
-        ) : null}
-      </Card>
-
-      {submitted ? (
-        <RequestSubmitted request={submitted} onRaiseAnother={() => setSubmitted(null)} />
-      ) : selected ? (
-        <div className="space-y-3">
-          {locked ? (
-            <p className="rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-xs leading-snug text-warn">
-              {t.editProfile.lockedNote}
-            </p>
-          ) : null}
-
-          {/*
-           * One form for everything that can be asked about one person.
-           *
-           * It was three tabs, and the tab was how HC told the portal which
-           * request they meant — a question the portal can answer itself from
-           * what was changed. See lifecycle/editIntent.ts for the rule, and for
-           * why two kinds of change at once is refused rather than guessed.
-           */}
-          <EmployeeEditForm
-            key={selected.id}
-            employee={selected}
-            managerCandidates={employees}
-            locked={locked}
-            onSubmitted={raised}
-          />
-        </div>
       ) : (
         <Card className="grid place-items-center p-10">
           <p className="text-sm text-ink-muted">{t.editProfile.pickSomeone}</p>
@@ -522,11 +455,16 @@ const SUBMIT_LABEL: Record<
  */
 export function EmployeeEditForm({
   employee,
+  employeeOptions,
+  onPick,
   managerCandidates,
   locked,
   onSubmitted,
 }: {
   employee: Employee;
+  /** The whole roster, as the header picker offers it. */
+  employeeOptions: ChoiceGroup[];
+  onPick: (employeeId: string) => void;
   /** The roster a new manager is picked from. Everybody, not just this person. */
   managerCandidates: Employee[];
   locked: boolean;
@@ -636,10 +574,24 @@ export function EmployeeEditForm({
   return (
     <Card className="p-3.5">
       <form onSubmit={handleSubmit} noValidate className="space-y-3">
-        {/* Name, address and state on one line: three short facts do not need
-            three rows, and the rows are what pushed the form off the screen. */}
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline pb-2">
-          <h2 className="truncate text-base font-semibold text-ink">{employee.displayName}</h2>
+        {/*
+         * Who is being edited, and the control that changes it, on one line.
+         *
+         * The picker IS the heading: it shows the name it would otherwise
+         * repeat, and searching the roster no longer costs a column beside
+         * the form. The address and the account state sit beside it because
+         * three short facts do not need three rows.
+         */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-hairline pb-2">
+          <ChoiceField
+            label={t.forms.employee}
+            name="employeeId"
+            value={employee.id}
+            onChange={onPick}
+            groups={employeeOptions}
+            icon={<IconUser className="size-4" />}
+            className="w-full sm:w-72 [&>label]:sr-only"
+          />
           <p className="min-w-0 flex-1 truncate font-mono text-xs text-ink-muted">
             {employee.email}
           </p>
