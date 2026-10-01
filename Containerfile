@@ -1,73 +1,87 @@
-# The portal container image, built by Podman from this Containerfile.
+# Two ways to run this portal, and the difference is not a detail.
 #
-# ---------------------------------------------------------------------------
-# Why this runs in DEVELOPMENT mode, deliberately
-# ---------------------------------------------------------------------------
-# This image is the demo target, and the choice is forced rather than lazy. The
-# application carries nine separate production guards, and every one of them
-# refuses the configuration this project actually has today:
+#   --target dev   `next dev`, the demo. Simulated directory, email written to
+#                  files, no TLS. What `jalankan-podman.bat` builds.
+#   --target prod  `next build` + `next start`, for the internal server. Nine
+#                  production guards apply, and every one of them refuses the
+#                  demo configuration rather than quietly degrading — see
+#                  MENJALANKAN.md part 2.
 #
-#   auth/ad.ts          no LDAP_URL in production -> authenticateAD THROWS.
-#                       Not degraded: nobody can sign in at all.
-#   auth/mockAdAuth.ts  MOCK_AD_LOGIN refused in production.
-#   ad/index.ts         AD_DRIVER=mock refused in production.
-#   email/index.ts      EMAIL_DRIVER=file refused, and EMAIL_REDIRECT_TO refused
-#                       — the safety net that keeps approval tokens off
-#                       strangers' inboxes.
-#   lifecycle/outboxCrypto.ts   OUTBOX_ENCRYPTION_KEY unset -> throws.
-#   auth/session.ts     secure:true on the session cookie, so the browser will
-#                       not send it over plain http://localhost and a login
-#                       never sticks without HTTPS in front.
-#
-# So `next start` here would produce a container that boots cleanly and then
-# refuses every login and every email. That is worse than no container, because
-# it looks like it works.
-#
-# A production image is a different artefact with different inputs — a real
-# domain controller, a real mailbox, a generated encryption key, and a reverse
-# proxy terminating TLS. It is not this file with a flag flipped.
-# ---------------------------------------------------------------------------
+# The default target is `dev`, because running the demo is what somebody does
+# first and a default that needs a real domain controller would make the first
+# command fail for a reason nobody has yet been told about.
 
-# Debian rather than Alpine: `sharp` (pulled in transitively by Next) is the one
-# dependency where musl still costs more care than the saved megabytes are
-# worth. Everything this application itself depends on — exceljs, nodemailer,
-# ldapts, jose — is pure JavaScript and would run on either.
-#
-# Node 22 matches .github/workflows/ci.yml, so the container and the gate that
-# guards the branch are running the same runtime.
-FROM node:22-bookworm-slim
-
-# Next writes build artefacts and the app writes its JSON stores; neither needs
-# anything outside /app.
+# ---------------------------------------------------------------------------
+# Dependencies, shared by both targets
+# ---------------------------------------------------------------------------
+FROM node:22-bookworm-slim AS deps
 WORKDIR /app
-
-# The manifest and lockfile first, on their own layer. Dependencies only
-# reinstall when one of these two changes — editing a component does not throw
-# away the install.
 COPY package.json package-lock.json ./
-
-# `ci`, not `install`: it installs exactly what the lockfile pins and fails if
-# the lockfile and manifest disagree. Dev dependencies are kept deliberately —
-# `next dev` needs TypeScript, Tailwind and the PostCSS pipeline at run time.
 RUN npm ci
 
-# Then the source. node_modules, data/ and .env* are excluded by .containerignore;
-# the first would import Windows binaries, and the other two would bake a live
-# App Password and a table of approval tokens into a layer that survives any
-# later deletion.
+
+# ---------------------------------------------------------------------------
+# dev — the demo
+# ---------------------------------------------------------------------------
+FROM deps AS dev
+WORKDIR /app
+COPY . .
+RUN mkdir -p data
+EXPOSE 3000
+CMD ["npx", "next", "dev", "-H", "0.0.0.0", "-p", "3000"]
+
+
+# ---------------------------------------------------------------------------
+# build — compiles the frontend and the server routes
+# ---------------------------------------------------------------------------
+FROM deps AS build
+WORKDIR /app
 COPY . .
 
-# The state directory, created here so the container still starts when nothing
-# is mounted over it. A bind mount at /app/data replaces this and is what makes
-# the roster, the sessions and the simulated directory outlive the container.
+# The build must not read a real configuration, and must not need one. Next
+# inlines NEXT_PUBLIC_* at build time and nothing else, so the branding is
+# given here and every secret arrives at run time instead. A build that needed
+# the production .env would mean the image could only ever be built on the
+# server it runs on.
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_BRAND_NAME="User Management"
+ENV NEXT_PUBLIC_BRAND_LOGO="/brand/logo.svg"
+
+RUN npm run build
+
+
+# ---------------------------------------------------------------------------
+# prod — what runs on the internal server
+# ---------------------------------------------------------------------------
+FROM node:22-bookworm-slim AS prod
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Only what serving needs. The source tree, the dev toolchain and the test
+# files are left behind: a server that can rebuild itself is a server with a
+# compiler and a copy of the source on it, and neither has a reason to be
+# there.
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+COPY --from=build /app/.next ./.next
+COPY --from=build /app/public ./public
+COPY --from=build /app/next.config.ts ./next.config.ts
+
+# The store and the simulated-directory file live here. On the server this is a
+# mounted volume — see compose.yaml — because a JSON store inside a container
+# is a JSON store that disappears with it.
 RUN mkdir -p data
+
+# Not root. The portal writes to data/ and reads a CA certificate, and needs
+# nothing else; it has no business being able to write to its own code.
+RUN chown -R node:node /app
+USER node
 
 EXPOSE 3000
 
-# -H 0.0.0.0 is stated rather than relied upon. `next dev --help` on 16.3.3
-# reports 0.0.0.0 as the default already, so this changes nothing today; it is
-# here because the failure it guards against is disproportionately confusing. A
-# server bound to localhost inside a container is reachable from nowhere, the
-# published port answers nothing, and the app looks broken rather than
-# misbound — so the binding is worth naming out loud instead of inheriting.
-CMD ["npx", "next", "dev", "-H", "0.0.0.0", "-p", "3000"]
+# `next start` rather than `next dev`: the compiled output, no file watcher, no
+# dev overlay, and the security headers and CSP from next.config.ts and
+# proxy.ts applied to real responses.
+CMD ["npx", "next", "start", "-H", "0.0.0.0", "-p", "3000"]
