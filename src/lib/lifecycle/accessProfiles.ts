@@ -1,5 +1,5 @@
 /**
- * The access profiles HC may pick from.
+ * The access profiles available to the worker.
  *
  * HC chooses a profile, never an OU, a group name, or a distinguished name.
  * That is the whole point of having a catalogue: the form offers a decision a
@@ -7,65 +7,95 @@
  * decision to directory objects is made once, reviewed, and kept out of reach
  * of whoever is filling in the form.
  *
- * The AD groups and OU each profile resolves to are deliberately NOT here yet.
- * They arrive with the execution worker, together with the review that has to
- * accompany them; adding plausible-looking group names now would invite
- * somebody to believe they mean something.
+ * Labels are application data; OUs and group DNs belong to the customer's
+ * directory and are supplied by environment variables on the server.
  */
+
+import { AdConfigurationError } from "@/lib/ad/configError";
 
 export interface AccessProfile {
   id: string;
   label: string;
   description: string;
-  /**
-   * The directory groups this profile resolves to, and the OU new accounts land
-   * in. Reviewed as a unit: changing what a profile grants is a change to who
-   * can do what, and it belongs in a diff somebody approves — not in a form
-   * field an operator fills in while raising a request.
-   */
-  groups: string[];
-  ou: string;
 }
-
-const BASE = "CN=HC-Base,OU=Groups,DC=corp,DC=example,DC=com";
 
 export const ACCESS_PROFILES: readonly AccessProfile[] = [
   {
     id: "standard",
     label: "Standar karyawan",
     description: "Akses dasar: email, direktori, dan aplikasi umum perusahaan.",
-    groups: [BASE],
-    ou: "OU=Karyawan,DC=corp,DC=example,DC=com",
   },
   {
     id: "engineering",
     label: "Engineering",
     description: "Akses standar ditambah repository kode dan lingkungan pengembangan.",
-    groups: [BASE, "CN=HC-Engineering,OU=Groups,DC=corp,DC=example,DC=com"],
-    ou: "OU=Engineering,OU=Karyawan,DC=corp,DC=example,DC=com",
   },
   {
     id: "finance",
     label: "Finance",
     description: "Akses standar ditambah aplikasi keuangan dan pelaporan.",
-    groups: [BASE, "CN=HC-Finance,OU=Groups,DC=corp,DC=example,DC=com"],
-    ou: "OU=Finance,OU=Karyawan,DC=corp,DC=example,DC=com",
   },
   {
     id: "security",
     label: "IT Security",
     description: "Akses standar ditambah perkakas keamanan dan pemantauan.",
-    groups: [BASE, "CN=HC-Security,OU=Groups,DC=corp,DC=example,DC=com"],
-    ou: "OU=Security,OU=Karyawan,DC=corp,DC=example,DC=com",
   },
   {
     id: "none",
     label: "Tanpa akses aplikasi",
     description: "Hanya akun direktori. Dipakai saat akses aplikasi diajukan terpisah.",
-    groups: [],
-    ou: "OU=Karyawan,DC=corp,DC=example,DC=com",
   },
 ] as const;
+
+const PROFILE_DIRECTORY_CONFIG = {
+  standard: {
+    groups: [["AD_ACCESS_GROUP_BASE", "CN=HC-Base,OU=Groups,DC=corp,DC=example,DC=com"]],
+    ou: ["AD_OU_STANDARD", "OU=Karyawan,DC=corp,DC=example,DC=com"],
+  },
+  engineering: {
+    groups: [
+      ["AD_ACCESS_GROUP_BASE", "CN=HC-Base,OU=Groups,DC=corp,DC=example,DC=com"],
+      ["AD_ACCESS_GROUP_ENGINEERING", "CN=HC-Engineering,OU=Groups,DC=corp,DC=example,DC=com"],
+    ],
+    ou: ["AD_OU_ENGINEERING", "OU=Engineering,OU=Karyawan,DC=corp,DC=example,DC=com"],
+  },
+  finance: {
+    groups: [
+      ["AD_ACCESS_GROUP_BASE", "CN=HC-Base,OU=Groups,DC=corp,DC=example,DC=com"],
+      ["AD_ACCESS_GROUP_FINANCE", "CN=HC-Finance,OU=Groups,DC=corp,DC=example,DC=com"],
+    ],
+    ou: ["AD_OU_FINANCE", "OU=Finance,OU=Karyawan,DC=corp,DC=example,DC=com"],
+  },
+  security: {
+    groups: [
+      ["AD_ACCESS_GROUP_BASE", "CN=HC-Base,OU=Groups,DC=corp,DC=example,DC=com"],
+      ["AD_ACCESS_GROUP_SECURITY", "CN=HC-Security,OU=Groups,DC=corp,DC=example,DC=com"],
+    ],
+    ou: ["AD_OU_SECURITY", "OU=Security,OU=Karyawan,DC=corp,DC=example,DC=com"],
+  },
+  none: {
+    groups: [],
+    ou: ["AD_OU_STANDARD", "OU=Karyawan,DC=corp,DC=example,DC=com"],
+  },
+} as const;
+
+type ConfigPair = readonly [environment: string, developmentDefault: string];
+
+function configuredDn([environment, developmentDefault]: ConfigPair): string {
+  const configured = process.env[environment]?.trim();
+  if (configured) return configured;
+  if (
+    process.env.NODE_ENV === "production" ||
+    process.env.AD_DRIVER?.trim().toLowerCase() === "ldap"
+  ) {
+    throw new AdConfigurationError(`${environment} wajib diisi saat driver Active Directory nyata digunakan.`);
+  }
+  return developmentDefault;
+}
+
+function profileConfig(id: string) {
+  return PROFILE_DIRECTORY_CONFIG[id as keyof typeof PROFILE_DIRECTORY_CONFIG];
+}
 
 /**
  * The groups a profile grants.
@@ -76,17 +106,15 @@ export const ACCESS_PROFILES: readonly AccessProfile[] = [
  * it is what stops a movement stripping a group this application never issued.
  */
 export const accessProfileGroups = Object.assign(
-  (id: string): string[] => [...(ACCESS_PROFILES.find((profile) => profile.id === id)?.groups ?? [])],
+  (id: string): string[] => profileConfig(id)?.groups.map(configuredDn) ?? [],
   {
-    all: (): string[] => [...new Set(ACCESS_PROFILES.flatMap((profile) => profile.groups))],
+    all: (): string[] =>
+      [...new Set(ACCESS_PROFILES.flatMap((profile) => accessProfileGroups(profile.id)))],
   },
 );
 
 export function accessProfileOu(id: string): string {
-  return (
-    ACCESS_PROFILES.find((profile) => profile.id === id)?.ou ??
-    "OU=Karyawan,DC=corp,DC=example,DC=com"
-  );
+  return configuredDn(profileConfig(id)?.ou ?? PROFILE_DIRECTORY_CONFIG.standard.ou);
 }
 
 /**
@@ -97,7 +125,15 @@ export function accessProfileOu(id: string): string {
  * approval. The plan is explicit that deletion is never the default here.
  */
 export function quarantineOu(): string {
-  return process.env.AD_QUARANTINE_OU?.trim() || "OU=Karantina,DC=corp,DC=example,DC=com";
+  const configured = process.env.AD_QUARANTINE_OU?.trim();
+  if (configured) return configured;
+  if (
+    process.env.NODE_ENV === "production" ||
+    process.env.AD_DRIVER?.trim().toLowerCase() === "ldap"
+  ) {
+    throw new AdConfigurationError("AD_QUARANTINE_OU wajib diisi saat driver Active Directory nyata digunakan.");
+  }
+  return "OU=Karantina,DC=corp,DC=example,DC=com";
 }
 
 export function isAccessProfileId(value: unknown): boolean {

@@ -98,7 +98,7 @@ function payloadRows(payload: LifecyclePayload): Array<[string, string]> {
       [
         "Status kepegawaian",
         isFixedTerm(payload.employmentType)
-          ? `${EMPLOYMENT_LABEL_ID[payload.employmentType]} · berakhir ${payload.expiredDate ?? "—"}`
+          ? `${EMPLOYMENT_LABEL_ID[payload.employmentType]} · tanggal terakhir bekerja ${payload.expiredDate ?? "—"}`
           : EMPLOYMENT_LABEL_ID[payload.employmentType],
       ],
       [
@@ -108,7 +108,6 @@ function payloadRows(payload: LifecyclePayload): Array<[string, string]> {
           : "Kantor pusat",
       ],
       ["Manager", `${payload.managerName} · ${payload.managerEmail}`],
-      ["Mulai bekerja", payload.startDate],
       ...(payload.accessProfileId
         ? [["Profil akses", accessProfileLabel(payload.accessProfileId)] as [string, string]]
         : []),
@@ -196,7 +195,6 @@ function detailRows(payload: ApprovalMailPayload): string {
     ["Diajukan oleh", payload.requesterName],
     ["Nomor", payload.requestId],
     ["Versi", String(payload.version)],
-    ["Waktu efektif", payload.effectiveAt ? formatDate(payload.effectiveAt) : "Segera setelah disetujui"],
   ];
 
   if (payload.managerDecision) {

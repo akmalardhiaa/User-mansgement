@@ -1,4 +1,7 @@
+import { readFile } from "node:fs/promises";
+
 import { DEV_USERS } from "./devUsers";
+import { isLdapLoginConfigured, readLdapLoginConfig } from "./ldapLoginConfig";
 import { authViaMockAd, isMockAdLoginEnabled } from "./mockAdAuth";
 import { rolesFromGroups } from "./roleMapping";
 import type { PortalRole } from "./roles";
@@ -15,7 +18,7 @@ import type { PortalRole } from "./roles";
  * in AD but in none of the mapped groups signs in and gets their own profile,
  * not the directory.
  *
- * When no `LDAP_URL` is set, a small local list (devUsers.ts) stands in so the
+ * When no `LDAP_URL` or `AD_LDAP_URL` is set, a small local list (devUsers.ts) stands in so the
  * portal runs before a real AD server is available. That fallback is refused in
  * production: there, a missing LDAP_URL is a configuration error, not a reason
  * to let anyone in with a demo password.
@@ -36,7 +39,7 @@ export interface AdUser {
 }
 
 export function isLdapConfigured(): boolean {
-  return Boolean(process.env.LDAP_URL?.trim());
+  return isLdapLoginConfigured();
 }
 
 /** True when the portal can authenticate anyone at all (real AD, or dev fallback). */
@@ -52,7 +55,7 @@ export async function authenticateAD(username: string, password: string): Promis
 
   if (process.env.NODE_ENV === "production") {
     throw new Error(
-      "LDAP_URL belum diset. Login Active Directory tidak bisa dijalankan di production tanpa alamat server AD.",
+      "AD_LDAP_URL/LDAP_URL belum diset. Login Active Directory tidak bisa dijalankan di production tanpa alamat server AD.",
     );
   }
 
@@ -121,32 +124,44 @@ function asArray(value: unknown): string[] {
 }
 
 async function authViaLdap(username: string, password: string): Promise<AdUser | null> {
-  const { Client } = await import("ldapts");
+  const { Client, InvalidCredentialsError } = await import("ldapts");
 
-  const url = process.env.LDAP_URL!.trim();
-  const domain = process.env.LDAP_DOMAIN?.trim();
-  const baseDN = process.env.LDAP_BASE_DN?.trim() ?? "";
+  const config = readLdapLoginConfig();
+  const ca = await readFile(config.caCertPath);
 
   // AD accepts either a UPN (user@domain) or DOMAIN\user for the bind. If the
   // caller typed a bare username and a domain is configured, build the UPN.
   const bindName =
-    username.includes("@") || username.includes("\\") || !domain ? username : `${username}@${domain}`;
+    username.includes("@") || username.includes("\\") || !config.domain
+      ? username
+      : `${username}@${config.domain}`;
   // The bare account name, for the sAMAccountName lookup.
   const account = username.split("\\").pop()!.split("@")[0];
 
-  const client = new Client({ url, timeout: 8000, connectTimeout: 8000 });
+  const client = new Client({
+    url: config.url,
+    timeout: 8000,
+    connectTimeout: 8000,
+    tlsOptions: {
+      ca,
+      rejectUnauthorized: true,
+      minVersion: "TLSv1.2",
+      servername: new URL(config.url).hostname,
+    },
+  });
 
   try {
     // The authentication itself: a failed bind means wrong credentials.
     await client.bind(bindName, password);
-  } catch {
+  } catch (error) {
     await client.unbind().catch(() => undefined);
-    return null;
+    if (error instanceof InvalidCredentialsError) return null;
+    throw error;
   }
 
   try {
     const filter = `(&(objectClass=user)(|(userPrincipalName=${escapeFilter(bindName)})(sAMAccountName=${escapeFilter(account)})))`;
-    const { searchEntries } = await client.search(baseDN, {
+    const { searchEntries } = await client.search(config.baseDn, {
       scope: "sub",
       filter,
       attributes: ["displayName", "mail", "userPrincipalName", "sAMAccountName", "department", "memberOf"],

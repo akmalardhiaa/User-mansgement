@@ -5,15 +5,14 @@ import { useState } from "react";
 import { createAndSubmit, reviseAndResubmit } from "@/components/lifecycle/submitRequest";
 import { useT } from "@/components/i18n/LocaleProvider";
 import { Button } from "@/components/ui/Button";
-import { Card, Field, SelectField } from "@/components/ui/Field";
+import { Card, SelectField } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
-import { IconBriefcase, IconBuilding, IconClock, IconSwap, IconUser } from "@/components/ui/Icons";
+import { IconBriefcase, IconBuilding, IconSwap, IconUser } from "@/components/ui/Icons";
 import { ManagerPicker } from "@/components/users/ManagerPicker";
 import type { LifecycleRequest } from "@/lib/lifecycle/types";
 import { ComboField } from "@/components/ui/ComboField";
 import { DEPARTMENT_GROUPS, JOB_TITLE_GROUPS } from "@/lib/db/seed";
 import type { Employee } from "@/lib/types";
-import { DATE_BOUNDS, dateInputBounds } from "@/lib/validation/dates";
 
 const SECTION =
   "mb-1.5 flex items-center gap-2 text-[11px] font-medium tracking-[0.14em] text-ink-faint uppercase";
@@ -231,18 +230,6 @@ export function MovementForm({
               error={fieldErrors.toJobTitle}
               placeholder="Security Engineer"
               hint={t.forms.jobTitleHint}
-            />
-
-            <Field
-              label={t.forms.effectiveAt}
-              name="effectiveAt"
-              type="date"
-              {...dateInputBounds(DATE_BOUNDS.effectiveAt)}
-              icon={<IconClock className="size-4" />}
-              value={values.effectiveAt}
-              onChange={(event) => update("effectiveAt", event.target.value)}
-              error={fieldErrors.effectiveAt}
-              hint={t.forms.effectiveAtHint}
             />
 
             {/*

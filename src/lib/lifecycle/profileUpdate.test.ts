@@ -133,7 +133,7 @@ describe("the diff", () => {
     expect(changes).toEqual([
       { field: "department", label: "Departemen", from: "IT — Engineering", to: "Finance" },
       { field: "employmentType", label: "Status kepegawaian", from: "—", to: "Temporary" },
-      { field: "expiredDate", label: "Tanggal berakhir", from: "—", to: "2027-01-31" },
+      { field: "expiredDate", label: "Tanggal terakhir bekerja", from: "—", to: "2027-01-31" },
     ]);
   });
 

@@ -31,8 +31,6 @@ export interface EmploymentKind {
 export const EMPLOYMENT_KINDS: readonly EmploymentKind[] = [
   { type: "PERMANENT", codes: [1, 2], fixedTerm: false },
   { type: "CONTRACT", codes: [3, 4], fixedTerm: true },
-  { type: "VENDOR", codes: [5, 6], fixedTerm: true },
-  { type: "INTERN", codes: [7, 8], fixedTerm: true },
 ];
 
 export const EMPLOYMENT_TYPES: readonly EmploymentType[] = EMPLOYMENT_KINDS.map(

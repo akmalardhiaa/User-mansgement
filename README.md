@@ -395,12 +395,13 @@ Beberapa aturan yang ditegakkan kode, bukan sekadar konvensi:
   departemen, dan jabatan ke AD, lalu memverifikasi status aktif, OU, dan group
   tidak ikut berubah. `PUT /api/users/:id` dihapus — dulu ia bisa memindahkan
   departemen tanpa persetujuan siapa pun.
-- **Onboarding dibuat begitu disetujui, apa pun tanggalnya.** Form Onboarding
-  tidak punya "Waktu efektif"; tanggal mulai bekerja hanya dicatat. Setelah
-  CISO menyetujui, akun langsung dibuat oleh worker otomatis — bahkan onboarding
-  lama yang sempat dijadwalkan ikut diproses. Movement dan Termination tetap
-  menghormati waktu efektifnya: menonaktifkan seseorang lebih awal bukan hal
-  yang boleh terjadi karena aturan ini. Karyawan yang sedang diproses langsung
+- **Onboarding dibuat begitu disetujui.** Form tidak meminta tanggal mulai
+  bekerja; sistem mengisinya otomatis. Karyawan kontrak hanya diminta tanggal
+  terakhir bekerja. Setelah CISO menyetujui, akun langsung dibuat oleh worker
+  otomatis — bahkan onboarding lama yang sempat dijadwalkan ikut diproses.
+  Pengajuan Movement baru berjalan setelah disetujui, sedangkan Termination
+  berjalan sehari setelah tanggal terakhir bekerja. Jadwal efektif pada
+  pengajuan lama tetap dihormati. Karyawan yang sedang diproses langsung
   tampil di panel "Karyawan baru dalam proses" di dashboard, lalu pindah ke
   tabel direktori setelah akunnya diverifikasi.
 - **Tanggal harus masuk akal.** Tahun wajib 4 digit, dan tiap tanggal punya
@@ -510,6 +511,14 @@ string kanonik, bit `ACCOUNTDISABLE` ke `enabled`, DN manager ke
 sAMAccountName, `distinguishedName` ke OU, dan `memberOf` disaring menjadi hanya
 group yang diterbitkan katalog akses.
 
+Login pengguna dan worker memakai host LDAPS/CA yang sama: `LDAP_URL` (atau
+`AD_LDAP_URL`), `LDAP_BASE_DN`, dan `LDAP_CA_CERT_PATH`. Login mengikat sebagai
+pengguna; worker mengikat terpisah sebagai `AD_BIND_DN`. Akun tanpa salah satu
+group `AD_GROUP_HC`, `AD_GROUP_ADMIN`, `AD_GROUP_OPS`, atau `AD_GROUP_AUDITOR`
+ditolak masuk. `.env.onprem.example` adalah template tanpa rahasia untuk
+deployment Windows Server; salin menjadi `.env.production` yang ACL-nya hanya
+mengizinkan akun service membaca, lalu isi nilai asli dari tim AD/infrastruktur.
+
 Keamanannya bukan opsi yang bisa dimatikan:
 
 - **Hanya `ldaps://` port 636**, rantai sertifikat diverifikasi terhadap CA di
@@ -523,6 +532,12 @@ Keamanannya bukan opsi yang bisa dimatikan:
   ketat lagi: hanya DN group yang diterbitkan katalog akses, sehingga driver ini
   tidak bisa menambahkan siapa pun ke group yang tidak pernah dikenalkan
   kepadanya.
+- **OU dan group katalog akses bukan nilai production bawaan.** Isi
+  `AD_OU_STANDARD`, `AD_OU_ENGINEERING`, `AD_OU_FINANCE`, `AD_OU_SECURITY`,
+  `AD_ACCESS_GROUP_BASE`, `AD_ACCESS_GROUP_ENGINEERING`,
+  `AD_ACCESS_GROUP_FINANCE`, dan `AD_ACCESS_GROUP_SECURITY` dengan DN yang
+  disetujui tim AD. Seluruh OU tujuan, termasuk `AD_QUARANTINE_OU`, harus ada
+  di `AD_MANAGED_OUS`.
 - **`AD_LDAP_WRITE_ENABLED` default mati.** Selama mati, setiap operasi tulis
   ditolak dengan pesan jelas — bahkan sebelum koneksi dibuka — sementara
   pembacaan tetap jalan. Itu keadaan untuk memverifikasi koneksi, hak, dan OU
@@ -543,6 +558,71 @@ Keamanannya bukan opsi yang bisa dimatikan:
   direktori — pengajuan berakhir `FAILED` dengan alasan aslinya, akunnya sudah
   ada dalam keadaan nonaktif dan tidak bisa dipakai. Yang memegang penerbitan
   password mengisinya, lalu langkah itu diulang dari titik yang sama.
+
+#### Menjalankan di Windows Server internal
+
+Production dijalankan langsung dengan Node.js 22 sebagai **satu instance**,
+bukan Docker Desktop. Salin `.env.onprem.example` menjadi `.env.production`,
+lengkapi hanya dengan nilai yang sudah dikonfirmasi tim AD/infrastruktur, dan
+batasi ACL berkas itu ke akun service serta administrator. Jangan masukkan
+rahasia ke Git. Untuk awal, biarkan `AD_LDAP_WRITE_ENABLED=false`.
+
+```powershell
+npm ci
+npm run ad:check -- <akun-pengguna>
+npm run ad:service-check -- <akun-di-OU-kelola> <DN-group-CISO>
+npm run build
+npm run start
+```
+
+Setelah pemeriksaan read-only lolos, uji lifecycle di OU pilot dengan email
+approval dialihkan ke penguji; baru setelah bukti uji diterima, aktifkan
+`AD_LDAP_WRITE_ENABLED=true` dan gunakan OU production yang didelegasikan.
+PC pilot memakai `.env.pilot.example`: `AD_LDAP_WRITE_ENABLED=false` dan
+`AD_MANAGED_OUS` kosong pada tahap read-only. Isi akun layanan dan passwordnya
+hanya di `.env.local` yang diabaikan Git. `ad:check` meminta password tanpa
+menampilkannya atau menaruhnya di argumen proses. Untuk tahap tulis pilot,
+masukkan hanya OU uji dan OU karantina uji ke `AD_MANAGED_OUS`, lalu arahkan
+semua email ke alamat penguji lewat `EMAIL_REDIRECT_TO`.
+
+Kedua perintah start mengikat Next ke `127.0.0.1`; di Windows Server IIS ARR
+menjadi satu-satunya pintu HTTPS. Di PC kantor Docker Compose juga menerbitkan
+port hanya ke loopback.
+
+Jalankan `npm run start` sebagai Windows Service dengan akun lokal non-admin,
+folder `data/` dan folder karyawan ber-ACL terbatas serta backup harian. IIS
+URL Rewrite/ARR menjadi reverse proxy HTTPS ke `127.0.0.1:3000`; firewall hanya
+membuka HTTPS bagi pengguna dan koneksi keluar server ke LDAPS 636 serta relay
+email. Jangan jalankan lebih dari satu instance karena state aplikasi masih
+berkas JSON lokal.
+
+#### Urutan pilot dan pemindahan
+
+Ikuti gerbang bertahap; jangan membuka penulisan AD sebelum pilot disetujui:
+
+1. **Demo awal:** di PC kantor, jalankan `docker compose up` dengan konfigurasi
+   simulasi. Pastikan portal dan alur approval demo jalan.
+2. **Uji baca:** salin nilai dari `.env.pilot.example` ke `.env.local`, isi DC,
+   CA, akun layanan, serta group peran yang telah disediakan tim AD. Biarkan
+   `AD_LDAP_WRITE_ENABLED=false` dan `AD_MANAGED_OUS` kosong. Jalankan
+   `npm run ad:check -- <akun-pengguna>` dan
+   `npm run ad:service-check -- <akun-di-direktori> <DN-group-CISO>`. Pastikan
+   login dan peran benar serta akun layanan dapat membaca objek dan group.
+3. **Pilot tulis:** aktifkan `AD_LDAP_WRITE_ENABLED=true`, tetapi isi
+   `AD_MANAGED_OUS` hanya dengan OU uji dan OU karantina uji. Pilih `smtp` atau
+   `gmail`, arahkan `EMAIL_REDIRECT_TO` ke penguji, lalu uji Onboarding,
+   Movement, Termination, dan Profile Update. Pastikan semua hasil dibaca
+   kembali dan diverifikasi di AD uji.
+4. **Production:** pindahkan ke satu Windows Server internal memakai
+   `.env.onprem.example`, OU production yang sudah didelegasikan, group final,
+   relay email production, backup `data/`, serta IIS HTTPS reverse proxy.
+   Hapus `EMAIL_REDIRECT_TO` hanya setelah daftar penerima dicek dan akses
+   approver dari luar kantor (VPN/jalur yang disetujui) dipastikan.
+
+Sebelum tahap 2, tim AD/infrastruktur harus menetapkan nama DC dan CA LDAPS,
+akun service serta delegasinya, OU uji/Karyawan/Karantina, group role dan CISO,
+server/host HTTPS, relay email, dan proses password akun baru. Portal sengaja
+tidak membuat tebakan untuk nilai-nilai tersebut.
 
 #### Mencoba ke Active Directory sungguhan
 

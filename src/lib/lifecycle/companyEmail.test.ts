@@ -16,8 +16,6 @@ describe("the suggested address", () => {
   it("runs the names together and ends with the kind's digit", () => {
     expect(companyEmailLocalPart("Nadia", "Kusuma", "PERMANENT")).toBe("nadiakusuma1");
     expect(companyEmailLocalPart("Budi", "Santoso", "CONTRACT")).toBe("budisantoso3");
-    expect(companyEmailLocalPart("Rani", "Puspita", "VENDOR")).toBe("ranipuspita5");
-    expect(companyEmailLocalPart("Tio", "Ramadhan", "INTERN")).toBe("tioramadhan7");
   });
 
   it("drops spaces, punctuation and accents rather than encoding them", () => {
@@ -36,8 +34,6 @@ describe("the suggested address", () => {
   it("uses the first digit of each range", () => {
     expect(employmentDigit("PERMANENT")).toBe("1");
     expect(employmentDigit("CONTRACT")).toBe("3");
-    expect(employmentDigit("VENDOR")).toBe("5");
-    expect(employmentDigit("INTERN")).toBe("7");
   });
 });
 

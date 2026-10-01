@@ -43,10 +43,10 @@ export const en: Dictionary = {
     demoTitle: "Demo mode — Active Directory is not connected",
     demoBody:
       "Sign in as admin with the password admin12345, or through the simulated directory as ayu.prameswari with mock12345. This portal is for Human Capital only: managers and the CISO team approve from email, not from here. The full list of demo accounts is in the README.",
-    demoEnvHint: "Set LDAP_URL in .env.local to switch on Active Directory sign-in.",
+    demoEnvHint: "Set AD_LDAP_URL, LDAP_BASE_DN, and LDAP_CA_CERT_PATH to switch on Active Directory sign-in.",
     notConfiguredTitle: "Sign-in is not configured",
     notConfiguredBody:
-      "Set LDAP_URL in the environment, then restart the application. There is an example in .env.example.",
+      "Set AD_LDAP_URL, LDAP_BASE_DN, and LDAP_CA_CERT_PATH in the environment, then restart the application. See .env.example.",
     failed: "Wrong username or password.",
   },
 
@@ -283,7 +283,7 @@ export const en: Dictionary = {
     department: "Department",
     employmentType: "Employment type",
     contractUntil: "Temporary · ends {date}",
-    endsOn: "ends {date}",
+    endsOn: "Last working day: {date}",
     permanent: "Permanent",
     location: "Place of work",
     branchNamed: "Branch · {name}",

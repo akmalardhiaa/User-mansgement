@@ -4,7 +4,7 @@ import type { PortalRole } from "./roles";
  * Local fallback accounts, used ONLY when no LDAP server is configured.
  *
  * The app is meant to authenticate against Active Directory (see ad.ts). Until
- * an `LDAP_URL` is set, these let the portal be opened and demoed locally.
+ * an `LDAP_URL` or `AD_LDAP_URL` is set, these let the portal be opened and demoed locally.
  * They never work in production: authenticateAD throws there rather than fall
  * back to this list. Passwords here are plain text on purpose — they are
  * throwaway demo credentials, not real ones.

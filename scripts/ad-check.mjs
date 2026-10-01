@@ -2,35 +2,64 @@
 // going through the web app. Run it once a real AD server is configured to
 // confirm the credentials and the base DN before wiring up the portal:
 //
-//   npm run ad:check -- <username> <password>
+//   npm run ad:check -- <username>
 //
-// It reads LDAP_URL, LDAP_DOMAIN, LDAP_BASE_DN and LDAP_ADMIN_GROUP from
-// .env.local — the same variables the app uses (see .env.example).
+// It reads the login and role-group settings from .env.local — the same values
+// the app uses (see .env.example).
 
 import nextEnv from "@next/env";
+import { readFile } from "node:fs/promises";
 import { Client } from "ldapts";
 
 const { loadEnvConfig } = nextEnv;
 loadEnvConfig(process.cwd(), true);
 
-const [, , username, password] = process.argv;
+const [, , username] = process.argv;
 
-const url = process.env.LDAP_URL?.trim();
+const url = (process.env.AD_LDAP_URL ?? process.env.LDAP_URL)?.trim();
 if (!url) {
   console.error(
-    "\n  LDAP_URL belum diset di .env.local.\n" +
+    "\n  AD_LDAP_URL/LDAP_URL belum diset di .env.local.\n" +
       "  Isi dulu konfigurasi AD (lihat .env.example), lalu jalankan lagi.\n",
   );
   process.exit(1);
 }
-if (!username || !password) {
-  console.error("\n  Pakai: npm run ad:check -- <username> <password>\n");
+if (!username) {
+  console.error("\n  Pakai: npm run ad:check -- <username>\n");
   process.exit(1);
 }
 
 const domain = process.env.LDAP_DOMAIN?.trim();
-const baseDN = process.env.LDAP_BASE_DN?.trim() ?? "";
-const adminGroup = process.env.LDAP_ADMIN_GROUP?.trim().toLowerCase();
+const baseDN = (process.env.AD_BASE_DN ?? process.env.LDAP_BASE_DN)?.trim() ?? "";
+const caPath = process.env.LDAP_CA_CERT_PATH?.trim();
+const roleGroups = [
+  ["HC_REQUESTER", process.env.AD_GROUP_HC],
+  ["SYSTEM_ADMIN", process.env.AD_GROUP_ADMIN ?? process.env.LDAP_ADMIN_GROUP],
+  ["OPS_OPERATOR", process.env.AD_GROUP_OPS],
+  ["AUDITOR", process.env.AD_GROUP_AUDITOR],
+].filter(([, group]) => group?.trim());
+
+function requireConfig(value, name) {
+  if (!value) {
+    console.error(`\n  ${name} belum diset di environment AD.\n`);
+    process.exit(1);
+  }
+}
+
+requireConfig(baseDN, "AD_BASE_DN/LDAP_BASE_DN");
+requireConfig(caPath, "LDAP_CA_CERT_PATH");
+
+let parsedUrl;
+try {
+  parsedUrl = new URL(url);
+} catch {
+  console.error("\n  AD_LDAP_URL/LDAP_URL bukan URL yang sah.\n");
+  process.exit(1);
+}
+if (parsedUrl.protocol !== "ldaps:" || (parsedUrl.port && parsedUrl.port !== "636")) {
+  console.error("\n  Login AD hanya menerima LDAPS pada port 636.\n");
+  process.exit(1);
+}
 
 const bindName =
   username.includes("@") || username.includes("\\") || !domain ? username : `${username}@${domain}`;
@@ -68,7 +97,74 @@ function matchesGroup(memberOf, configured) {
   return needle.every((part, index) => group[index] === part);
 }
 
-const client = new Client({ url, timeout: 8000, connectTimeout: 8000 });
+const ca = await readFile(caPath).catch((error) => {
+  console.error(`\n  Sertifikat CA tidak bisa dibaca: ${error.message}\n`);
+  process.exit(1);
+});
+
+function promptPassword() {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    throw new Error("Jalankan ad:check dari terminal interaktif agar kata sandi tidak masuk argumen proses.");
+  }
+
+  return new Promise((resolve, reject) => {
+    let password = "";
+    const input = process.stdin;
+    const output = process.stdout;
+
+    function cleanup() {
+      input.removeListener("data", onData);
+      input.setRawMode(false);
+      input.pause();
+      output.write("\n");
+    }
+
+    function onData(chunk) {
+      for (const character of chunk.toString("utf8")) {
+        if (character === "\r" || character === "\n") {
+          cleanup();
+          resolve(password);
+          return;
+        }
+        if (character === "\u0003") {
+          cleanup();
+          reject(new Error("Pemeriksaan dibatalkan."));
+          return;
+        }
+        if (character === "\u007f" || character === "\b") {
+          password = password.slice(0, -1);
+        } else if (character >= " ") {
+          password += character;
+        }
+      }
+    }
+
+    output.write("Kata sandi AD (tidak ditampilkan): ");
+    input.setRawMode(true);
+    input.resume();
+    input.on("data", onData);
+  });
+}
+
+let password;
+try {
+  password = await promptPassword();
+} catch (error) {
+  console.error(`\n  ${error.message}\n`);
+  process.exit(1);
+}
+
+const client = new Client({
+  url,
+  timeout: 8000,
+  connectTimeout: 8000,
+  tlsOptions: {
+    ca,
+    rejectUnauthorized: true,
+    minVersion: "TLSv1.2",
+    servername: parsedUrl.hostname,
+  },
+});
 
 try {
   console.info(`\n  Menyambung ke ${url} …`);
@@ -88,15 +184,24 @@ try {
       "  ⚠ Bind berhasil, tetapi record user tidak ditemukan di BASE_DN.\n" +
         "    Periksa LDAP_BASE_DN.\n",
     );
+    process.exitCode = 1;
   } else {
     const groups = [].concat(entry.memberOf ?? []).map(String);
-    const role =
-      adminGroup && groups.some((group) => matchesGroup(group, adminGroup)) ? "ADMIN" : "USER";
+    const roles = roleGroups
+      .filter(([, configured]) =>
+        groups.some((group) => matchesGroup(group, configured.trim().toLowerCase())),
+      )
+      .map(([role]) => role);
     console.info("  Nama    : " + (firstString(entry.displayName) || "(kosong)"));
     console.info("  Email   : " + (firstString(entry.mail) || "(kosong)"));
     console.info("  Divisi  : " + (firstString(entry.department) || "(kosong)"));
-    console.info("  Peran   : " + role);
-    console.info("\n  ✓ Konfigurasi AD siap dipakai portal.\n");
+    console.info("  Peran   : " + (roles.join(", ") || "(tidak ada group portal)"));
+    console.info(
+      roles.length
+        ? "\n  ✓ Login dan pemetaan peran berhasil.\n"
+        : "\n  ✗ Akun tidak memiliki group peran portal; login portal akan ditolak.\n",
+    );
+    if (roles.length === 0) process.exitCode = 1;
   }
 } catch (error) {
   console.error(`\n  ✗ Gagal: ${error.message}\n`);

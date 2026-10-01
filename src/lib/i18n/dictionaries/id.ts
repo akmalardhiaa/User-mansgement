@@ -44,10 +44,10 @@ export const id = {
     demoTitle: "Mode demo — Active Directory belum tersambung",
     demoBody:
       "Masuk sebagai admin dengan kata sandi admin12345, atau lewat direktori simulasi sebagai ayu.prameswari dengan mock12345. Portal ini hanya untuk Human Capital: manager dan tim CISO menyetujui dari email, bukan dari sini. Daftar akun demo ada di README.",
-    demoEnvHint: "Isi LDAP_URL di .env.local untuk mengaktifkan login Active Directory.",
+    demoEnvHint: "Isi AD_LDAP_URL, LDAP_BASE_DN, dan LDAP_CA_CERT_PATH untuk mengaktifkan login Active Directory.",
     notConfiguredTitle: "Login belum dikonfigurasi",
     notConfiguredBody:
-      "Setel LDAP_URL di environment, lalu jalankan ulang aplikasinya. Contohnya ada di .env.example.",
+      "Setel AD_LDAP_URL, LDAP_BASE_DN, dan LDAP_CA_CERT_PATH di environment, lalu jalankan ulang aplikasi. Contohnya ada di .env.example.",
     failed: "Username atau kata sandi salah.",
   },
 
@@ -236,9 +236,9 @@ export const id = {
     intern: "Magang",
     /** Shown under the employment type field, as the company's own convention. */
     employmentCodeHint:
-      "1-2 permanent, 3-4 temporary, 5-6 vendor, 7-8 magang.",
+      "1-2 permanent, 3-4 temporary.",
     contractEnd: "Tanggal berakhir",
-    contractEndHint: "Wajib untuk temporary, vendor, dan magang.",
+    contractEndHint: "Wajib untuk temporary.",
     emailHint: "Nama depan + belakang, lalu angka status di akhir. Misalnya nadiakusuma3.",
     userId: "User ID",
     userIdHint: "Nama untuk login ke komputer dan aplikasi kantor. Terisi dari email.",
@@ -294,7 +294,7 @@ export const id = {
     /** {date} is when the contract ends. */
     contractUntil: "Temporary · berakhir {date}",
     /** Appended after the kind of employment, for the fixed-term kinds. */
-    endsOn: "berakhir {date}",
+    endsOn: "Tanggal terakhir bekerja: {date}",
     permanent: "Permanent",
     location: "Lokasi",
     /** {name} is the branch. */

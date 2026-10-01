@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AdAccountState } from "@/lib/ad/types";
 
-import { authenticateAD } from "./ad";
+import { authenticateAD, isLdapConfigured } from "./ad";
 
 /**
  * Which credential source answers, and in what order.
@@ -114,6 +114,13 @@ describe("with the simulated directory switched on", () => {
 });
 
 describe("what is refused outright", () => {
+  it("recognizes the unified worker endpoint as the portal login endpoint", () => {
+    vi.stubEnv("AD_LDAP_URL", "ldaps://dc.corp.example.com:636");
+    vi.stubEnv("LDAP_URL", "");
+
+    expect(isLdapConfigured()).toBe(true);
+  });
+
   it("rejects an empty username or password without consulting anything", async () => {
     vi.stubEnv("MOCK_AD_LOGIN", "true");
 

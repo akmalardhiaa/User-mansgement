@@ -116,7 +116,7 @@ export interface ApprovalStep {
  * permanent, contract, vendor and intern. See lifecycle/employment.ts for the
  * digit each one ends an address with, and for which of them end on a date.
  */
-export type EmploymentType = "PERMANENT" | "CONTRACT" | "VENDOR" | "INTERN";
+export type EmploymentType = "PERMANENT" | "CONTRACT";
 export type LocationType = "PUSAT" | "CABANG";
 
 /** Creating an account for somebody who does not have one yet. */
