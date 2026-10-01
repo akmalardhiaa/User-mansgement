@@ -1,7 +1,7 @@
-# What must never enter the build context.
+# What must never enter the Podman build context.
 #
 # Two entries here are security, not tidiness, and they are the reason this file
-# exists before the Dockerfile does:
+# exists before the Containerfile does:
 #
 #   .env*   holds a live SMTP App Password. Anything copied into an image stays
 #           in that layer forever, readable by anyone who can pull it — even if
@@ -51,7 +51,8 @@ README.md
 AGENTS.md
 CLAUDE.md
 
-# The Docker files themselves
-Dockerfile*
-docker-compose*.yml
-.dockerignore
+# The Podman container files themselves
+Containerfile*
+compose*.yml
+compose*.yaml
+.containerignore

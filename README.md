@@ -71,14 +71,10 @@ Akun yang dinonaktifkan tidak bisa masuk — itulah yang membuat Termination
 terlihat utuh: login berhenti bekerja sebagai *akibat* pengajuan, bukan sebagai
 langkah terpisah yang harus diingat seseorang. **Ditolak di production.**
 
-## Menjalankan tanpa Docker
+## Menjalankan tanpa container
 
-Docker Desktop **berbayar** untuk perusahaan besar — di atas 250 karyawan atau
-pendapatan di atas $10 juta — dan mendaftar dengan email kantor masuk hitungan
-lisensi itu. Aplikasi ini tidak membutuhkannya: isinya aplikasi Next.js biasa,
-dan Docker hanya pembungkus yang memudahkan.
-
-Klik dua kali `jalankan.bat`, atau dari terminal:
+Untuk menjalankan lokal tanpa container, aplikasi ini hanya memerlukan Node.js.
+Klik dua kali `jalankan.bat`, atau jalankan perintah terminal di bawah.
 
 ```bash
 npm install     # sekali saja
@@ -87,7 +83,7 @@ npm run dev
 
 Lalu buka `http://localhost:3000`. Hasilnya identik dengan container, karena
 `.env.development` — ikut di-commit, tanpa rahasia — memuat bawaan yang sama
-dengan `.env.docker.example`, dan `.env.local` Anda tetap menimpanya.
+dengan `.env.podman.example`, dan `.env.local` Anda tetap menimpanya.
 
 **Bila komputernya tidak boleh memasang apa pun,** unduh Node.js versi
 *Windows Binary (.zip)* dari nodejs.org, ekstrak ke folder `node` di dalam
@@ -98,34 +94,39 @@ tersebut tanpa pemasangan dan tanpa hak admin.
 dari komputer yang sudah menjalankan `npm install`. Salinan antar-Windows
 kompatibel, dan `npm install` lalu tidak diperlukan sama sekali.
 
-Alternatif lain bila memang harus memakai container: Rancher Desktop atau
-Podman Desktop (keduanya gratis), atau Docker Engine di dalam WSL2 — yang
-berbayar adalah Docker **Desktop**, bukan mesin Dockernya.
+Untuk mode container, gunakan Podman Desktop dan Podman Compose.
 
-## Menjalankan dengan Docker
+## Menjalankan dengan Podman
 
 ```bash
-docker compose up
+podman compose up
 ```
 
 Lalu buka `http://localhost:3000`. Satu perintah itu memang seluruh ceritanya,
 dan dua hal menjaganya tetap begitu.
 
+Pasang Podman Desktop, mulai Podman machine, lalu pastikan provider Compose
+tersedia dengan `podman compose version`. Jalankan perintah dari folder proyek.
+Image dibangun dari `Containerfile`, dengan konfigurasi di `compose.yaml`.
+
 **Konfigurasi bertumpuk dua lapis.** `env_file` membaca
-`.env.docker.example` — yang ikut di-commit, berisi bawaan demo, tanpa rahasia —
-lalu `.env.docker` yang **opsional** dan menimpa nilai apa pun yang diisinya.
-Hasilnya: hasil `git clone` yang belum punya `.env.docker` tetap menyala dengan
+`.env.podman.example` — yang ikut di-commit, berisi bawaan demo, tanpa rahasia —
+lalu `.env.podman` yang **opsional** dan menimpa nilai apa pun yang diisinya.
+Hasilnya: hasil `git clone` yang belum punya `.env.podman` tetap menyala dengan
 direktori simulasi dan email ditulis ke berkas, sedangkan mesin yang sudah
-mengisi SMTP tetap memakai SMTP. Untuk mengisi rahasianya:
-`cp .env.docker.example .env.docker`, lalu isi dua placeholder di dalamnya.
+mengisi SMTP tetap memakai SMTP. Jika sebelumnya sudah memakai `.env.docker`,
+isinya telah disalin ke `.env.podman`; berkas lama tetap ada tetapi tidak lagi
+digunakan. Untuk salinan baru, jalankan
+`Copy-Item .env.podman.example .env.podman`, lalu isi placeholder rahasia di
+dalamnya.
 
 **Kode di-mount, jadi mengubah berkas tidak perlu `--build`.** Yang tidak
 di-mount hanya `node_modules` dan `.next`: yang pertama dipasang `npm ci` di
 dalam image dan harus tetap versi Linux, yang kedua milik siapa pun yang sedang
 menjalankan. Pemantau berkas Next **tidak** menerima notifikasi perubahan dari
 folder Windows lewat bind mount, jadi hot reload tidak menyala di Windows —
-hentikan (`Ctrl+C`) lalu `docker compose up` lagi, dan kode baru langsung
-terpakai. `docker compose up` pada container yang masih hidup tidak melakukan
+hentikan (`Ctrl+C`) lalu `podman compose up` lagi, dan kode baru langsung
+terpakai. `podman compose up` pada container yang masih hidup tidak melakukan
 apa-apa, jadi menghentikannya dulu bukan langkah opsional.
 
 `--build` hanya perlu ketika `package.json` atau lockfile berubah, karena
@@ -147,16 +148,16 @@ kegagalan — dan memulihkannya diam-diam adalah kejutan tersendiri.
 
 ### Pindah ke komputer lain
 
-Dua jalur, dan keduanya tidak butuh langkah seeding apa pun. Tanpa Docker:
+Dua jalur, dan keduanya tidak butuh langkah seeding apa pun. Tanpa container:
 salin folder proyek beserta `node_modules`, lalu `jalankan.bat` — lihat
-**Menjalankan tanpa Docker** di atas, yang juga jalan tanpa hak admin dan tanpa
-koneksi. Dengan Docker, yang perlu dipasang hanya **Docker Desktop** dan tidak
-perlu Node maupun `npm install`.
+**Menjalankan tanpa container** di atas, yang juga jalan tanpa hak admin dan
+tanpa koneksi. Dengan Podman, yang perlu dipasang hanya **Podman Desktop** dan
+Compose provider; Node.js tidak perlu dipasang di host.
 
 **Mulai bersih** — salin repositori ini (tanpa `node_modules` dan `.next`), lalu:
 
 ```bash
-docker compose up
+podman compose up
 ```
 
 Data terbentuk sendiri: enam karyawan, satu akun direktori simulasi untuk
@@ -165,7 +166,7 @@ masing-masing, dan login lewat akun Active Directory simulasi
 karena portal ini memang hanya untuk Human Capital.
 
 **Membawa data yang sudah ada** — matikan dulu portal di komputer lama
-(`docker compose down`) supaya tidak ada yang sedang menulis, salin folder
+(`podman compose down`) supaya tidak ada yang sedang menulis, salin folder
 `data/` apa adanya, lalu jalankan perintah yang sama. Berkas `*.tmp` dan
 `*.bak-*` di dalamnya sisa lama dan tidak perlu ikut. Jangan menyalakan
 keduanya bersamaan: dua penjadwal outbox pada data yang sama berarti satu email
@@ -173,15 +174,15 @@ persetujuan terkirim dua kali.
 
 **Folder per karyawan baru mengikuti konfigurasi, bukan nama komputer.** Setiap
 akun yang selesai dibuat mendapat satu folder berisi ringkasan data yang
-disetujui, di bawah `USER_FOLDER_ROOT`. Lewat Docker itu sudah diatur:
-`docker-compose.yml` memetakan folder **di atas** proyek, jadi di komputer mana
+disetujui, di bawah `USER_FOLDER_ROOT`. Lewat Podman itu sudah diatur:
+`compose.yaml` memetakan folder **di atas** proyek, jadi di komputer mana
 pun foldernya muncul di sebelah folder proyek tanpa mengubah apa-apa. Tanpa
-Docker, isi `USER_FOLDER_ROOT` di `.env.local` dengan path Windows biasa.
+container, isi `USER_FOLDER_ROOT` di `.env.local` dengan path Windows biasa.
 Dibiarkan kosong, fiturnya mati dan tidak ada yang dicatat.
 
-`.env.docker` **opsional**. Tanpa berkas itu email ditulis sebagai berkas ke
+`.env.podman` **opsional**. Tanpa berkas itu email ditulis sebagai berkas ke
 `data/outbox-mail/` dan tidak ada yang keluar dari mesin — cukup untuk
-mendemokan seluruh alur. Untuk mengirim email sungguhan, salin `.env.docker`
+mendemokan seluruh alur. Untuk mengirim email sungguhan, isi `.env.podman`
 lewat jalur pribadi: di dalamnya ada App Password, dan repositori bukan tempat
 untuk itu. Bila portal dibuka dari perangkat lain lewat alamat IP, sesuaikan
 `APP_BASE_URL` — setiap tautan persetujuan di email dibangun dari nilai itu.
@@ -200,8 +201,8 @@ Image produksi adalah artefak berbeda dengan masukan berbeda: domain controller
 sungguhan, mailbox sungguhan, kunci enkripsi yang dibangkitkan, dan proxy yang
 menerminasi TLS. Bukan berkas ini dengan satu flag dibalik.
 
-`.dockerignore` adalah keamanan, bukan kerapian, dan merupakan berkas yang tidak
-boleh ditinggalkan saat Dockerfile dibagikan. Apa pun yang tersalin ke sebuah
+`.containerignore` adalah keamanan, bukan kerapian, dan merupakan berkas yang
+mencegah rahasia masuk ke image. Apa pun yang tersalin ke sebuah
 layer menetap di sana dan terbaca siapa pun yang bisa menarik image — sekalipun
 layer berikutnya menghapusnya. `.env*` memuat App Password yang hidup, dan
 `data/` memuat hash id sesi, payload outbox tersegel, serta tabel token
@@ -228,7 +229,7 @@ Container dan `npm run dev` **tidak boleh jalan bersamaan**. Keduanya menulis
 tidak bisa menengahi dua proses — dan dua penjadwal outbox yang menyapu antrean
 yang sama berarti satu email persetujuan bisa terkirim dua kali.
 
-**Portal hanya menerima koneksi dari komputernya sendiri.** `docker-compose.yml`
+**Portal hanya menerima koneksi dari komputernya sendiri.** `compose.yaml`
 mempublikasikan port ke `127.0.0.1:3000`, bukan ke `0.0.0.0`. Alasannya bukan
 kerapian: aplikasi ini berjalan dalam mode development, tanpa TLS, dengan
 direktori simulasi dan akun demo yang kata sandinya tertulis di README ini —
@@ -562,7 +563,7 @@ Keamanannya bukan opsi yang bisa dimatikan:
 #### Menjalankan di Windows Server internal
 
 Production dijalankan langsung dengan Node.js 22 sebagai **satu instance**,
-bukan Docker Desktop. Salin `.env.onprem.example` menjadi `.env.production`,
+bukan container. Salin `.env.onprem.example` menjadi `.env.production`,
 lengkapi hanya dengan nilai yang sudah dikonfirmasi tim AD/infrastruktur, dan
 batasi ACL berkas itu ke akun service serta administrator. Jangan masukkan
 rahasia ke Git. Untuk awal, biarkan `AD_LDAP_WRITE_ENABLED=false`.
@@ -586,7 +587,7 @@ masukkan hanya OU uji dan OU karantina uji ke `AD_MANAGED_OUS`, lalu arahkan
 semua email ke alamat penguji lewat `EMAIL_REDIRECT_TO`.
 
 Kedua perintah start mengikat Next ke `127.0.0.1`; di Windows Server IIS ARR
-menjadi satu-satunya pintu HTTPS. Di PC kantor Docker Compose juga menerbitkan
+menjadi satu-satunya pintu HTTPS. Di PC kantor Podman Compose juga menerbitkan
 port hanya ke loopback.
 
 Jalankan `npm run start` sebagai Windows Service dengan akun lokal non-admin,
@@ -600,7 +601,7 @@ berkas JSON lokal.
 
 Ikuti gerbang bertahap; jangan membuka penulisan AD sebelum pilot disetujui:
 
-1. **Demo awal:** di PC kantor, jalankan `docker compose up` dengan konfigurasi
+1. **Demo awal:** di PC kantor, jalankan `podman compose up` dengan konfigurasi
    simulasi. Pastikan portal dan alur approval demo jalan.
 2. **Uji baca:** salin nilai dari `.env.pilot.example` ke `.env.local`, isi DC,
    CA, akun layanan, serta group peran yang telah disediakan tim AD. Biarkan
@@ -634,8 +635,8 @@ yang tidak bisa ditemukan tes unit mana pun (lihat catatan `<GUID=...>` di
 [ldapFilter.ts](src/lib/ad/ldapFilter.ts)).
 
 ```bash
-docker network create hc-ad-demo
-docker run -d --name samba-ad --hostname dc1 --privileged \
+podman network create hc-ad-demo
+podman run -d --name samba-ad --hostname dc1 --privileged \
   --network hc-ad-demo --network-alias dc1.corp.example.com \
   -e REALM=CORP.EXAMPLE.COM -e DOMAIN=CORP \
   -e ADMIN_PASS='<kata-sandi-administrator>' -e DNS_FORWARDER=8.8.8.8 \
@@ -647,9 +648,9 @@ membaca nama interface (`eth0@ifNN`), sehingga Samba hanya mendengar di
 loopback. Perbaiki lalu mulai ulang:
 
 ```bash
-docker exec samba-ad sed -i 's/interfaces = lo eth0@if[0-9]*/interfaces = lo eth0/' \
+podman exec samba-ad sed -i 's/interfaces = lo eth0@if[0-9]*/interfaces = lo eth0/' \
   /usr/local/samba/etc/smb.conf
-docker restart samba-ad
+podman restart samba-ad
 ```
 
 Lalu buat OU dan group yang sama dengan katalog akses (`OU=Karyawan`,
@@ -662,7 +663,7 @@ yang sedang ditunjukkan oleh `AD_MANAGED_OUS`.
 Sertifikat CA-nya diambil dari direktorinya sendiri:
 
 ```bash
-docker cp samba-ad:/usr/local/samba/private/tls/ca.pem ./ca.pem
+podman cp samba-ad:/usr/local/samba/private/tls/ca.pem ./ca.pem
 ```
 
 Nama host harus cocok dengan sertifikat (`dc1.corp.example.com`) — itulah guna
@@ -831,9 +832,9 @@ dan tidak mengirim `Origin`. Pencocokannya berhenti di batas segmen —
 
 **Asal "diri sendiri" dibaca dari header `Host`**, bukan dari alamat yang dikira
 Next.js. Next selalu menganggap dirinya `localhost` (atau `0.0.0.0` di bawah
-`next dev -H 0.0.0.0` di Docker), apa pun alamat di browser — sehingga dulu setiap
+`next dev -H 0.0.0.0` di container), apa pun alamat di browser — sehingga dulu setiap
 form yang dikirim dari `127.0.0.1`, dari IP jaringan, atau dari container ditolak
-"berasal dari asal yang tidak dikenal", dan di Docker **semuanya** ditolak.
+"berasal dari asal yang tidak dikenal", dan di dalam container **semuanya** ditolak.
 Membaca `Host` tetap aman: request palsu dari situs lain dikirim browser dengan
 `Host` situs ini dan `Origin` situs penyerang, jadi tetap tidak cocok. Yang juga
 diterima: `APP_BASE_URL`, dan `X-Forwarded-Proto` dari proxy HTTPS (hanya
@@ -931,5 +932,5 @@ NEXT_DIST_DIR=.next-build npm run build   # dev server di .next tetap aman
 Pemeriksaan di atas dijalankan `.github/workflows/ci.yml` — **pada push ke
 `main` dan pada setiap pull request**, bukan pada setiap push. Push ke branch
 biasa tidak memicunya; bukalah pull request bila ingin diperiksa sebelum
-digabung. Urutannya: `npm ci`, typecheck, lint, test, build Next, lalu build
-image Docker.
+digabung. urutannya: `npm ci`, typecheck, lint, test, build Next, lalu build image
+dengan Podman.

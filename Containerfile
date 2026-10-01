@@ -1,4 +1,4 @@
-# The portal, as a container you can hand to somebody.
+# The portal container image, built by Podman from this Containerfile.
 #
 # ---------------------------------------------------------------------------
 # Why this runs in DEVELOPMENT mode, deliberately
@@ -51,7 +51,7 @@ COPY package.json package-lock.json ./
 # `next dev` needs TypeScript, Tailwind and the PostCSS pipeline at run time.
 RUN npm ci
 
-# Then the source. node_modules, data/ and .env* are excluded by .dockerignore;
+# Then the source. node_modules, data/ and .env* are excluded by .containerignore;
 # the first would import Windows binaries, and the other two would bake a live
 # App Password and a table of approval tokens into a layer that survives any
 # later deletion.

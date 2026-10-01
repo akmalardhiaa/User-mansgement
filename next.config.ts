@@ -86,7 +86,7 @@ const nextConfig: NextConfig = isStaticExport
       /*
        * The floating development badge, off.
        *
-       * This container runs `next dev` deliberately (see the Dockerfile), and
+       * This container runs `next dev` deliberately (see the Containerfile), and
        * that badge was the only thing saying so on screen — a "Rendering…"
        * pill and an N button in the corner of every page, including during a
        * demo. Next still surfaces compile and runtime errors with this off, so

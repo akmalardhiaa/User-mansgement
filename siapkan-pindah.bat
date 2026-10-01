@@ -9,7 +9,7 @@ REM  Yang ikut: kode, node_modules, data, dan berkas .env.
 REM  Yang tidak: .next (cache build, 700+ MB, dibuat ulang sendiri) dan .git.
 REM
 REM  Kenapa node_modules ikut: di komputer yang jaringannya memblokir npm,
-REM  itulah satu-satunya cara portal bisa jalan tanpa Docker dan tanpa admin.
+REM  itulah satu-satunya cara portal bisa jalan tanpa Podman dan tanpa admin.
 REM
 REM  Dua hal di bawah ini ada karena pernah salah, bukan karena kehati-hatian:
 REM
@@ -45,13 +45,13 @@ echo  ==========================================================
 echo.
 
 REM Portal yang sedang menulis ke data\ bisa menghasilkan salinan setengah
-REM jadi. Dimatikan dulu bila Docker ada; kalau tidak ada, dilewati.
-where docker >nul 2>&1
+REM jadi. Dimatikan dulu bila Podman ada; kalau tidak ada, dilewati.
+where podman >nul 2>&1
 if %errorlevel%==0 (
   echo  [1/4] Menghentikan portal supaya tidak ada yang sedang menulis...
-  docker compose down >nul 2>&1
+  podman compose down >nul 2>&1
 ) else (
-  echo  [1/4] Docker tidak ada di komputer ini, dilewati.
+  echo  [1/4] Podman tidak ada di komputer ini, dilewati.
   echo        Pastikan portal tidak sedang berjalan sebelum lanjut.
 )
 
@@ -74,7 +74,7 @@ if not exist "%TUJUAN%\data\hc-store.json"      set "KURANG=%KURANG% data\hc-sto
 if not exist "%TUJUAN%\data\mock-ad.json"       set "KURANG=%KURANG% data\mock-ad.json"
 if not exist "%TUJUAN%\jalankan.bat"            set "KURANG=%KURANG% jalankan.bat"
 if not exist "%TUJUAN%\.env.development"        set "KURANG=%KURANG% .env.development"
-if not exist "%TUJUAN%\docker-compose.yml"      set "KURANG=%KURANG% docker-compose.yml"
+if not exist "%TUJUAN%\compose.yaml"            set "KURANG=%KURANG% compose.yaml"
 
 if not "%KURANG%"=="" (
   echo.
@@ -101,11 +101,11 @@ if not "%ASAL%"=="%SALIN%" (
 echo        Lengkap.
 
 echo  [4/4] Memeriksa berkas rahasia...
-if exist "%TUJUAN%\.env.docker" (
-  echo        .env.docker ikut tersalin. Di dalamnya ada App Password Gmail -
+if exist "%TUJUAN%\.env.podman" (
+  echo        .env.podman ikut tersalin. Di dalamnya ada App Password Gmail -
   echo        jangan pernah kirim lewat chat atau unggah ke repositori.
 ) else (
-  echo        .env.docker tidak ada. Tanpa berkas itu email ditulis sebagai
+  echo        .env.podman tidak ada. Tanpa berkas itu email ditulis sebagai
   echo        berkas ke data\outbox-mail\ dan seluruh alur tetap bisa didemokan.
 )
 
@@ -114,8 +114,8 @@ echo  ==========================================================
 echo   Selesai. Di komputer tujuan:
 echo  ==========================================================
 echo.
-echo   Ada Docker berlisensi  ^>  docker compose up
-echo   Tidak ada              ^>  klik dua kali jalankan.bat
+echo   Dengan Podman          ^>  podman compose up
+echo   Tanpa container        ^>  klik dua kali jalankan.bat
 echo.
 echo   Node.js belum ada dan tidak punya hak admin? Unduh Node 22 versi
 echo   .zip dari nodejs.org, ekstrak jadi folder "node" di sebelah

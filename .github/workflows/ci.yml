@@ -54,26 +54,12 @@ jobs:
           AD_DRIVER: mock
           EMAIL_DRIVER: file
 
-      # The image is not published anywhere; this only proves it still builds.
-      # Without it the Dockerfile is guarded by nothing — a dependency that
-      # stops installing under Linux, or a file the .dockerignore now excludes,
-      # would be discovered by whoever next tried to run the container rather
-      # than by the gate.
-      #
-      # `load: false` keeps the result in the build cache instead of importing
-      # it into the runner's daemon: nothing here runs the image, and the import
-      # is pure cost.
-      #
-      # Buildx first, and it is not optional: the runner's default docker driver
-      # cannot export a cache, so `cache-to: type=gha` below fails outright
-      # without a builder that supports it.
-      - uses: docker/setup-buildx-action@v3
+      # The image is not published anywhere; this only proves the Podman
+      # Containerfile and build context still work on Linux.
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes podman
 
-      - name: Docker image builds
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: false
-          load: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build container image with Podman
+        run: podman build --tag hc-user-management:ci .

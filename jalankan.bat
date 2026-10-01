@@ -1,9 +1,8 @@
 @echo off
 REM ---------------------------------------------------------------------------
-REM  Menjalankan portal tanpa Docker. Klik dua kali berkas ini.
+REM  Menjalankan portal tanpa container. Klik dua kali berkas ini.
 REM
-REM  Docker Desktop berbayar untuk perusahaan besar, dan aplikasi ini tidak
-REM  membutuhkannya: isinya aplikasi Next.js biasa yang jalan di atas Node.js.
+REM  Portal ini aplikasi Next.js biasa yang berjalan di atas Node.js.
 REM
 REM  Node.js dicari di dua tempat, sehingga komputer tanpa hak admin pun bisa:
 REM    1. folder "node" di sebelah berkas ini (unduh Node versi .zip dari
