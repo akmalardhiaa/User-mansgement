@@ -56,8 +56,15 @@ services:
     # Secrets arrive at run time, never in a layer: .containerignore keeps .env*
     # out of the build context entirely, so this is the only way in.
     env_file:
-      - path: .env.podman.example
+      # The same demo defaults `npm run dev` uses. The container runs
+      # `next dev`, which reads that file itself — a separate
+      # .env.podman.example existed for a while and not one of its keys
+      # differed from this one.
+      - path: .env.development
         required: true
+      # Real secrets — SMTP, the outbox key — go here, read second so every
+      # value in it wins. This is the only way in: .containerignore keeps
+      # .env* out of the build context entirely.
       - path: .env.podman
         required: false
 

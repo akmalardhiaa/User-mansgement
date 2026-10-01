@@ -83,7 +83,7 @@ npm run dev
 
 Lalu buka `http://localhost:3000`. Hasilnya identik dengan container, karena
 `.env.development` — ikut di-commit, tanpa rahasia — memuat bawaan yang sama
-dengan `.env.podman.example`, dan `.env.local` Anda tetap menimpanya.
+dengan `.env.development`, dan `.env.local` Anda tetap menimpanya.
 
 **Bila komputernya tidak boleh memasang apa pun,** unduh Node.js versi
 *Windows Binary (.zip)* dari nodejs.org, ekstrak ke folder `node` di dalam
@@ -94,7 +94,8 @@ tersebut tanpa pemasangan dan tanpa hak admin.
 dari komputer yang sudah menjalankan `npm install`. Salinan antar-Windows
 kompatibel, dan `npm install` lalu tidak diperlukan sama sekali.
 
-Untuk mode container, gunakan Podman Desktop dan Podman Compose.
+Untuk mode container, yang dipasang hanya Podman CLI — tidak ada aplikasi
+desktop seperti Docker Desktop, dan tidak ada lisensi.
 
 ## Menjalankan dengan Podman
 
@@ -105,19 +106,19 @@ podman compose up
 Lalu buka `http://localhost:3000`. Satu perintah itu memang seluruh ceritanya,
 dan dua hal menjaganya tetap begitu.
 
-Pasang Podman Desktop, mulai Podman machine, lalu pastikan provider Compose
-tersedia dengan `podman compose version`. Jalankan perintah dari folder proyek.
-Image dibangun dari `Containerfile`, dengan konfigurasi di `compose.yaml`.
+Pasang Podman sekali dengan `winget install -e --id RedHat.Podman` — itu CLI
+saja, bukan aplikasi desktop. Mesin Podman dan `podman-compose` dibuat sendiri
+oleh **`jalankan-podman.bat`**, jadi untuk pemakaian sehari-hari klik dua kali
+berkas itu dan lewati perintah di atas. Image dibangun dari `Containerfile`,
+dengan konfigurasi di `compose.yaml`. Urutan lengkapnya ada di MENJALANKAN.md.
 
 **Konfigurasi bertumpuk dua lapis.** `env_file` membaca
-`.env.podman.example` — yang ikut di-commit, berisi bawaan demo, tanpa rahasia —
+`.env.development` — yang ikut di-commit, berisi bawaan demo, tanpa rahasia —
 lalu `.env.podman` yang **opsional** dan menimpa nilai apa pun yang diisinya.
 Hasilnya: hasil `git clone` yang belum punya `.env.podman` tetap menyala dengan
 direktori simulasi dan email ditulis ke berkas, sedangkan mesin yang sudah
-mengisi SMTP tetap memakai SMTP. Jika sebelumnya sudah memakai `.env.docker`,
-isinya telah disalin ke `.env.podman`; berkas lama tetap ada tetapi tidak lagi
-digunakan. Untuk salinan baru, jalankan
-`Copy-Item .env.podman.example .env.podman`, lalu isi placeholder rahasia di
+mengisi SMTP tetap memakai SMTP. Untuk salinan baru, jalankan
+`Copy-Item .env.development .env.podman`, lalu isi placeholder rahasia di
 dalamnya.
 
 **Kode di-mount, jadi mengubah berkas tidak perlu `--build`.** Yang tidak
@@ -151,8 +152,9 @@ kegagalan — dan memulihkannya diam-diam adalah kejutan tersendiri.
 Dua jalur, dan keduanya tidak butuh langkah seeding apa pun. Tanpa container:
 salin folder proyek beserta `node_modules`, lalu `jalankan.bat` — lihat
 **Menjalankan tanpa container** di atas, yang juga jalan tanpa hak admin dan
-tanpa koneksi. Dengan Podman, yang perlu dipasang hanya **Podman Desktop** dan
-Compose provider; Node.js tidak perlu dipasang di host.
+tanpa koneksi. Dengan Podman, yang perlu dipasang hanya **Podman CLI**
+(`winget install -e --id RedHat.Podman`); mesin dan Compose disiapkan oleh
+`jalankan-podman.bat`, dan Node.js tidak perlu dipasang di host.
 
 **Mulai bersih** — salin repositori ini (tanpa `node_modules` dan `.next`), lalu:
 
@@ -579,7 +581,7 @@ npm run start
 Setelah pemeriksaan read-only lolos, uji lifecycle di OU pilot dengan email
 approval dialihkan ke penguji; baru setelah bukti uji diterima, aktifkan
 `AD_LDAP_WRITE_ENABLED=true` dan gunakan OU production yang didelegasikan.
-PC pilot memakai `.env.pilot.example`: `AD_LDAP_WRITE_ENABLED=false` dan
+PC pilot memakai `.env.onprem.example`: `AD_LDAP_WRITE_ENABLED=false` dan
 `AD_MANAGED_OUS` kosong pada tahap read-only. Isi akun layanan dan passwordnya
 hanya di `.env.local` yang diabaikan Git. `ad:check` meminta password tanpa
 menampilkannya atau menaruhnya di argumen proses. Untuk tahap tulis pilot,
@@ -603,7 +605,7 @@ Ikuti gerbang bertahap; jangan membuka penulisan AD sebelum pilot disetujui:
 
 1. **Demo awal:** di PC kantor, jalankan `podman compose up` dengan konfigurasi
    simulasi. Pastikan portal dan alur approval demo jalan.
-2. **Uji baca:** salin nilai dari `.env.pilot.example` ke `.env.local`, isi DC,
+2. **Uji baca:** salin nilai dari `.env.onprem.example` ke `.env.local`, isi DC,
    CA, akun layanan, serta group peran yang telah disediakan tim AD. Biarkan
    `AD_LDAP_WRITE_ENABLED=false` dan `AD_MANAGED_OUS` kosong. Jalankan
    `npm run ad:check -- <akun-pengguna>` dan
