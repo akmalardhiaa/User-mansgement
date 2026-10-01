@@ -1,6 +1,6 @@
-# One command to run the portal:
+# One command to run the portal with Podman:
 #
-#   docker compose up
+#   podman compose up
 #
 # Then open http://localhost:3000 and sign in as ayu.prameswari / mock12345.
 #
@@ -8,19 +8,21 @@
 # keep it true. The source is mounted, so editing a file does not need a rebuild
 # — `next dev` inside the container reads the same files you edit. And the
 # configuration has a committed layer of demo defaults underneath the local one,
-# so a fresh clone with no .env.docker still starts.
+# so a fresh clone with no .env.podman still starts.
 #
 # The exception is dependencies and the build configuration: a changed
 # package.json, lockfile, next.config.ts or tsconfig.json needs
 #
-#   docker compose up --build
+#   podman compose up --build
 #
 # because those are installed or baked into the image, not mounted.
 
 services:
   portal:
-    build: .
-    # Named so `docker compose logs portal` and `docker compose exec portal sh`
+    build:
+      context: .
+      dockerfile: Containerfile
+    # Named so `podman compose logs portal` and `podman compose exec portal sh`
     # read the same way whatever the directory is called.
     container_name: hc-portal
 
@@ -46,20 +48,20 @@ services:
 
     # Two layers, and the order is the point. The example file is committed and
     # holds the demo defaults — mock directory, email written to files, nothing
-    # secret — so `docker compose up` works on a machine that has just cloned
-    # this and has no .env.docker yet. The local file is read second, so every
+    # secret — so `podman compose up` works on a machine that has just cloned
+    # this and has no .env.podman yet. The local file is read second, so every
     # value it sets wins, and it is the only place the SMTP password lives.
     #
-    # Secrets arrive at run time, never in a layer: .dockerignore keeps .env*
+    # Secrets arrive at run time, never in a layer: .containerignore keeps .env*
     # out of the build context entirely, so this is the only way in.
     env_file:
-      - path: .env.docker.example
+      - path: .env.podman.example
         required: true
-      - path: .env.docker
+      - path: .env.podman
         required: false
 
     # Where the per-employee folders are made, as the CONTAINER sees it. It
-    # belongs here rather than in .env.docker because it only means anything
+    # belongs here rather than in .env.podman because it only means anything
     # together with the mount below: the two have to agree, so they sit
     # together. Remove both lines to switch the feature off.
     environment:
@@ -93,13 +95,13 @@ services:
 
       # The state the portal actually owns: the employee roster, server-side
       # sessions, the simulated directory, and the file-driver outbox. Bound to
-      # the host so it survives `docker compose down` — and so the accounts
+      # the host so it survives `podman compose down` — and so the accounts
       # already seeded by `npm run mock-ad:roles` are the ones the container
       # sees, rather than an empty directory nobody can log in to.
       - ./data:/app/data
 
     # A crashed container comes back; a stopped one stays stopped. `always`
-    # would restart it after an explicit `docker compose stop`, which is rarely
+    # would restart it after an explicit `podman compose stop`, which is rarely
     # what anybody means.
     restart: unless-stopped
 
