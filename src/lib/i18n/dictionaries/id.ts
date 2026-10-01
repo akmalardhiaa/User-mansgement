@@ -453,11 +453,7 @@ export const id = {
     description:
       "Setiap perubahan disetujui manager lalu CISO lewat email sebelum berlaku.",
 
-    searchEmployee: "Cari karyawan",
-    searchPlaceholder: "Nama, email, departemen…",
-    noMatch: "Tidak ada yang cocok.",
-    showAll: "Tampilkan seluruh karyawan ({count})",
-    showFewer: "Tampilkan lebih sedikit",
+    inFlight: "dalam pengajuan",
     submitProfile: "Ajukan perubahan profil",
     submitMovement: "Ajukan pindah divisi",
     submitTermination: "Ajukan penonaktifan",
