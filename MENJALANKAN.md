@@ -198,6 +198,73 @@ mengisinya, lalu langkah itu diulang dari titik yang sama.
 
 ---
 
+---
+
+## Bagian 3 — Di server, mode production
+
+Bagian 1 menjalankan mode demo (`next dev`). Untuk server internal, modenya
+berbeda dan berkasnya memang dipisah:
+
+```bash
+podman-compose -f compose.prod.yaml up -d --build
+```
+
+Di server Linux, perintahnya sama dengan `docker compose` — **Docker Engine CE
+itu gratis**; yang berbayar untuk perusahaan besar hanya Docker *Desktop*.
+
+Bedanya dengan mode demo bukan sekadar optimasi:
+
+| | demo | production |
+|---|---|---|
+| Perintah | `next dev` | `next build` + `next start` |
+| Direktori | simulasi | AD sungguhan — mock **ditolak** |
+| Email | ditulis ke berkas | SMTP — `file` **ditolak** |
+| Login | daftar demo boleh | tanpa `LDAP_URL` **melempar error** |
+| Cookie sesi | biasa | `secure` — **butuh TLS di depannya** |
+| Pengguna di container | root | `node`, tanpa source & toolchain |
+
+**TLS tidak ada di dalam compose itu, dan itu bukan kelupaan.** Cookie sesi
+membawa `secure`, jadi browser tidak akan mengirimnya balik lewat http dan
+tidak ada yang bisa tetap login. Terminasi TLS di depannya — IIS, nginx, apa
+pun yang sudah dipakai perusahaan — lalu arahkan `APP_BASE_URL` ke alamat
+https-nya, karena setiap tautan persetujuan di email dibangun dari nilai itu.
+
+**Jangan di-scale lebih dari satu instance.** Kunci klaim job itu per-proses;
+dua instance pada data yang sama berarti dua worker sama-sama merasa memegang
+satu job yang sama.
+
+### Kalau servernya Windows Server
+
+Pertimbangkan **tanpa container sama sekali**. Aplikasi ini satu proses Node:
+`npm run build` lalu `npm start`, dijadikan Windows Service. Tidak ada runtime
+container yang perlu dilisensi, dipelihara, atau dijelaskan ke tim infra.
+
+### Mendirikan AD uji coba sendiri
+
+Seluruh jalur on-premise di Bagian 2 sudah dibuktikan ke domain controller
+sungguhan — Samba AD DC, berjalan di bawah Podman, bukan simulasi:
+
+```
+✓ bind akun layanan berhasil
+✓ objectGUID terbaca sebagai biner
+✓ objek berada di dalam AD_MANAGED_OUS
+✓ anggota group bisa dimintai persetujuan
+```
+
+lalu siklus penuhnya dengan sakelar tulis dinyalakan — buat akun, isi atribut,
+beri group, aktifkan, pindah ke karantina, nonaktifkan: **11 dari 11 lolos**,
+dan hasilnya diperiksa langsung ke direktorinya, bukan lewat aplikasi.
+
+Hak akun layanannya **didelegasikan ke OU tertentu saja** lewat
+`samba-tool dsacl set`, bukan dengan memasukkannya ke Domain Admins — itu
+justru yang sedang ditunjukkan oleh `AD_MANAGED_OUS`.
+
+Untuk mendirikan ulang, jalankan `src/lib/ad/ldapLive.test.ts` dengan
+`AD_LIVE_TEST=true` setelah `.env`-nya diarahkan ke DC itu. Tes itu **mati
+secara default** dan tidak ikut `npm test`.
+
+---
+
 ## Yang belum ada
 
 **Worker terpisah.** Sekarang worker berjalan di dalam proses portal yang sama.

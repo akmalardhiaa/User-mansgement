@@ -22,6 +22,7 @@ services:
     build:
       context: .
       dockerfile: Containerfile
+      target: dev
     # Named so `podman compose logs portal` and `podman compose exec portal sh`
     # read the same way whatever the directory is called.
     container_name: hc-portal
