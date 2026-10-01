@@ -28,6 +28,17 @@ describe("reading the driver configuration", () => {
     expect(readLdapAdConfig({ ...COMPLETE, AD_LDAP_WRITE_ENABLED: "true" }).writeEnabled).toBe(true);
   });
 
+  it("allows an empty OU allow-list during read-only validation", () => {
+    expect(readLdapAdConfig({ ...COMPLETE, AD_MANAGED_OUS: "" }).managedOus).toEqual([]);
+    expect(() =>
+      readLdapAdConfig({
+        ...COMPLETE,
+        AD_MANAGED_OUS: "",
+        AD_LDAP_WRITE_ENABLED: "true",
+      }),
+    ).toThrowError(/AD_MANAGED_OUS/);
+  });
+
   it("keeps nested group resolution off by default", () => {
     expect(readLdapAdConfig(COMPLETE).nestedGroups).toBe(false);
     expect(readLdapAdConfig({ ...COMPLETE, LDAP_NESTED_GROUPS: "true" }).nestedGroups).toBe(true);
@@ -51,7 +62,10 @@ describe("a configuration that is not finished", () => {
   it("names every missing variable in one message", () => {
     let message = "";
     try {
-      readLdapAdConfig({ AD_LDAP_URL: "ldaps://dc.corp.example.com" });
+      readLdapAdConfig({
+        AD_LDAP_URL: "ldaps://dc.corp.example.com",
+        AD_LDAP_WRITE_ENABLED: "true",
+      });
     } catch (error) {
       message = error instanceof Error ? error.message : String(error);
     }
@@ -64,10 +78,14 @@ describe("a configuration that is not finished", () => {
     expect(message).toContain("AD_BASE_DN");
   });
 
-  it("refuses an empty allow-list rather than treating it as everything", () => {
-    expect(() => readLdapAdConfig({ ...COMPLETE, AD_MANAGED_OUS: "  ;  " })).toThrowError(
-      AdConfigurationError,
-    );
+  it("refuses an empty allow-list when writing is enabled", () => {
+    expect(() =>
+      readLdapAdConfig({
+        ...COMPLETE,
+        AD_MANAGED_OUS: "  ;  ",
+        AD_LDAP_WRITE_ENABLED: "true",
+      }),
+    ).toThrowError(AdConfigurationError);
   });
 });
 

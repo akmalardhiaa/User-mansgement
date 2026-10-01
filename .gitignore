@@ -37,6 +37,8 @@ yarn-error.log*
 # to be named too — without this line .env.docker.example is ignored like a real
 # secrets file, and the template nobody can commit helps nobody.
 !.env.docker.example
+!.env.onprem.example
+!.env.pilot.example
 # The demo defaults for `npm run dev`. Holds no secrets — placeholders and a
 # simulated directory — and is committed so a fresh clone runs without Docker.
 !.env.development

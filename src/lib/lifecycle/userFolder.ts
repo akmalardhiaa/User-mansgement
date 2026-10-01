@@ -101,8 +101,7 @@ export function employeeSummary(employee: NewEmployeeDetails, now = new Date()):
     ["Jabatan", employee.jobTitle],
     ["Status", `${employee.employmentType} (${employmentCodeRange(employee.employmentType)})`],
     ["Manager", employee.managerName],
-    ["Mulai bekerja", employee.startDate?.slice(0, 10)],
-    ["Berakhir", employee.expiredDate?.slice(0, 10)],
+    ["Tanggal terakhir bekerja", employee.expiredDate?.slice(0, 10)],
   ];
 
   const width = Math.max(...rows.map(([label]) => label.length));

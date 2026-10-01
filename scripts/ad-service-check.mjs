@@ -37,6 +37,7 @@ const managedOus = (process.env.AD_MANAGED_OUS ?? "")
   .map((entry) => entry.trim())
   .filter(Boolean);
 const group = (groupArgument ?? process.env.CISO_APPROVER_GROUP ?? "").trim();
+const writeEnabled = (process.env.AD_LDAP_WRITE_ENABLED ?? "").trim().toLowerCase() === "true";
 
 function bail(message) {
   console.error(`\n  ${message}\n`);
@@ -51,13 +52,21 @@ const missing = [
   [bindDn, "AD_BIND_DN"],
   [bindPassword, "AD_BIND_PASSWORD"],
   [caPath, "LDAP_CA_CERT_PATH"],
-  [managedOus.length ? "ada" : "", "AD_MANAGED_OUS"],
+  [!writeEnabled || managedOus.length ? "ada" : "", "AD_MANAGED_OUS (wajib saat penulisan diaktifkan)"],
 ]
   .filter(([value]) => !value)
   .map(([, name]) => name);
 
 if (missing.length > 0) bail(`Belum diisi di .env.local: ${missing.join(", ")}`);
-if (!url.startsWith("ldaps://")) bail(`Driver AD hanya menerima ldaps:// (diberi "${url}").`);
+let parsedUrl;
+try {
+  parsedUrl = new URL(url);
+} catch {
+  bail("AD_LDAP_URL/LDAP_URL bukan URL yang sah.");
+}
+if (parsedUrl.protocol !== "ldaps:" || (parsedUrl.port && parsedUrl.port !== "636")) {
+  bail(`Driver AD hanya menerima ldaps:// port 636 (diberi "${url}").`);
+}
 
 function escapeFilterValue(value) {
   return value.replace(/[\\*()\0]/g, (char) => `\\${char.charCodeAt(0).toString(16).padStart(2, "0")}`);
@@ -165,7 +174,11 @@ try {
     console.info(`     divisi       ${one(entry.department)} · ${one(entry.title)}`);
     console.info(`     manager      ${one(entry.manager) || "—"}`);
     check("userAccountControl terbaca", !Number.isNaN(uac), `${uac} (aktif: ${(uac & 0x2) === 0})`);
-    check("objek berada di dalam AD_MANAGED_OUS", insideManagedOu(dn), dn);
+    if (managedOus.length) {
+      check("objek berada di dalam AD_MANAGED_OUS", insideManagedOu(dn), dn);
+    } else {
+      console.info("     OU kelola     belum diizinkan (read-only; AD_MANAGED_OUS kosong)");
+    }
     console.info(`     memberOf     ${many(entry.memberOf).length} group`);
   }
 
@@ -202,7 +215,7 @@ try {
 
   console.info(
     `\n  Penulisan ke AD: ${
-      (process.env.AD_LDAP_WRITE_ENABLED ?? "").trim().toLowerCase() === "true"
+      writeEnabled
         ? "AKTIF (AD_LDAP_WRITE_ENABLED=true)"
         : "mati — driver hanya membaca"
     }`,

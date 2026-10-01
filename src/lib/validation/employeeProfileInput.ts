@@ -53,9 +53,9 @@ export function parseEmployeeProfileInput(payload: unknown, now = new Date()): P
     // A contract without an end date is the case this form exists to catch:
     // the record then looks permanent to everyone reading it later.
     if (!expiredDate) {
-      errors.expiredDate = "Tanggal berakhir kontrak wajib diisi untuk karyawan kontrak.";
+      errors.expiredDate = "Tanggal terakhir bekerja wajib diisi untuk karyawan kontrak.";
     } else {
-      const check = checkDate(expiredDate, "Tanggal berakhir kontrak", DATE_BOUNDS.contractEnd, now);
+      const check = checkDate(expiredDate, "Tanggal terakhir bekerja", DATE_BOUNDS.contractEnd, now);
       if (!check.ok) errors.expiredDate = check.message;
     }
   }

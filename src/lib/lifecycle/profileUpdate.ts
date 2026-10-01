@@ -34,7 +34,7 @@ export const PROFILE_FIELD_LABEL: Record<ProfileField, string> = {
   jobTitle: "Jabatan",
   jobDescription: "Keterangan jabatan",
   employmentType: "Status kepegawaian",
-  expiredDate: "Tanggal berakhir",
+  expiredDate: "Tanggal terakhir bekerja",
   locationType: "Lokasi penempatan",
   branchName: "Nama cabang",
   description: "Catatan HC",

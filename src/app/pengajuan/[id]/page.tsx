@@ -256,10 +256,6 @@ export default async function RequestDetailPage({
               {[
                 [t.detail.number, request.id],
                 [t.detail.versionLabel, String(request.version)],
-                [
-                  t.detail.effectiveAt,
-                  request.effectiveAt ? formatDate(request.effectiveAt) : t.detail.immediately,
-                ],
                 [t.detail.policy, request.policyVersion],
                 ...(request.closedReason ? [[t.detail.closedReason, request.closedReason]] : []),
               ].map(([label, value]) => (

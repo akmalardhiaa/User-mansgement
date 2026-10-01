@@ -65,29 +65,29 @@ describe("the summary", () => {
   it("writes what was approved, with the company's digit range", () => {
     const text = employeeSummary(NADIA, NOW);
 
-    expect(text).toContain("Nama          : Nadia Kusuma");
+    expect(text).toMatch(/^Nama\s+: Nadia Kusuma$/m);
     // The login name is the thing HC looks this file up for.
-    expect(text).toContain("User ID       : nadiakusuma1");
-    expect(text).toContain("Email         : nadiakusuma1@mandirisekuritas.co.id");
-    expect(text).toContain("Status        : PERMANENT (1-2)");
-    expect(text).toContain("Manager       : Bagus Nugroho");
-    expect(text).toContain("Mulai bekerja : 2026-10-01");
+    expect(text).toMatch(/^User ID\s+: nadiakusuma1$/m);
+    expect(text).toMatch(/^Email\s+: nadiakusuma1@mandirisekuritas\.co\.id$/m);
+    expect(text).toMatch(/^Status\s+: PERMANENT \(1-2\)$/m);
+    expect(text).toMatch(/^Manager\s+: Bagus Nugroho$/m);
+    expect(text).not.toContain("Mulai bekerja");
   });
 
   it("leaves out a line it has nothing for", () => {
-    // A permanent hire has no end date, and a row reading "Berakhir : —" is a
+    // A permanent hire has no end date, and a blank last-working-day row is a
     // row HC has to read before deciding it says nothing.
-    expect(employeeSummary(NADIA, NOW)).not.toContain("Berakhir");
+    expect(employeeSummary(NADIA, NOW)).not.toContain("Tanggal terakhir bekerja");
 
-    const vendor = { ...NADIA, employmentType: "VENDOR" as const, expiredDate: "2027-09-29" };
-    expect(employeeSummary(vendor, NOW)).toContain("Berakhir      : 2027-09-29");
-    expect(employeeSummary(vendor, NOW)).toContain("Status        : VENDOR (5-6)");
+    const contract = { ...NADIA, employmentType: "CONTRACT" as const, expiredDate: "2027-09-29" };
+    expect(employeeSummary(contract, NOW)).toContain("Tanggal terakhir bekerja : 2027-09-29");
+    expect(employeeSummary(contract, NOW)).toMatch(/^Status\s+: CONTRACT \(3-4\)$/m);
   });
 
   it("trims an ISO timestamp down to the date", () => {
     const withTime = { ...NADIA, startDate: "2026-10-01T00:00:00.000Z" };
 
-    expect(employeeSummary(withTime, NOW)).toContain("Mulai bekerja : 2026-10-01");
+    expect(employeeSummary(withTime, NOW)).not.toContain("Mulai bekerja");
   });
 
   it("names the file after the Jakarta day, not the machine's", () => {

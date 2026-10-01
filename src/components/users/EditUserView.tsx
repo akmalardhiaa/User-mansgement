@@ -324,7 +324,7 @@ export function ProfileForm({
 
           {isContract ? (
             <Field
-              label={t.forms.contractEnd}
+              label={t.forms.lastWorkingDate}
               name="expiredDate"
               type="date"
               {...dateInputBounds(DATE_BOUNDS.contractEnd)}
@@ -503,7 +503,6 @@ export function EmployeeEditForm({
   }
 
   const intent = editIntent(employee, values);
-  const isContract = isFixedTerm(values.employmentType as EmploymentType);
   const isBranch = values.locationType === "CABANG";
 
   /**
@@ -658,18 +657,7 @@ export function EmployeeEditForm({
             ))}
           </SelectField>
 
-          {isContract ? (
-            <Field
-              label={t.forms.contractEnd}
-              name="expiredDate"
-              type="date"
-              {...dateInputBounds(DATE_BOUNDS.contractEnd)}
-              value={values.expiredDate}
-              onChange={(event) => update("expiredDate", event.target.value)}
-              error={errors.expiredDate}
-              required
-            />
-          ) : null}
+          {/* `expiredDate` field removed per request to only have 1 date field for termination */}
 
           <SelectField
             label={t.forms.location}
@@ -705,7 +693,7 @@ export function EmployeeEditForm({
          */}
         <fieldset
           disabled={locked || saving}
-          className="grid gap-x-4 gap-y-1 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 disabled:opacity-60 sm:grid-cols-[14rem_1fr] sm:items-center"
+          className="grid gap-x-4 gap-y-3 rounded-lg border border-danger/30 bg-danger/5 px-3 py-3 disabled:opacity-60 sm:grid-cols-[14rem_1fr_auto] sm:items-center"
         >
           <Field
             label={t.forms.lastWorkingDate}
@@ -717,6 +705,20 @@ export function EmployeeEditForm({
             error={errors.lastWorkingDate}
           />
           <p className="text-xs leading-snug text-ink-muted">{t.editProfile.deactivateNote}</p>
+          <Button
+            type="button"
+            variant="danger"
+            size="sm"
+            onClick={() => {
+              const today = new Date();
+              const yyyy = today.getFullYear();
+              const mm = String(today.getMonth() + 1).padStart(2, '0');
+              const dd = String(today.getDate()).padStart(2, '0');
+              update("lastWorkingDate", `${yyyy}-${mm}-${dd}`);
+            }}
+          >
+            Terminate
+          </Button>
         </fieldset>
 
         {intent === "MIXED" ? (

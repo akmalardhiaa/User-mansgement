@@ -3,6 +3,7 @@ import { EMPLOYMENT_TYPES, isFixedTerm } from "@/lib/lifecycle/employment";
 import {
   DATE_BOUNDS,
   checkDate,
+  jakartaDay,
   nextJakartaDay,
   startOfJakartaDay,
   type DateBounds,
@@ -188,7 +189,9 @@ export function parseLifecycleRequestInput(payload: unknown, now = new Date()): 
       requireField(errors, body, "managerEmail", "Email manager", 5, 200),
       "Email manager",
     );
-    const startDate = date(errors, body, "startDate", "Tanggal mulai", true, DATE_BOUNDS.startDate, now);
+    const startDate =
+      date(errors, body, "startDate", "Tanggal mulai", false, DATE_BOUNDS.startDate, now) ??
+      jakartaDay(now);
     const accessProfileId = accessProfile(errors, body);
     const jobDescription = optional(errors, body, "jobDescription", "Keterangan jabatan", 2000);
 
@@ -202,7 +205,7 @@ export function parseLifecycleRequestInput(payload: unknown, now = new Date()): 
      * to notice that a vendor's access should have stopped in March.
      */
     const expiredDate = isFixedTerm(employmentType)
-      ? date(errors, body, "expiredDate", "Tanggal berakhir", true, DATE_BOUNDS.newContractEnd, now)
+      ? date(errors, body, "expiredDate", "Tanggal terakhir bekerja", true, DATE_BOUNDS.newContractEnd, now)
       : undefined;
 
     const locationType = asString(body.locationType).toUpperCase();

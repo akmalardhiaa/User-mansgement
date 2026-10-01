@@ -59,7 +59,6 @@ export function RequestPayloadSummary({ payload }: { payload: LifecyclePayload }
               : t.summary.headOffice,
           ],
           [t.summary.manager, `${payload.managerName} · ${payload.managerEmail}`],
-          [t.summary.startDate, payload.startDate],
           ...(payload.accessProfileId
             ? [
                 [t.summary.accessProfile, accessProfileLabel(payload.accessProfileId)] as [

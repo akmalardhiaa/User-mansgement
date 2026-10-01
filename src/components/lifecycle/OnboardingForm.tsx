@@ -10,7 +10,6 @@ import { FormAlert } from "@/components/ui/FormAlert";
 import {
   IconBriefcase,
   IconBuilding,
-  IconClock,
   IconIdCard,
   IconMail,
   IconUser,
@@ -50,6 +49,7 @@ const EMPTY = {
   branchName: "",
   managerName: "",
   managerEmail: "",
+  /** Kept in the request payload, but no longer entered on the form. */
   startDate: "",
 };
 
@@ -163,8 +163,8 @@ export function OnboardingForm({
       // The two halves are a form concern; the request carries one address.
       email: `${values.emailLocal.trim()}${values.emailDomain}`,
       userId: values.userId.trim().toLowerCase(),
-      // Empty strings would fail date validation. There is no effective date for
-      // an onboarding: the account is made as soon as both approvals are in.
+      // Only fixed-term employment carries an end date. The server assigns a
+      // start date automatically, so the form does not ask HC to enter one.
       expiredDate: isFixedTerm(values.employmentType as EmploymentType)
         ? values.expiredDate
         : undefined,
@@ -320,7 +320,7 @@ export function OnboardingForm({
 
             {isFixedTerm(values.employmentType as EmploymentType) ? (
               <Field
-                label={t.forms.contractEnd}
+                label={t.forms.lastWorkingDate}
                 name="expiredDate"
                 type="date"
                 {...dateInputBounds(DATE_BOUNDS.newContractEnd)}
@@ -353,18 +353,6 @@ export function OnboardingForm({
                 placeholder="Cabang Surabaya"
               />
             ) : null}
-
-            <Field
-              label={t.forms.startDate}
-              name="startDate"
-              type="date"
-              {...dateInputBounds(DATE_BOUNDS.startDate)}
-              icon={<IconClock className="size-4" />}
-              value={values.startDate}
-              onChange={(event) => update("startDate", event.target.value)}
-              error={fieldErrors.startDate}
-              hint={t.forms.startDateHint}
-            />
 
             {/*
              * The approving manager, in the same grid as the placement it

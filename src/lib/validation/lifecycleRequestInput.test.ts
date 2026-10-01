@@ -102,11 +102,13 @@ describe("when a termination takes effect", () => {
   });
 
   it("leaves an onboarding with no effective date at all", () => {
-    // Its account is made as soon as both approvals are in, whatever the start
-    // date says — two date fields are how a start-today hire never appeared.
-    const result = parse(ONBOARDING);
+    // The start date is no longer entered; it is recorded as the request day.
+    const result = parse({ ...ONBOARDING, startDate: "" });
 
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.effectiveAt).toBeUndefined();
+    if (result.ok && result.value.payload.kind === "ONBOARDING") {
+      expect(result.value.payload.startDate).toBe("2026-09-30");
+    }
   });
 });

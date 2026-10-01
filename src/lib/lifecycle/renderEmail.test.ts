@@ -75,6 +75,8 @@ describe("what the approver can see", () => {
 
     expect(message.html).toContain("Engineering");
     expect(message.html).not.toContain("accessProfileId");
+    expect(message.html).not.toContain("Mulai bekerja");
+    expect(message.html).not.toContain("Waktu efektif");
   });
 
   it("says the same things on the card as in the body", () => {

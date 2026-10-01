@@ -156,6 +156,7 @@ export function readLdapAdConfig(env: LdapEnv = process.env): LdapAdConfig {
     .split(";")
     .map((entry) => entry.trim())
     .filter(Boolean);
+  const writeEnabled = flag(env.AD_LDAP_WRITE_ENABLED);
 
   const missing = [
     [url, "AD_LDAP_URL (atau LDAP_URL)"],
@@ -163,7 +164,7 @@ export function readLdapAdConfig(env: LdapEnv = process.env): LdapAdConfig {
     [bindDn, "AD_BIND_DN"],
     [bindPassword, "AD_BIND_PASSWORD"],
     [caCertPath, "LDAP_CA_CERT_PATH"],
-    [managedOus.length ? "ada" : "", "AD_MANAGED_OUS"],
+    [!writeEnabled || managedOus.length ? "ada" : "", "AD_MANAGED_OUS (wajib saat penulisan diaktifkan)"],
   ]
     .filter(([value]) => !value)
     .map(([, name]) => name);
@@ -183,7 +184,7 @@ export function readLdapAdConfig(env: LdapEnv = process.env): LdapAdConfig {
     bindPassword,
     caCertPath,
     managedOus,
-    writeEnabled: flag(env.AD_LDAP_WRITE_ENABLED),
+    writeEnabled,
     nestedGroups: flag(env.LDAP_NESTED_GROUPS),
     timeoutMs: positiveInt(env.LDAP_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, "LDAP_TIMEOUT_MS"),
     pageSize: positiveInt(env.LDAP_PAGE_SIZE, DEFAULT_PAGE_SIZE, "LDAP_PAGE_SIZE"),

@@ -57,8 +57,6 @@ export function lifecycleTypeLabel(t: Dictionary, type: LifecycleType): string {
 const EMPLOYMENT_LABEL: Record<EmploymentType, keyof Dictionary["forms"]> = {
   PERMANENT: "permanent",
   CONTRACT: "contract",
-  VENDOR: "vendor",
-  INTERN: "intern",
 };
 
 export function employmentLabel(t: Dictionary, type: EmploymentType): string {
