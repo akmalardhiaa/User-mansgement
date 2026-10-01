@@ -112,14 +112,14 @@ ke Domain Admins. Itu justru yang sedang dijaga oleh `AD_MANAGED_OUS`.
 
 ### Langkah 2 — Isi berkasnya
 
-Ada dua template, pilih sesuai keadaan:
+Satu template, dua keadaan — isinya sama, yang berbeda cuma kapan sakelar
+tulisnya dinyalakan:
 
 | Berkas | Untuk |
 |---|---|
-| `.env.pilot.example` | **PC kantor**, uji coba. Salin isinya ke `.env.local` |
-| `.env.onprem.example` | **Server portal internal**, production. Salin jadi `.env.production` |
+| `.env.onprem.example` | **PC kantor, uji coba** — salin isinya ke `.env.local`.<br>**Server internal, production** — salin jadi `.env.production`. |
 
-Keduanya sudah berisi semua kunci yang dibutuhkan beserta keterangannya.
+Template itu sudah berisi semua kunci yang dibutuhkan beserta keterangannya.
 `.env.example` adalah rujukan lengkap kalau ada yang ingin ditelusuri.
 
 Yang **wajib** diisi, dan portal akan menyebut namanya satu per satu kalau ada
