@@ -2,6 +2,9 @@
 
 # dependencies
 /node_modules
+# Portable Node.js for offline PCs (jalankan.bat looks here first). Copied in,
+# never committed: 90+ MB of binaries for one operating system.
+/node
 /.pnp
 .pnp.*
 .yarn/*

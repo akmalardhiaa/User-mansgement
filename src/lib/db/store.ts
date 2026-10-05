@@ -68,9 +68,25 @@ export interface StoreShape {
  * a real database later means rewriting one file rather than the whole app.
  */
 
+/**
+ * Whether this portal is acting on a real directory.
+ *
+ * The same test accessProfiles.ts applies before it lets a placeholder DN
+ * through, for the same reason: once a domain controller is on the other end,
+ * example data stops being harmless. Here the example data is the seed
+ * employees — fictitious people who would sit in the directory table beside
+ * real ones, and whom a movement or termination could be raised against.
+ */
+function actsOnRealDirectory(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.AD_DRIVER?.trim().toLowerCase() === "ldap"
+  );
+}
+
 function emptyStore(): StoreShape {
   return {
-    employees: seedEmployees(),
+    employees: actsOnRealDirectory() ? [] : seedEmployees(),
     requests: [],
     activity: [],
     lifecycleRequests: [],
@@ -124,7 +140,8 @@ async function load(): Promise<StoreShape> {
   if (raw !== undefined) return parse(raw);
 
   /*
-   * A genuine first run: seed it. Written with "create only if absent", never
+   * A genuine first run: seed it — with demo employees only when no real
+   * directory is configured. Written with "create only if absent", never
    * write-then-rename, so a store that reappears between being found missing
    * and this line is read, not overwritten.
    */

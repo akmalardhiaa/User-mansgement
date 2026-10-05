@@ -93,7 +93,39 @@ describe("the portal store, when its file vanishes", () => {
 
   it("still seeds a genuinely new store on a first run", async () => {
     vi.stubEnv("HC_DATA_FILE", path.join(workspace, "fresh-store.json"));
+    vi.stubEnv("AD_DRIVER", "");
     const store = await readStore();
     expect(store.employees.length).toBeGreaterThan(0);
+  });
+});
+
+describe("the portal store, on a first run against a real directory", () => {
+  /*
+   * Demo employees beside real ones are not harmless: a movement or a
+   * termination can be raised against them, and the worker then goes looking
+   * for an account no domain controller holds.
+   */
+  it("starts with no employees when AD_DRIVER=ldap", async () => {
+    vi.stubEnv("HC_DATA_FILE", path.join(workspace, "ldap-store.json"));
+    vi.stubEnv("AD_DRIVER", "ldap");
+    const store = await readStore();
+    expect(store.employees).toEqual([]);
+  });
+
+  it("starts with no employees in production", async () => {
+    vi.stubEnv("HC_DATA_FILE", path.join(workspace, "production-store.json"));
+    vi.stubEnv("AD_DRIVER", "");
+    vi.stubEnv("NODE_ENV", "production");
+    const store = await readStore();
+    expect(store.employees).toEqual([]);
+  });
+
+  it("leaves an existing store's employees alone", async () => {
+    const file = path.join(workspace, "existing-store.json");
+    await writeFile(file, JSON.stringify({ employees: [{ id: "kept" }] }));
+    vi.stubEnv("HC_DATA_FILE", file);
+    vi.stubEnv("AD_DRIVER", "ldap");
+    const store = await readStore();
+    expect(store.employees.map((employee) => employee.id)).toEqual(["kept"]);
   });
 });
