@@ -29,11 +29,15 @@ vi.mock("@/lib/ad/mockAd", () => ({
 
 const ldapMockState = vi.hoisted(() => ({
   bindError: undefined as unknown,
+  /** What the last Client was constructed with, so a test can see where it connected. */
+  options: undefined as { url?: string; tlsOptions?: { servername?: string } } | undefined,
 }));
 
 vi.mock("ldapts", () => ({
   Client: class {
-    constructor() {}
+    constructor(options: { url?: string; tlsOptions?: { servername?: string } }) {
+      ldapMockState.options = options;
+    }
     async bind() {
       if (ldapMockState.bindError) throw ldapMockState.bindError;
     }
@@ -51,6 +55,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.clearAllMocks();
   ldapMockState.bindError = undefined;
+  ldapMockState.options = undefined;
 });
 
 function account(overrides: Partial<AdAccountState> = {}): AdAccountState {
@@ -194,6 +199,29 @@ describe("the login TLS boundary", () => {
     await expect(authenticateAD("employee", "wrong")).resolves.toBeNull();
 
     ldapMockState.bindError = Object.assign(new Error("connection refused"), { code: "ECONNREFUSED" });
+    await expect(authenticateAD("employee", "secret")).rejects.toBeInstanceOf(LdapUnavailableError);
+  });
+
+  // A blank AD_LDAP_URL is common: the templates list both names, and somebody
+  // fills in one. The login read the URL with `??`, which kept the blank, and
+  // every sign-in became "server unreachable".
+  it("falls back to LDAP_URL when AD_LDAP_URL is present but blank", async () => {
+    vi.stubEnv("AD_LDAP_URL", "");
+    vi.stubEnv("LDAP_URL", "ldaps://dc.corp.example.com:636");
+    vi.stubEnv("AD_BASE_DN", "DC=corp,DC=example,DC=com");
+
+    const user = await authenticateAD("employee", "secret");
+
+    expect(user?.username).toBe("employee");
+    expect(ldapMockState.options?.url).toBe("ldaps://dc.corp.example.com:636");
+    expect(ldapMockState.options?.tlsOptions?.servername).toBe("dc.corp.example.com");
+  });
+
+  it("reports an unusable login configuration as AD unavailable, not as a crash", async () => {
+    vi.stubEnv("AD_LDAP_URL", "ldaps://dc.corp.example.com:636");
+    vi.stubEnv("AD_BASE_DN", "");
+    vi.stubEnv("LDAP_BASE_DN", "");
+
     await expect(authenticateAD("employee", "secret")).rejects.toBeInstanceOf(LdapUnavailableError);
   });
 });

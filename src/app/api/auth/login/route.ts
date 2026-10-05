@@ -111,6 +111,9 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     if (error instanceof LdapUnavailableError) {
+      // The person is told to call IT; IT needs to know why. The cause is the
+      // TLS, socket or configuration error underneath — never the password.
+      console.error("[auth/login] AD tidak bisa dihubungi:", error.message, error.cause);
       return withCors(
         fail("Server Active Directory tidak bisa dihubungi. Hubungi tim IT.", 503, {
           code: "AD_UNAVAILABLE",

@@ -172,9 +172,23 @@ function asArray(value: unknown): string[] {
 async function authViaLdap(username: string, password: string): Promise<AdUser | null> {
   const { Client } = await import("ldapts");
 
-  const url = (process.env.AD_LDAP_URL ?? process.env.LDAP_URL ?? "").trim();
-  const tlsOptions = await loginTlsOptions(url);
-  const config = readLdapLoginConfig();
+  /*
+   * The URL comes from the validated configuration, not from a second read of
+   * the environment. That second read used `??`, which does not fall through
+   * on an empty string: a .env with `AD_LDAP_URL=` left blank and LDAP_URL
+   * filled in turned every login into "server unreachable", while every other
+   * reader of these two variables, using `||`, saw a perfectly good URL.
+   *
+   * A configuration that cannot be read is the same outage from the login
+   * screen, so it is reported the same way; the log keeps the detail.
+   */
+  let config;
+  try {
+    config = readLdapLoginConfig();
+  } catch (error) {
+    throw new LdapUnavailableError("Konfigurasi login Active Directory tidak bisa dipakai.", { cause: error });
+  }
+  const tlsOptions = await loginTlsOptions(config.url);
 
   // AD accepts either a UPN (user@domain) or DOMAIN\user for the bind. If the
   // caller typed a bare username and a domain is configured, build the UPN.
@@ -193,7 +207,7 @@ async function authViaLdap(username: string, password: string): Promise<AdUser |
   });
 
   try {
-    // The authentication itself: a failed bind means wrong credentials.
+    // The authentication itself. Only result code 49 means wrong credentials.
     await client.bind(bindName, password);
   } catch (error) {
     await client.unbind().catch(() => undefined);
