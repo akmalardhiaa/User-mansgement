@@ -198,10 +198,14 @@ export function readLdapAdConfig(env: LdapEnv = process.env): LdapAdConfig {
  * certificate off disk for each one is work nobody asked for. A rotated CA
  * therefore needs a restart — the same as every other value in this
  * configuration.
+ *
+ * Exported because the login bind and the diagnostics page verify the same
+ * domain controller against the same CA, and a second reader is a second
+ * place for the two to disagree about what the CA is.
  */
 const caCache = new Map<string, Promise<Buffer>>();
 
-function readCa(path: string): Promise<Buffer> {
+export function readLdapCa(path: string): Promise<Buffer> {
   const cached = caCache.get(path);
   if (cached) return cached;
 
@@ -231,7 +235,7 @@ export function resetLdapCaCache(): void {
 export function ldapConnector(config: LdapAdConfig): LdapConnect {
   return async () => {
     const { Attribute, Change, Client } = await import("ldapts");
-    const ca = await readCa(config.caCertPath);
+    const ca = await readLdapCa(config.caCertPath);
 
     const client = new Client({
       url: config.url,
