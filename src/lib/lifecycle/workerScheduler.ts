@@ -88,15 +88,26 @@ function describe(report: RunReport): string {
 }
 
 /** The kick after an approval: logged, never thrown at the approver. */
-export async function kickWorkerAfterApproval(): Promise<void> {
+export async function kickWorkerAfterApproval(
+  run: () => Promise<RunReport> = () => runDueJobs(),
+): Promise<void> {
   try {
-    const report = await kickWorker();
+    const report = await kickWorker(run);
     if (report.ran > 0) console.log(`[worker] dijalankan setelah persetujuan: ${describe(report)}`);
   } catch (error) {
     // The approval is already recorded. A worker that cannot run now is picked
     // up by the sweep, or by an operator pressing the button.
+    if (error instanceof AdConfigurationError) {
+      console.warn(`[worker] ${waitingForDirectory(error)}`);
+      return;
+    }
     console.error("[worker] gagal dijalankan setelah persetujuan", error);
   }
+}
+
+/** One calm line for a worker that has no directory to act on yet. */
+function waitingForDirectory(error: AdConfigurationError): string {
+  return `Worker menunggu: Active Directory belum dikonfigurasi. Portal tetap berjalan, dan pengajuan yang sudah disetujui menunggu di antrean. (${error.message})`;
 }
 
 let started = false;
@@ -125,9 +136,14 @@ export function startWorkerSchedulerFromEnv(): void {
       }
     } catch (error) {
       if (error instanceof AdConfigurationError) {
-        // Misconfiguration does not fix itself; retrying it every half minute
-        // only buries the one line that says what is wrong.
-        console.error("[worker-scheduler] Berhenti: direktori belum terkonfigurasi.", error);
+        /*
+         * Misconfiguration does not fix itself; retrying it every half minute
+         * only buries the one line that says what is wrong. Said calmly, on one
+         * line: a portal not yet connected to a directory is in an expected
+         * state, and the red stack trace this used to print in the jalankan.bat
+         * window read as the whole portal having died.
+         */
+        console.warn(`[worker-scheduler] ${waitingForDirectory(error)}`);
         clearInterval(timer);
         return;
       }

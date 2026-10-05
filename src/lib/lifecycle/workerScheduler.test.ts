@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { AdConfigurationError } from "@/lib/ad";
 
 import type { RunReport } from "./worker";
-import { kickWorker, resolveWorkerPollSeconds } from "./workerScheduler";
+import { kickWorker, kickWorkerAfterApproval, resolveWorkerPollSeconds } from "./workerScheduler";
 
 const REPORT: RunReport = { ran: 1, completed: 1, failed: 0, reclaimed: 0, outcomes: [] };
 
@@ -50,5 +52,31 @@ describe("kicking the worker", () => {
     await kickWorker(run);
     await kickWorker(run);
     expect(started).toBe(2);
+  });
+});
+
+describe("a worker with no directory to act on yet", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("says so on one calm line, not as an error, so the portal does not look dead", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await kickWorkerAfterApproval(() => Promise.reject(new AdConfigurationError("AD_DRIVER belum diset.")));
+
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toMatch(/Worker menunggu.*Portal tetap berjalan/);
+  });
+
+  it("still reports any other failure as an error", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await kickWorkerAfterApproval(() => Promise.reject(new Error("disk penuh")));
+
+    expect(error).toHaveBeenCalledTimes(1);
   });
 });
