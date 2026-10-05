@@ -12,8 +12,8 @@ berjalan di aplikasi dan tidak berubah.
 - Podman Desktop/Podman CLI untuk Windows dan provider `podman compose`.
 - IIS URL Rewrite, Application Request Routing (ARR), dan sertifikat HTTPS
   untuk nama portal.
-- Git, jaringan ke DNS kantor dan DC LDAPS, serta akun service AD dengan hak
-  minimum yang disetujui tim AD.
+- Jaringan ke DNS kantor dan DC LDAPS, serta akun service AD dengan hak
+  minimum yang disetujui tim AD. Git opsional: proyek boleh disalin manual.
 - Satu akun Windows khusus/terkelola yang memiliki Podman machine. Jangan
   menjalankan machine sebagai SYSTEM; machine Podman bersifat per-user.
 - Ruang disk untuk image, volume JSON, dan backup. Hanya satu instance portal.
@@ -29,8 +29,12 @@ podman machine start
 podman info
 ```
 
-Clone repository ke `C:\hc-portal` atau lokasi tetap lain. Perintah di bawah
-mengasumsikan `C:\hc-portal`. Pastikan `podman info` berhasil dari akun yang
+Taruh proyek di `C:\hc-portal` atau lokasi tetap lain: `git clone`, atau salin
+foldernya secara manual bila git tidak bisa dipakai di jaringan kantor. Yang
+perlu ikut hanya kode sumbernya. `node_modules`, `.next`, `data`, dan berkas
+`.env` dari komputer lain tidak dipakai: image memasang dependensinya sendiri,
+dan konfigurasi production dibuat di server. Perintah di bawah mengasumsikan
+`C:\hc-portal`. Pastikan `podman info` berhasil dari akun yang
 sama sebelum melanjutkan. Jangan menginisialisasi/menjalankan machine sebagai
 akun lain atau SYSTEM.
 
@@ -78,6 +82,29 @@ berasal dari dependency production; skrip pemeriksaan tidak memerlukan
 devDependencies. Image menjalankan user non-root, dan `.containerignore` serta
 `.dockerignore` mengecualikan `.env*` dan data lokal. Containerfile/compose
 development tidak diubah.
+
+### Tanpa git atau tanpa akses npm
+
+Build di atas mengunduh dependensi dari registry npm. Bila server tidak bisa
+menjangkaunya, build image di komputer lain yang bisa, lalu bawa hasilnya:
+
+```powershell
+podman build -f Containerfile.production -t hc-portal:latest `
+  --build-arg NEXT_PUBLIC_BRAND_NAME="<nama-perusahaan>" `
+  --build-arg NEXT_PUBLIC_BRAND_LOGO="/brand/<logo-perusahaan>.png" .
+podman save -o hc-portal-image.tar hc-portal:latest
+```
+
+Dua nilai brand itu satu-satunya yang tertanam di image; tidak ada rahasia yang
+perlu ada di komputer pembangun. Salin `hc-portal-image.tar` bersama folder
+proyek, lalu di server muat image itu sebagai pengganti langkah build:
+
+```powershell
+podman load -i D:\hc-portal-image.tar
+```
+
+Untuk update berikutnya, `.\deploy\windows\update-portal.ps1 -ImageArchive
+D:\hc-portal-image.tar` memuat arsip itu alih-alih membangun.
 
 ### Uji DNS dari container
 
@@ -172,7 +199,13 @@ Masukkan akun pemilik machine dan password saat diminta. Password diberikan ke
 Task Scheduler agar task dapat berjalan saat pengguna tidak login; password
 tidak ditulis ke skrip. Task memanggil `start-portal.ps1`, yang mencoba
 menyalakan machine, menunggu `podman info`, menjalankan compose secara
-idempoten, dan mencatat log ke `C:\hc-portal\logs`.
+idempoten, dan mencatat log ke folder `logs` di samping aplikasi
+(`C:\hc-portal\logs`).
+
+Uji sekali dengan **me-restart server tanpa login**: portal harus kembali
+menjawab dengan sendirinya. Bila tidak, `logs\start-portal.log` menyebut
+langkah yang gagal. Uji ini wajib karena task berjalan tanpa sesi pengguna,
+dan WSL2 di keadaan itu hanya bisa dibuktikan di server itu sendiri.
 
 ## 6. IIS HTTPS reverse proxy
 
@@ -203,8 +236,9 @@ idempoten, dan mencatat log ke `C:\hc-portal\logs`.
 ## Backup dan restore
 
 `backup-data.ps1` menghentikan portal sementara agar ekspor volume konsisten,
-menghasilkan arsip tar bertimestamp di `C:\hc-portal\backups`, menyalakan
-kembali portal, dan menghapus arsip lebih lama dari 30 hari:
+menghasilkan arsip tar bertimestamp di folder `backups` di samping aplikasi
+(ubah dengan `-BackupPath`, misalnya ke disk lain), menyalakan kembali portal,
+dan menghapus arsip lebih lama dari 30 hari:
 
 ```powershell
 .\deploy\windows\backup-data.ps1
@@ -232,9 +266,18 @@ Jalankan sebagai akun pemilik Podman machine:
 .\deploy\windows\update-portal.ps1
 ```
 
-Skrip menjalankan `git pull`, menyalakan/memeriksa Podman machine, build image
-production memakai `.env.production.local` untuk build args brand,
-memperbarui container, dan menampilkan status compose serta healthcheck. Pastikan backup terbaru
+Bila folder aplikasi adalah checkout git, skrip menjalankan `git pull`. Bila
+proyek disalin manual, salin dulu versi barunya ke folder yang sama, tanpa
+menimpa `.env.production.local`, `certs`, `logs`, atau `backups`. Skrip lalu
+menyalakan/memeriksa Podman machine, build image production memakai
+`.env.production.local` untuk build args brand (atau memuat arsip dengan
+`-ImageArchive`), memperbarui container, dan menampilkan status compose serta
+healthcheck.
+
+Semua skrip di folder ini ditulis untuk Windows PowerShell 5.1 — versi yang
+dipakai Task Scheduler — dan memanggil `podman` lewat `podman-common.ps1`,
+supaya pesan biasa podman di stderr seperti "already running" tidak
+menghentikan skrip. Pastikan backup terbaru
 sebelum update. Jangan menimpa `.env.production.local`, `certs`, atau volume
 `hc-data`. Bila gagal, pulihkan versi aplikasi sebelumnya dan data dari backup
 yang konsisten.

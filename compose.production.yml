@@ -11,6 +11,23 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     restart: always
+    # Declared here, not only in Containerfile.production: Podman builds OCI
+    # images by default, and the OCI format drops HEALTHCHECK ("HEALTHCHECK is
+    # not supported for OCI image format and will be ignored"). Without this
+    # block the container ran with no health check at all, and the status
+    # update-portal.ps1 prints after an update meant nothing.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     env_file:
       - .env.production.local
     environment:

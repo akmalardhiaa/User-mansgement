@@ -1,38 +1,35 @@
 [CmdletBinding()]
 param(
-    [string]$BackupPath = "C:\hc-portal\backups"
+    # Default: "backups" beside the application. Point it at another disk or a
+    # share for a copy that survives the loss of this server.
+    [string]$BackupPath
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "podman-common.ps1")
+
 $appRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+if (-not $BackupPath) { $BackupPath = Join-Path $appRoot "backups" }
 New-Item -ItemType Directory -Path $BackupPath -Force | Out-Null
 
-& podman machine start 2>&1 | Out-Null
-$ready = $false
-for ($attempt = 0; $attempt -lt 60; $attempt++) {
-    & podman info *> $null
-    if ($LASTEXITCODE -eq 0) {
-        $ready = $true
-        break
-    }
-    Start-Sleep -Seconds 2
-}
-if (-not $ready) {
-    throw "Podman belum siap setelah menunggu 120 detik."
-}
+Wait-PodmanReady
 
 Push-Location $appRoot
 $stopped = $false
 try {
-    & podman compose -f compose.production.yml stop portal
-    if ($LASTEXITCODE -ne 0) { throw "Gagal menghentikan portal untuk membuat backup konsisten." }
+    # Stopped so the export is one consistent moment, not a store caught
+    # halfway through a write.
+    $null = Invoke-Podman -ArgumentList @("compose", "-f", "compose.production.yml", "stop", "portal") `
+        -What "Menghentikan portal untuk backup yang konsisten"
     $stopped = $true
 
     $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $archive = Join-Path $BackupPath "hc-data-$timestamp.tar"
-    & podman volume export hc-data --output $archive
-    if ($LASTEXITCODE -ne 0) { throw "podman volume export gagal." }
+    $null = Invoke-Podman -ArgumentList @("volume", "export", "hc-data", "--output", $archive) `
+        -What "podman volume export"
 
+    # Old archives are removed only after a new one exists, so a run that
+    # fails never leaves fewer backups than it found.
     $cutoff = (Get-Date).AddDays(-30)
     Get-ChildItem -LiteralPath $BackupPath -Filter "hc-data-*.tar" -File |
         Where-Object { $_.LastWriteTime -lt $cutoff } |
@@ -40,9 +37,9 @@ try {
     Write-Host "Backup volume hc-data dibuat: $archive"
 } finally {
     if ($stopped) {
-        & podman compose -f compose.production.yml up -d
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "Backup selesai tetapi portal gagal dimulai kembali. Jalankan start-portal.ps1."
+        $restart = Invoke-Native -FilePath "podman" -ArgumentList @("compose", "-f", "compose.production.yml", "up", "-d")
+        if ($restart.ExitCode -ne 0) {
+            Write-Warning "Backup selesai tetapi portal gagal dimulai kembali (kode $($restart.ExitCode)). Jalankan start-portal.ps1."
         }
     }
     Pop-Location
