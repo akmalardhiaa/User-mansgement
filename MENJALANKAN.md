@@ -112,12 +112,13 @@ ke Domain Admins. Itu justru yang sedang dijaga oleh `AD_MANAGED_OUS`.
 
 ### Langkah 2 — Isi berkasnya
 
-Satu template, dua keadaan — isinya sama, yang berbeda cuma kapan sakelar
-tulisnya dinyalakan:
+Satu template per keadaan. Kuncinya sama; yang berbeda adalah path-nya, karena
+di server portal berjalan di dalam container:
 
 | Berkas | Untuk |
 |---|---|
-| `.env.onprem.example` | **PC kantor, uji coba** — salin isinya ke `.env.local`.<br>**Server internal, production** — salin jadi `.env.production`. |
+| `.env.onprem.example` | **PC kantor, uji coba** — salin isinya ke `.env.local`. |
+| `deploy/windows/env.production.example` | **Server internal, production** — salin jadi `.env.production.local`. Urutannya di [deploy/windows/README.md](deploy/windows/README.md). |
 
 Template itu sudah berisi semua kunci yang dibutuhkan beserta keterangannya.
 `.env.example` adalah rujukan lengkap kalau ada yang ingin ditelusuri.
@@ -202,15 +203,15 @@ mengisinya, lalu langkah itu diulang dari titik yang sama.
 
 ## Bagian 3 — Di server, mode production
 
-Bagian 1 menjalankan mode demo (`next dev`). Untuk server internal, modenya
-berbeda dan berkasnya memang dipisah:
+Bagian 1 menjalankan mode demo (`next dev`). Server internal memakai mode
+production dengan berkasnya sendiri — `Containerfile.production` dan
+`compose.production.yml` — dan **satu panduan langkah demi langkah:
+[deploy/windows/README.md](deploy/windows/README.md)**. Bagian ini hanya
+menjelaskan apa bedanya.
 
-```bash
-podman-compose -f compose.prod.yaml up -d --build
-```
-
-Di server Linux, perintahnya sama dengan `docker compose` — **Docker Engine CE
-itu gratis**; yang berbayar untuk perusahaan besar hanya Docker *Desktop*.
+Di server Linux, `compose.production.yml` yang sama jalan dengan
+`docker compose` — **Docker Engine CE itu gratis**; yang berbayar untuk
+perusahaan besar hanya Docker *Desktop*.
 
 Bedanya dengan mode demo bukan sekadar optimasi:
 
@@ -232,12 +233,6 @@ https-nya, karena setiap tautan persetujuan di email dibangun dari nilai itu.
 **Jangan di-scale lebih dari satu instance.** Kunci klaim job itu per-proses;
 dua instance pada data yang sama berarti dua worker sama-sama merasa memegang
 satu job yang sama.
-
-### Kalau servernya Windows Server
-
-Pertimbangkan **tanpa container sama sekali**. Aplikasi ini satu proses Node:
-`npm run build` lalu `npm start`, dijadikan Windows Service. Tidak ada runtime
-container yang perlu dilisensi, dipelihara, atau dijelaskan ke tim infra.
 
 ### Mendirikan AD uji coba sendiri
 

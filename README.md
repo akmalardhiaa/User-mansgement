@@ -518,9 +518,11 @@ Login pengguna dan worker memakai host LDAPS/CA yang sama: `LDAP_URL` (atau
 `AD_LDAP_URL`), `LDAP_BASE_DN`, dan `LDAP_CA_CERT_PATH`. Login mengikat sebagai
 pengguna; worker mengikat terpisah sebagai `AD_BIND_DN`. Akun tanpa salah satu
 group `AD_GROUP_HC`, `AD_GROUP_ADMIN`, `AD_GROUP_OPS`, atau `AD_GROUP_AUDITOR`
-ditolak masuk. `.env.onprem.example` adalah template tanpa rahasia untuk
-deployment Windows Server; salin menjadi `.env.production` yang ACL-nya hanya
-mengizinkan akun service membaca, lalu isi nilai asli dari tim AD/infrastruktur.
+ditolak masuk. Template tanpa rahasianya satu per keadaan: `.env.onprem.example`
+untuk PC pilot (salin ke `.env.local`), dan `deploy/windows/env.production.example`
+untuk server (salin menjadi `.env.production.local`, dengan ACL hanya untuk akun
+pemilik dan administrator). Isi keduanya hanya dengan nilai asli dari tim
+AD/infrastruktur.
 
 Keamanannya bukan opsi yang bisa dimatikan:
 
@@ -564,19 +566,12 @@ Keamanannya bukan opsi yang bisa dimatikan:
 
 #### Menjalankan di Windows Server internal
 
-Production dijalankan langsung dengan Node.js 22 sebagai **satu instance**,
-bukan container. Salin `.env.onprem.example` menjadi `.env.production`,
-lengkapi hanya dengan nilai yang sudah dikonfirmasi tim AD/infrastruktur, dan
-batasi ACL berkas itu ke akun service serta administrator. Jangan masukkan
-rahasia ke Git. Untuk awal, biarkan `AD_LDAP_WRITE_ENABLED=false`.
-
-```powershell
-npm ci
-npm run ad:check -- <akun-pengguna>
-npm run ad:service-check -- <akun-di-OU-kelola> <DN-group-CISO>
-npm run build
-npm run start
-```
+Satu panduan, satu tempat: **[deploy/windows/README.md](deploy/windows/README.md)**.
+Isinya urutan lengkap untuk server — Podman machine, ekspor CA ke PEM, uji AD
+hanya-baca, IIS HTTPS, startup otomatis, backup, update, serta jalur tanpa git
+atau tanpa akses npm. Konfigurasinya `deploy/windows/env.production.example`,
+disalin menjadi `.env.production.local` di server dan tidak pernah di-commit.
+Untuk awal, biarkan `AD_LDAP_WRITE_ENABLED=false`.
 
 Setelah pemeriksaan read-only lolos, uji lifecycle di OU pilot dengan email
 approval dialihkan ke penguji; baru setelah bukti uji diterima, aktifkan
@@ -588,16 +583,11 @@ menampilkannya atau menaruhnya di argumen proses. Untuk tahap tulis pilot,
 masukkan hanya OU uji dan OU karantina uji ke `AD_MANAGED_OUS`, lalu arahkan
 semua email ke alamat penguji lewat `EMAIL_REDIRECT_TO`.
 
-Kedua perintah start mengikat Next ke `127.0.0.1`; di Windows Server IIS ARR
-menjadi satu-satunya pintu HTTPS. Di PC kantor Podman Compose juga menerbitkan
-port hanya ke loopback.
-
-Jalankan `npm run start` sebagai Windows Service dengan akun lokal non-admin,
-folder `data/` dan folder karyawan ber-ACL terbatas serta backup harian. IIS
-URL Rewrite/ARR menjadi reverse proxy HTTPS ke `127.0.0.1:3000`; firewall hanya
-membuka HTTPS bagi pengguna dan koneksi keluar server ke LDAPS 636 serta relay
-email. Jangan jalankan lebih dari satu instance karena state aplikasi masih
-berkas JSON lokal.
+Portal hanya diterbitkan ke `127.0.0.1:3000`, di server maupun di PC kantor;
+di server IIS ARR menjadi satu-satunya pintu HTTPS. Firewall hanya membuka
+HTTPS bagi pengguna, serta koneksi keluar server ke LDAPS 636 dan relay email.
+Jangan jalankan lebih dari satu instance karena state aplikasi masih berkas
+JSON lokal.
 
 #### Urutan pilot dan pemindahan
 
@@ -616,9 +606,11 @@ Ikuti gerbang bertahap; jangan membuka penulisan AD sebelum pilot disetujui:
    `gmail`, arahkan `EMAIL_REDIRECT_TO` ke penguji, lalu uji Onboarding,
    Movement, Termination, dan Profile Update. Pastikan semua hasil dibaca
    kembali dan diverifikasi di AD uji.
-4. **Production:** pindahkan ke satu Windows Server internal memakai
-   `.env.onprem.example`, OU production yang sudah didelegasikan, group final,
-   relay email production, backup `data/`, serta IIS HTTPS reverse proxy.
+4. **Production:** pindahkan ke satu Windows Server internal mengikuti
+   [deploy/windows/README.md](deploy/windows/README.md): `.env.production.local`
+   dari `deploy/windows/env.production.example`, OU production yang sudah
+   didelegasikan, group final, relay email production, backup volume data,
+   serta IIS HTTPS reverse proxy.
    Hapus `EMAIL_REDIRECT_TO` hanya setelah daftar penerima dicek dan akses
    approver dari luar kantor (VPN/jalur yang disetujui) dipastikan.
 
