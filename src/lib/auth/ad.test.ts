@@ -2,7 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AdAccountState } from "@/lib/ad/types";
 
-import { authenticateAD, isLdapConfigured } from "./ad";
+import {
+  authenticateAD,
+  isInvalidCredentials,
+  isLdapConfigured,
+  LdapUnavailableError,
+  loginTlsOptions,
+} from "./ad";
 
 /**
  * Which credential source answers, and in what order.
@@ -21,12 +27,30 @@ vi.mock("@/lib/ad/mockAd", () => ({
   readMockDirectory: vi.fn(),
 }));
 
+const ldapMockState = vi.hoisted(() => ({
+  bindError: undefined as unknown,
+}));
+
+vi.mock("ldapts", () => ({
+  Client: class {
+    constructor() {}
+    async bind() {
+      if (ldapMockState.bindError) throw ldapMockState.bindError;
+    }
+    async search() {
+      return { searchEntries: [] };
+    }
+    async unbind() {}
+  },
+}));
+
 const { readMockDirectory } = await import("@/lib/ad/mockAd");
 const directory = vi.mocked(readMockDirectory);
 
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.clearAllMocks();
+  ldapMockState.bindError = undefined;
 });
 
 function account(overrides: Partial<AdAccountState> = {}): AdAccountState {
@@ -135,5 +159,41 @@ describe("what is refused outright", () => {
     vi.stubEnv("NODE_ENV", "production");
 
     await expect(authenticateAD("admin", "admin12345")).rejects.toThrow(/LDAP_URL/);
+  });
+});
+
+describe("the login TLS boundary", () => {
+  it("refuses ldap:// in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+
+    await expect(loginTlsOptions("ldap://dc.corp.example.com:389")).rejects.toThrow(/LDAPS/);
+  });
+
+  it("keeps certificate and hostname verification enabled", async () => {
+    const options = await loginTlsOptions("ldaps://dc.corp.example.com:636", {});
+
+    expect(options).toEqual({
+      rejectUnauthorized: true,
+      minVersion: "TLSv1.2",
+      servername: "dc.corp.example.com",
+    });
+  });
+
+  it("recognises only LDAP result code 49 as invalid credentials", () => {
+    expect(isInvalidCredentials({ code: 49 })).toBe(true);
+    expect(isInvalidCredentials({ code: "49" })).toBe(false);
+    expect(isInvalidCredentials({ code: 50 })).toBe(false);
+    expect(isInvalidCredentials(new Error("invalid credentials"))).toBe(false);
+    expect(isInvalidCredentials(null)).toBe(false);
+  });
+
+  it("returns null for code 49 but maps other bind failures to AD unavailable", async () => {
+    vi.stubEnv("AD_LDAP_URL", "ldaps://dc.corp.example.com:636");
+    vi.stubEnv("AD_BASE_DN", "DC=corp,DC=example,DC=com");
+    ldapMockState.bindError = Object.assign(new Error("invalid credentials"), { code: 49 });
+    await expect(authenticateAD("employee", "wrong")).resolves.toBeNull();
+
+    ldapMockState.bindError = Object.assign(new Error("connection refused"), { code: "ECONNREFUSED" });
+    await expect(authenticateAD("employee", "secret")).rejects.toBeInstanceOf(LdapUnavailableError);
   });
 });

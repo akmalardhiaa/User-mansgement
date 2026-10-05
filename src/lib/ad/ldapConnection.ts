@@ -251,7 +251,12 @@ export function ldapConnector(config: LdapAdConfig): LdapConnect {
       },
     });
 
-    await client.bind(config.bindDn, config.bindPassword);
+    try {
+      await client.bind(config.bindDn, config.bindPassword);
+    } catch (error) {
+      await client.unbind().catch(() => undefined);
+      throw error;
+    }
 
     const wrapper: LdapClientLike = {
       async search(baseDn, options) {

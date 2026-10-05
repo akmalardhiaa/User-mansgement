@@ -36,10 +36,16 @@ describe("LDAP login configuration", () => {
     expect(isLdapLoginConfigured({ AD_LDAP_URL: "ldaps://dc.corp.example.com" })).toBe(true);
   });
 
-  it("requires a base DN and trusted CA", () => {
+  it("requires a base DN and accepts the system trust store when no CA file is set", () => {
     expect(() => readLdapLoginConfig({ AD_LDAP_URL: COMPLETE.AD_LDAP_URL })).toThrowError(
-      /AD_BASE_DN.*LDAP_CA_CERT_PATH/,
+      /AD_BASE_DN/,
     );
+    expect(
+      readLdapLoginConfig({
+        AD_LDAP_URL: COMPLETE.AD_LDAP_URL,
+        AD_BASE_DN: COMPLETE.AD_BASE_DN,
+      }).caCertPath,
+    ).toBeUndefined();
   });
 
   it("refuses plaintext LDAP and non-LDAPS ports", () => {

@@ -12,7 +12,7 @@ import { readFile } from "node:fs/promises";
 import { Client } from "ldapts";
 
 const { loadEnvConfig } = nextEnv;
-loadEnvConfig(process.cwd(), true);
+loadEnvConfig(process.cwd(), process.env.NODE_ENV !== "production");
 
 const [, , username] = process.argv;
 

@@ -4,7 +4,7 @@ export interface LdapLoginConfig {
   url: string;
   domain?: string;
   baseDn: string;
-  caCertPath: string;
+  caCertPath?: string;
 }
 
 type LdapLoginEnv = Record<string, string | undefined>;
@@ -25,7 +25,6 @@ export function readLdapLoginConfig(env: LdapLoginEnv = process.env): LdapLoginC
   const missing = [
     [url, "AD_LDAP_URL (atau LDAP_URL)"],
     [baseDn, "AD_BASE_DN (atau LDAP_BASE_DN)"],
-    [caCertPath, "LDAP_CA_CERT_PATH"],
   ]
     .filter(([value]) => !value)
     .map(([, name]) => name);
@@ -58,6 +57,6 @@ export function readLdapLoginConfig(env: LdapLoginEnv = process.env): LdapLoginC
     url,
     domain: trimmed(env.LDAP_DOMAIN) || undefined,
     baseDn,
-    caCertPath,
+    caCertPath: caCertPath || undefined,
   };
 }

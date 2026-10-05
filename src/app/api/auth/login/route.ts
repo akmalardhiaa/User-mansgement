@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 
-import { authenticateAD } from "@/lib/auth/ad";
+import { authenticateAD, LdapUnavailableError } from "@/lib/auth/ad";
 import { portalRolesOf } from "@/lib/auth/roles";
 import { SESSION_COOKIE, createSession, sessionCookieOptions } from "@/lib/auth/session";
 import { fail, ok, readJson } from "@/lib/http/apiResponse";
@@ -110,6 +110,14 @@ export async function POST(request: Request) {
       request,
     );
   } catch (error) {
+    if (error instanceof LdapUnavailableError) {
+      return withCors(
+        fail("Server Active Directory tidak bisa dihubungi. Hubungi tim IT.", 503, {
+          code: "AD_UNAVAILABLE",
+        }),
+        request,
+      );
+    }
     console.error("[auth/login]", error);
     return withCors(fail("Tidak bisa masuk saat ini. Coba lagi.", 500), request);
   }

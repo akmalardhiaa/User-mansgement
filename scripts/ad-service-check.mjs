@@ -23,7 +23,7 @@ import nextEnv from "@next/env";
 import { Client } from "ldapts";
 
 const { loadEnvConfig } = nextEnv;
-loadEnvConfig(process.cwd(), true);
+loadEnvConfig(process.cwd(), process.env.NODE_ENV !== "production");
 
 const [, , account, groupArgument] = process.argv;
 

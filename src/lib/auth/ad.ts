@@ -1,10 +1,56 @@
-import { readFile } from "node:fs/promises";
-
+import { readLdapCa, type LdapEnv } from "@/lib/ad/ldapConnection";
 import { DEV_USERS } from "./devUsers";
 import { isLdapLoginConfigured, readLdapLoginConfig } from "./ldapLoginConfig";
 import { authViaMockAd, isMockAdLoginEnabled } from "./mockAdAuth";
 import { rolesFromGroups } from "./roleMapping";
 import type { PortalRole } from "./roles";
+
+export class LdapUnavailableError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "LdapUnavailableError";
+  }
+}
+
+export function isInvalidCredentials(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === 49;
+}
+
+export async function loginTlsOptions(
+  url: string,
+  env: LdapEnv = process.env,
+): Promise<{
+  ca?: Buffer;
+  rejectUnauthorized: true;
+  minVersion: "TLSv1.2";
+  servername: string;
+}> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch (error) {
+    throw new LdapUnavailableError("Alamat server Active Directory tidak valid.", { cause: error });
+  }
+
+  if ((env.NODE_ENV ?? process.env.NODE_ENV) === "production" && parsed.protocol !== "ldaps:") {
+    throw new LdapUnavailableError("Login Active Directory production hanya menerima LDAPS.");
+  }
+  if (parsed.protocol !== "ldaps:") {
+    throw new LdapUnavailableError("Login Active Directory hanya menerima koneksi LDAPS.");
+  }
+
+  const caPath = env.LDAP_CA_CERT_PATH?.trim();
+  try {
+    return {
+      ...(caPath ? { ca: await readLdapCa(caPath) } : {}),
+      rejectUnauthorized: true,
+      minVersion: "TLSv1.2",
+      servername: parsed.hostname,
+    };
+  } catch (error) {
+    throw new LdapUnavailableError("Sertifikat Active Directory tidak bisa dibaca.", { cause: error });
+  }
+}
 
 /**
  * Authentication against Active Directory (LDAP).
@@ -124,10 +170,11 @@ function asArray(value: unknown): string[] {
 }
 
 async function authViaLdap(username: string, password: string): Promise<AdUser | null> {
-  const { Client, InvalidCredentialsError } = await import("ldapts");
+  const { Client } = await import("ldapts");
 
+  const url = (process.env.AD_LDAP_URL ?? process.env.LDAP_URL ?? "").trim();
+  const tlsOptions = await loginTlsOptions(url);
   const config = readLdapLoginConfig();
-  const ca = await readFile(config.caCertPath);
 
   // AD accepts either a UPN (user@domain) or DOMAIN\user for the bind. If the
   // caller typed a bare username and a domain is configured, build the UPN.
@@ -142,12 +189,7 @@ async function authViaLdap(username: string, password: string): Promise<AdUser |
     url: config.url,
     timeout: 8000,
     connectTimeout: 8000,
-    tlsOptions: {
-      ca,
-      rejectUnauthorized: true,
-      minVersion: "TLSv1.2",
-      servername: new URL(config.url).hostname,
-    },
+    tlsOptions,
   });
 
   try {
@@ -155,8 +197,8 @@ async function authViaLdap(username: string, password: string): Promise<AdUser |
     await client.bind(bindName, password);
   } catch (error) {
     await client.unbind().catch(() => undefined);
-    if (error instanceof InvalidCredentialsError) return null;
-    throw error;
+    if (isInvalidCredentials(error)) return null;
+    throw new LdapUnavailableError("Server Active Directory tidak bisa dihubungi.", { cause: error });
   }
 
   try {
@@ -177,6 +219,8 @@ async function authViaLdap(username: string, password: string): Promise<AdUser |
       roles: rolesFromGroups(asArray(entry?.memberOf)),
       department: firstString(entry?.department) || undefined,
     };
+  } catch (error) {
+    throw new LdapUnavailableError("Server Active Directory tidak bisa dihubungi.", { cause: error });
   } finally {
     await client.unbind().catch(() => undefined);
   }
