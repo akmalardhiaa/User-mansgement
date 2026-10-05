@@ -203,6 +203,7 @@ export const ACTIVITY_ACTIONS = [
   "request.completed",
   "directory.exported",
   "employee.profile_updated",
+  "directory.synced",
 ] as const;
 
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];

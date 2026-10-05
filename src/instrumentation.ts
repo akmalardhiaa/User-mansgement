@@ -22,4 +22,9 @@ export async function register(): Promise<void> {
   // having to press "Jalankan worker".
   const { startWorkerSchedulerFromEnv } = await import("@/lib/lifecycle/workerScheduler");
   startWorkerSchedulerFromEnv();
+
+  // And the employee directory, read from Active Directory, so the people in
+  // it appear in the portal without anybody typing them in.
+  const { startDirectorySyncFromEnv } = await import("@/lib/lifecycle/directorySyncScheduler");
+  startDirectorySyncFromEnv();
 }

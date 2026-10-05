@@ -23,6 +23,9 @@ export interface AdAccountState {
   sAMAccountName: string;
   userPrincipalName: string;
   displayName: string;
+  /** First and last name, when the directory holds them. */
+  givenName?: string;
+  sn?: string;
   mail: string;
   department: string;
   title: string;
@@ -121,6 +124,15 @@ export interface AdDriver {
    * The group is matched as a whole DN, never as a substring.
    */
   listGroupMembers(groupDn: string): Promise<AdAccountState[]>;
+
+  /**
+   * Every user account under one container, enabled or not.
+   *
+   * A read, used to keep the portal's employee directory in step with the
+   * directory: an account added in Active Directory appears in the portal
+   * without anybody typing it in. Never writes.
+   */
+  listAccounts(baseDn: string): Promise<AdAccountState[]>;
 
   /**
    * Creates the object DISABLED, always.

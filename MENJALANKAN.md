@@ -157,6 +157,12 @@ Login ke portal. Yang harus benar:
 - Peran portalnya benar — kalau kosong, `AD_GROUP_*` belum cocok dengan group
   yang sebenarnya dipegang akun itu.
 - Direktori karyawan terbaca.
+- **Direktori karyawan terisi sendiri dari AD.** Beberapa detik setelah portal
+  start, lalu tiap 15 menit, portal membaca akun aktif yang punya email dan
+  menampilkannya di halaman Direktori — tanpa input manual. Di `/status-ad`,
+  pemeriksaan **Sinkron karyawan** menyebut kapan terakhir dibaca dan berapa
+  yang baru. Kalau terlalu banyak akun ikut (akun admin, dll.), persempit
+  dengan `AD_SYNC_OUS`.
 - Di `/status-ad`, pemeriksaan **OU per divisi** hijau: setiap OU divisi ada di
   AD dan berada di dalam `AD_MANAGED_OUS`. Divisi yang disebut "belum punya
   OU" akan gagal saat onboarding sampai OU-nya dibuat atau dipetakan.

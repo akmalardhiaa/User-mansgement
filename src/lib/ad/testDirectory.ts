@@ -54,6 +54,9 @@ export type DirectoryFault =
 export interface TestAccount {
   sAMAccountName: string;
   displayName: string;
+  givenName?: string;
+  sn?: string;
+  /** Empty for a service or resource account with no mailbox. */
   mail: string;
   ou: string;
   department?: string;
@@ -194,7 +197,9 @@ export function createTestDirectory(): TestDirectory {
         dn,
         sAMAccountName: account.sAMAccountName,
         displayName: account.displayName,
-        mail: account.mail,
+        givenName: account.givenName,
+        sn: account.sn,
+        mail: account.mail || undefined,
         department: account.department,
         title: account.title,
         managerDn,

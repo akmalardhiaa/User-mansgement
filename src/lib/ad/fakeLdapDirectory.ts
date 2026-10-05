@@ -189,6 +189,8 @@ export class FakeLdapDirectory {
     dn: string;
     sAMAccountName: string;
     displayName?: string;
+    givenName?: string;
+    sn?: string;
     mail?: string;
     department?: string;
     title?: string;
@@ -205,6 +207,8 @@ export class FakeLdapDirectory {
         samaccountname: [options.sAMAccountName],
         userprincipalname: [`${options.sAMAccountName}@corp.example.com`],
         displayname: [options.displayName ?? options.sAMAccountName],
+        givenname: options.givenName ? [options.givenName] : [],
+        sn: options.sn ? [options.sn] : [],
         mail: options.mail ? [options.mail] : [],
         department: options.department ? [options.department] : [],
         title: options.title ? [options.title] : [],

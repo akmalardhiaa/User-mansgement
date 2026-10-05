@@ -17,6 +17,7 @@ import {
   IconPower,
   IconSearch,
   IconSwap,
+  IconSync,
   IconUser,
   IconUserPlus,
 } from "@/components/ui/Icons";
@@ -79,6 +80,11 @@ const ACTION_PRESENTATION: Record<
     label: "profileUpdated" as const,
     tone: "border-hairline-strong bg-elevated text-ink-muted",
     icon: IconUser,
+  },
+  "directory.synced": {
+    label: "directorySynced" as const,
+    tone: "border-hairline-strong bg-elevated text-ink-muted",
+    icon: IconSync,
   },
 };
 

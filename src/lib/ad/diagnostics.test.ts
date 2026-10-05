@@ -6,6 +6,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resetLdapCaCache, type LdapClientLike, type LdapEnv } from "./ldapConnection";
+import type { DirectorySyncStatus } from "@/lib/lifecycle/directorySyncScheduler";
+
 import { runAdDiagnostics } from "./diagnostics";
 
 const BASE_DN = "DC=corp,DC=example,DC=com";
@@ -326,5 +328,51 @@ describe("division OUs", () => {
 
   it("fails a mapping it cannot read", async () => {
     expect(check(await run({ AD_DEPARTMENT_OUS: "Finance OU=Finance" }), "department-ous").status).toBe("fail");
+  });
+});
+
+describe("employee sync", () => {
+  const REPORT = {
+    at: "2026-10-05T03:00:00.000Z",
+    sources: [BASE_DN],
+    read: 120,
+    created: 3,
+    updated: 2,
+    linked: 1,
+    skipped: 4,
+    ignoredDisabled: 9,
+    conflicts: 0,
+    notFound: 0,
+  };
+
+  async function syncCheck(status: DirectorySyncStatus, env: LdapEnv = {}) {
+    const report = await runAdDiagnostics({ env: { NODE_ENV: "development", AD_DRIVER: "ldap", ...env }, syncStatus: () => status });
+    return check(report, "employee-sync");
+  }
+
+  it("is skipped without the LDAP driver", async () => {
+    const result = await runAdDiagnostics({ env: { NODE_ENV: "development" }, syncStatus: () => ({ enabled: false }) });
+
+    expect(check(result, "employee-sync").status).toBe("skip");
+  });
+
+  it("reports the last read in WIB, with what it changed", async () => {
+    const result = await syncCheck({ enabled: true, minutes: 15, lastReport: REPORT });
+
+    expect(result.status).toBe("ok");
+    expect(result.message).toMatch(/120 akun dibaca; 3 baru, 2 diperbarui, 1 ditautkan/);
+    expect(result.message).toMatch(/WIB/);
+  });
+
+  it("warns when the last attempt failed after the last good read", async () => {
+    const result = await syncCheck({
+      enabled: true,
+      minutes: 15,
+      lastReport: REPORT,
+      lastError: { at: "2026-10-05T03:15:00.000Z", message: "DC tidak menjawab" },
+    });
+
+    expect(result.status).toBe("warn");
+    expect(result.message).toMatch(/DC tidak menjawab/);
   });
 });

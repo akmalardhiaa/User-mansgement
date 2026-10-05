@@ -511,6 +511,7 @@ export const id = {
     provisioningDone: "Penyiapan selesai",
     directoryExported: "Direktori diekspor",
     profileUpdated: "Profil diperbarui",
+    directorySynced: "Sinkron dari AD",
   },
 
   notifications: {
@@ -657,6 +658,7 @@ export const id = {
       "managed-ous": "OU yang dikelola",
       "quarantine-ou": "OU karantina",
       "department-ous": "OU per divisi",
+      "employee-sync": "Sinkron karyawan",
       "ciso-group": "Group CISO",
       write: "Mode tulis",
     },

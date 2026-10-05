@@ -438,6 +438,13 @@ Keamanannya bukan opsi yang bisa dimatikan:
   `AD_ACCESS_GROUP_FINANCE`, dan `AD_ACCESS_GROUP_SECURITY` dengan DN yang
   disetujui tim AD. Seluruh OU tujuan, termasuk `AD_QUARANTINE_OU`, harus ada
   di `AD_MANAGED_OUS`.
+- **Direktori karyawan mengikuti AD.** Dengan `AD_DRIVER=ldap`, portal membaca
+  akun pengguna dari AD saat start dan tiap `AD_SYNC_MINUTES` (bawaan 15), lalu
+  memasukkan atau memperbarui direktori karyawannya: tertaut lewat `objectGUID`
+  (atau email untuk data lama), kolom yang dipegang AD disalin, kolom khusus
+  portal tidak disentuh, nilai kosong di AD tidak menghapus isi portal. Hanya
+  akun **aktif** yang punya email yang ditambahkan; akun yang hilang dari AD
+  dibiarkan dan dilaporkan di `/status-ad`, tidak dihapus. Hanya membaca AD.
 - **OU mengikuti divisi.** `AD_DEPARTMENT_OUS` (`Divisi=>DN OU;…`) dan/atau
   `AD_DEPARTMENT_OU_PARENT` (OU bernama sama dengan divisi di bawah OU induk)
   menentukan OU akun baru dari divisi yang dipilih di form, dan pindah divisi

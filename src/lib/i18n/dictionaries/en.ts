@@ -489,6 +489,7 @@ export const en: Dictionary = {
     provisioningDone: "Provisioning finished",
     directoryExported: "Directory exported",
     profileUpdated: "Profile updated",
+    directorySynced: "Synced from AD",
   },
 
   notifications: {
@@ -629,6 +630,7 @@ export const en: Dictionary = {
       "managed-ous": "Managed OUs",
       "quarantine-ou": "Quarantine OU",
       "department-ous": "Division OUs",
+      "employee-sync": "Employee sync",
       "ciso-group": "CISO group",
       write: "Write mode",
     },

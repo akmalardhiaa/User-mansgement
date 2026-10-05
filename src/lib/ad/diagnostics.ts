@@ -6,6 +6,7 @@ import {
   departmentOu,
   departmentOuParent,
 } from "@/lib/lifecycle/accessProfiles";
+import { directorySyncStatus, type DirectorySyncStatus } from "@/lib/lifecycle/directorySyncScheduler";
 
 import { toAdError } from "./ldapErrors";
 import { isManaged } from "./ldapDn";
@@ -25,6 +26,7 @@ export type AdDiagnosticCheckId =
   | "quarantine-ou"
   | "department-ous"
   | "ciso-group"
+  | "employee-sync"
   | "write";
 
 export interface AdDiagnosticCheck {
@@ -166,14 +168,60 @@ async function checkDepartmentOus(
   }
 }
 
+const CLOCK = new Intl.DateTimeFormat("id-ID", {
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "Asia/Jakarta",
+});
+
+/**
+ * Whether the portal's employee directory is being read from AD, and how the
+ * last read went. Reported from this process's memory, not by reading the
+ * directory again: the status page must not cost a full sync per visit.
+ */
+function employeeSyncCheck(status: DirectorySyncStatus, driver: string): AdDiagnosticCheck {
+  const id = "employee-sync";
+  if (driver !== "ldap") {
+    return { id, status: "skip", message: "Sinkronisasi karyawan hanya berjalan dengan AD_DRIVER=ldap." };
+  }
+  if (!status.enabled) {
+    return { id, status: "skip", message: "Sinkronisasi karyawan dimatikan (AD_SYNC_MINUTES=0)." };
+  }
+  const report = status.lastReport;
+  const failure = status.lastError;
+  if (failure && (!report || failure.at > report.at)) {
+    return {
+      id,
+      status: "warn",
+      message: `Sinkronisasi terakhir gagal (${CLOCK.format(new Date(failure.at))} WIB): ${failure.message}`,
+    };
+  }
+  if (!report) {
+    return { id, status: "skip", message: "Belum berjalan; sinkronisasi pertama dimulai beberapa detik setelah portal start." };
+  }
+  const extra = [
+    report.conflicts ? `${report.conflicts} alamat bentrok` : "",
+    report.notFound ? `${report.notFound} tidak ditemukan di AD (dibiarkan)` : "",
+  ].filter(Boolean);
+  return {
+    id,
+    status: "ok",
+    message: `Terakhir ${CLOCK.format(new Date(report.at))} WIB, tiap ${status.minutes} menit: ${report.read} akun dibaca; ${report.created} baru, ${report.updated} diperbarui, ${report.linked} ditautkan${extra.length ? `; ${extra.join(", ")}` : ""}.`,
+  };
+}
+
 export async function runAdDiagnostics({
   env = process.env,
   connect,
   now = () => new Date(),
+  syncStatus = directorySyncStatus,
 }: {
   env?: LdapEnv;
   connect?: () => Promise<LdapClientLike>;
   now?: () => Date;
+  syncStatus?: () => DirectorySyncStatus;
 } = {}): Promise<AdDiagnosticReport> {
   const checks: AdDiagnosticCheck[] = [];
   const production = env.NODE_ENV === "production";
@@ -375,6 +423,8 @@ export async function runAdDiagnostics({
   } else {
     checks.push({ id: "write", status: "ok", message: "Penulisan LDAP diaktifkan." });
   }
+
+  checks.push(employeeSyncCheck(syncStatus(), driver));
 
   const overall = checks.reduce<AdCheckStatus>(
     (worst, check) => (STATUS_WEIGHT[check.status] > STATUS_WEIGHT[worst] ? check.status : worst),

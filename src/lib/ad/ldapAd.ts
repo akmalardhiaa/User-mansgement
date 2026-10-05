@@ -159,6 +159,37 @@ export class LdapAdDriver implements AdDriver {
     });
   }
 
+  async listAccounts(baseDn: string): Promise<AdAccountState[]> {
+    return this.run(`membaca akun di ${baseDn}`, async ({ client }) => {
+      const entries = await client.search(baseDn, {
+        scope: "sub",
+        filter: anyUserFilter(),
+        attributes: ACCOUNT_ATTRIBUTES,
+        binaryAttributes: BINARY_ATTRIBUTES,
+        pageSize: this.config.pageSize,
+      });
+
+      /*
+       * Group membership is not what this read is for, and the access
+       * catalogue may not be configured yet in the read-only phase - when
+       * asking it would throw. Reading the people must not depend on it.
+       */
+      let managedGroups: string[] = [];
+      try {
+        managedGroups = accessProfileGroups.all();
+      } catch {
+        managedGroups = [];
+      }
+
+      const managers = new Map<string, string | undefined>();
+      const accounts: AdAccountState[] = [];
+      for (const entry of entries) {
+        accounts.push(await this.toAccount(client, entry, managers, managedGroups));
+      }
+      return accounts.sort((left, right) => left.sAMAccountName.localeCompare(right.sAMAccountName));
+    });
+  }
+
   /* ---------------------------------------------------------------- writing */
 
   async createAccount(spec: AdCreateSpec): Promise<AdAccountState> {
@@ -454,6 +485,7 @@ export class LdapAdDriver implements AdDriver {
     client: LdapClientLike,
     entry: DirectoryEntry,
     managers = new Map<string, string | undefined>(),
+    managedGroups?: readonly string[],
   ): Promise<AdAccountState> {
     const managerDn = managerDnOf(entry);
     let manager: string | undefined;
@@ -465,7 +497,7 @@ export class LdapAdDriver implements AdDriver {
       manager = managers.get(managerDn);
     }
 
-    return accountFromEntry(entry, { managedGroups: accessProfileGroups.all(), manager });
+    return accountFromEntry(entry, { managedGroups: managedGroups ?? accessProfileGroups.all(), manager });
   }
 
   /**
