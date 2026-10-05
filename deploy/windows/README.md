@@ -1,145 +1,248 @@
-# Deploy HC User Management di Windows Server
+# Deploy HC User Management di Podman Windows
 
-Panduan ini memasang satu instance aplikasi Next.js pada Windows Server. Node.js
-berjalan sebagai Windows Service melalui NSSM; IIS menangani HTTPS dan
-reverse-proxy ke `127.0.0.1:3000`. Koneksi ke Active Directory harus memakai
-LDAPS pada port 636.
+Production menjalankan satu container Linux di Podman machine (WSL2); IIS
+menangani HTTPS dan meneruskan request ke `127.0.0.1:3000`. Koneksi ke domain
+controller wajib memakai LDAPS port 636. Alur approval manager → CISO tetap
+berjalan di aplikasi dan tidak berubah.
 
 ## Prasyarat
 
-- Windows Server yang bergabung atau memiliki jalur jaringan ke domain kantor.
-- Node.js LTS yang didukung proyek, npm, IIS URL Rewrite, IIS ARR, dan NSSM.
-- Sertifikat TLS untuk nama HTTPS portal, serta sertifikat CA internal yang
-  menerbitkan sertifikat domain controller.
-- Akun service AD khusus dengan hak minimum yang disetujui tim AD.
-- Hak lokal **Log on as a service** untuk akun Windows service.
-- Satu direktori aplikasi dan satu volume/folder backup yang persisten.
-- Satu instance aplikasi saja. Store JSON, sesi, outbox, dan worker tidak
-  dirancang untuk beberapa proses atau beberapa server yang menulis bersamaan.
+- Windows Server 2022 dengan WSL2 dan virtualisasi diaktifkan. Windows Server
+  2019 tidak didukung untuk prosedur Podman machine/WSL2 ini.
+- Podman Desktop/Podman CLI untuk Windows dan provider `podman compose`.
+- IIS URL Rewrite, Application Request Routing (ARR), dan sertifikat HTTPS
+  untuk nama portal.
+- Git, jaringan ke DNS kantor dan DC LDAPS, serta akun service AD dengan hak
+  minimum yang disetujui tim AD.
+- Satu akun Windows khusus/terkelola yang memiliki Podman machine. Jangan
+  menjalankan machine sebagai SYSTEM; machine Podman bersifat per-user.
+- Ruang disk untuk image, volume JSON, dan backup. Hanya satu instance portal.
 
-Jalankan PowerShell sebagai Administrator untuk pemasangan service, ACL, dan
-IIS. Pengisian konfigurasi serta uji AD harus dikoordinasikan dengan tim AD.
+## 1. Pasang Podman dan siapkan lokasi
 
-## 1. Ekspor CA ke PEM
-
-1. Buka `certlm.msc`.
-2. Temukan CA internal yang menerbitkan sertifikat LDAPS DC (umumnya di
-   **Trusted Root Certification Authorities** atau **Intermediate Certification
-   Authorities**).
-3. Klik kanan sertifikat CA → **All Tasks** → **Export**.
-4. Pilih **Base-64 encoded X.509 (.CER)** dan simpan hasilnya, misalnya sebagai
-   `C:\HC\UserManagement\certs\corp-ca.cer`.
-5. Bila nama ekstensi perlu `.pem`, ubah nama file menjadi `.pem`; isi Base-64
-   X.509 yang sama adalah PEM yang dibaca Node.js.
-
-Node.js tidak membaca Windows certificate store untuk koneksi LDAP. Isi
-`LDAP_CA_CERT_PATH` dengan path berkas biasa, misalnya
-`C:\HC\UserManagement\certs\corp-ca.pem`. Pastikan nama host pada
-`AD_LDAP_URL`/`LDAP_URL` cocok dengan sertifikat DC.
-
-## 2. Siapkan aplikasi dan environment
-
-Salin repository ke lokasi tetap, misalnya `C:\HC\UserManagement`, lalu:
+Pasang WSL2 dan Podman sesuai panduan resmi untuk Windows Server 2022. Buka
+PowerShell sebagai akun Windows yang akan menjalankan machine:
 
 ```powershell
-Set-Location C:\HC\UserManagement
-npm ci
-npm run build
+podman machine init
+podman machine start
+podman info
+```
+
+Clone repository ke `C:\hc-portal` atau lokasi tetap lain. Perintah di bawah
+mengasumsikan `C:\hc-portal`. Pastikan `podman info` berhasil dari akun yang
+sama sebelum melanjutkan. Jangan menginisialisasi/menjalankan machine sebagai
+akun lain atau SYSTEM.
+
+## 2. Ekspor CA ke PEM
+
+1. Buka `certlm.msc`.
+2. Temukan CA internal yang menerbitkan sertifikat LDAPS DC.
+3. Klik kanan → **All Tasks** → **Export**.
+4. Pilih **Base-64 encoded X.509 (.CER)**; simpan sebagai
+   `C:\hc-portal\certs\corp-root-ca.pem`.
+5. Pastikan folder `certs` berada di samping `compose.production.yml`.
+
+Node.js di container tidak membaca Windows certificate store. Sertifikat
+tersebut di-mount read-only sebagai `/run/certs/corp-root-ca.pem`; nilai
+`LDAP_CA_CERT_PATH` di template sudah menunjuk ke path container itu. Nama host
+DC di `LDAP_URL`/`AD_LDAP_URL` harus cocok dengan sertifikat.
+
+## 3. Environment dan image
+
+```powershell
+Set-Location C:\hc-portal
 Copy-Item deploy\windows\env.production.example .env.production.local
 ```
 
-Lengkapi `.env.production.local` memakai nilai yang diberikan tim AD,
-infrastruktur, dan pemilik proses. Jangan commit atau mengirim file environment
-yang berisi rahasia. Awali dengan `AD_LDAP_WRITE_ENABLED=false`. Isi
-`AD_MANAGED_OUS`, `AD_QUARANTINE_OU`, OU profil, group peran, dan konfigurasi
-email secara konsisten; buat `OUTBOX_ENCRYPTION_KEY` dengan 32 byte acak yang
-di-Base64-kan.
-
-## 3. Uji koneksi hanya-baca
-
-Di PowerShell pada direktori aplikasi, set production lalu jalankan dua uji:
+Ganti placeholder `<...>` dengan nilai yang disetujui AD, infrastruktur, dan
+pemilik proses. Jangan commit `.env.production.local`, jangan masukkan secret
+ke image, dan jangan menyalin konfigurasi production ke `.env`. Pastikan
+`OUTBOX_ENCRYPTION_KEY` berisi 32 byte acak dalam Base64; buat dengan:
 
 ```powershell
-$env:NODE_ENV = "production"
-npm run ad:check -- <akun-uji-AD>
-npm run ad:service-check -- <sAMAccountName-uji>
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-`ad:check` menguji login sebagai akun uji. `ad:service-check` menguji bind
-akun service, pembacaan akun, serta group CISO bila dikonfigurasi. Keduanya
-hanya membaca AD; masukkan kata sandi saat diminta di terminal, jangan sebagai
-argumen perintah. Jangan lanjut bila TLS, bind, base DN, OU, atau hasil
-pembacaan tidak benar.
-
-## 4. Pasang Windows Service
-
-Pastikan `.next\BUILD_ID` dan `.env.production.local` sudah ada, lalu jalankan
-skrip sebagai Administrator:
+Jaga `AD_LDAP_WRITE_ENABLED=false` saat uji. Build image production:
 
 ```powershell
-.\deploy\windows\install-service.ps1
+podman compose --env-file .env.production.local -f compose.production.yml build
 ```
 
-Skrip menyiapkan `data`, `certs`, dan `logs` dengan ACL terbatas, mendaftarkan
-`next start -H 127.0.0.1 -p 3000` lewat NSSM, mengaktifkan start otomatis,
-rotasi log, dan restart setelah proses berhenti. Nama akun service diminta oleh
-skrip; NSSM meminta kata sandinya secara interaktif dan kata sandi tidak
-disimpan di skrip. Jangan jalankan service dengan akun Administrator.
+Build memakai multi-stage Node 22, hanya membawa output Next, dependency
+production, `public`, konfigurasi Next, dan skrip pemeriksaan ke runtime. Nama
+brand dan logo yang bersifat publik dibaca sebagai build args dari env file;
+secret lainnya tidak diteruskan sebagai build args. `ldapts` dan `@next/env`
+berasal dari dependency production; skrip pemeriksaan tidak memerlukan
+devDependencies. Image menjalankan user non-root, dan `.containerignore` serta
+`.dockerignore` mengecualikan `.env*` dan data lokal. Containerfile/compose
+development tidak diubah.
 
-## 5. Pasang IIS reverse proxy HTTPS
+### Uji DNS dari container
 
-1. Instal binding HTTPS pada situs IIS untuk nama DNS portal dan pasang
-   sertifikat TLS yang sesuai.
-2. Instal IIS URL Rewrite dan Application Request Routing (ARR).
-3. Salin `deploy\windows\web.config` ke root situs IIS. Ganti `hc.example.internal`
-   di rule redirect dengan nama DNS portal.
+Container harus dapat resolve FQDN domain controller:
+
+```powershell
+podman compose -f compose.production.yml run --rm portal node -e "require('dns').lookup('<dc>',console.log)"
+```
+
+Jika lookup gagal, periksa resolver yang dipakai machine:
+
+```powershell
+podman machine ssh -- cat /etc/resolv.conf
+```
+
+Minta alamat DNS kantor dari tim infrastruktur. Utamakan memperbaiki DNS pada
+adapter Windows/VPN yang dipakai WSL2, lalu jalankan `podman machine stop` dan
+`podman machine start`. Jika kebijakan mengharuskan resolver khusus di machine,
+tim Linux dapat menonaktifkan pembuatan otomatis resolver di `/etc/wsl.conf`
+dengan bagian berikut:
+
+```ini
+[network]
+generateResolvConf=false
+```
+
+Untuk resolver khusus, jalankan dari PowerShell sebagai akun pemilik machine,
+ganti placeholder dengan DNS yang diberikan tim infrastruktur:
+
+```powershell
+podman machine ssh
+```
+
+Di shell Linux machine, jalankan:
+
+```sh
+sudo sh -c 'printf "[network]\ngenerateResolvConf=false\n" > /etc/wsl.conf'
+sudo sh -c 'printf "nameserver <alamat-DNS-kantor>\n" > /etc/resolv.conf'
+exit
+```
+
+Setelah kembali ke PowerShell:
+
+```powershell
+podman machine stop
+podman machine start
+```
+
+Perubahan manual itu persisten di filesystem Podman machine dan perlu dikelola
+bersama konfigurasi infrastruktur. Jangan menanam alamat IP DC ke konfigurasi
+LDAP sebagai jalan pintas: TLS memeriksa nama host sertifikat.
+
+## 4. Uji AD hanya-baca
+
+Image mengatur `NODE_ENV=production`, dan `env_file` compose memuat
+`.env.production.local`. Jalankan dari terminal interaktif:
+
+```powershell
+podman compose -f compose.production.yml run --rm portal npm run ad:check -- <user>
+podman compose -f compose.production.yml run --rm portal npm run ad:service-check -- <sAMAccountName>
+```
+
+`ad:check` meminta password login secara tersembunyi di terminal. Jangan
+menambahkan password sebagai argumen command: itu dapat terlihat di riwayat
+shell/process list, dan skrip memang tidak membutuhkannya sebagai argumen.
+`ad:service-check` membaca konfigurasi akun service dari env file. Skrip
+diagnostik hanya membaca AD. Jangan lanjut bila CA, bind, base DN, OU, atau
+hasil uji tidak benar.
+
+## 5. Jalankan container dan daftarkan startup
+
+CA file, `.env.production.local`, dan image harus sudah tersedia:
+
+```powershell
+podman compose -f compose.production.yml up -d
+podman compose -f compose.production.yml ps
+```
+
+Port container hanya dipublish pada `127.0.0.1:3000`; volume bernama `hc-data`
+menyimpan JSON, sesi, outbox, dan folder karyawan pada filesystem Linux
+Podman machine. Jangan menggantinya dengan bind mount ke disk Windows: store
+mengandalkan rename atomik.
+
+Untuk mulai otomatis setelah Windows boot, buka PowerShell sebagai
+Administrator pada akun Windows pemilik Podman machine, lalu:
+
+```powershell
+.\deploy\windows\register-startup-task.ps1
+```
+
+Masukkan akun pemilik machine dan password saat diminta. Password diberikan ke
+Task Scheduler agar task dapat berjalan saat pengguna tidak login; password
+tidak ditulis ke skrip. Task memanggil `start-portal.ps1`, yang mencoba
+menyalakan machine, menunggu `podman info`, menjalankan compose secara
+idempoten, dan mencatat log ke `C:\hc-portal\logs`.
+
+## 6. IIS HTTPS reverse proxy
+
+1. Pasang sertifikat dan binding HTTPS IIS untuk nama DNS portal.
+2. Instal URL Rewrite dan ARR.
+3. Salin `deploy\windows\web.config` ke root situs IIS dan ubah host contoh
+   `hc.example.internal` ke nama DNS yang sebenarnya.
 4. Jalankan perintah `appcmd` yang tercantum sebagai komentar di `web.config`
-   untuk mengaktifkan proxy ARR, `preserveHostHeader`, dan mengizinkan
+   untuk mengaktifkan ARR proxy, `preserveHostHeader`, dan mengizinkan
    `HTTP_X_FORWARDED_PROTO`.
-5. Verifikasi situs hanya dapat dicapai lewat HTTPS dan meneruskan ke
+5. Jangan expose port 3000 ke jaringan; arahkan IIS ke
    `http://127.0.0.1:3000`.
 
-Jangan expose port 3000 ke jaringan. Firewall hanya perlu mengizinkan HTTPS ke
-IIS dan LDAPS 636 dari server aplikasi menuju DC yang disetujui.
+## 7. Verifikasi dan aktifkan penulisan
 
-## 6. Verifikasi dan aktifkan penulisan
+- Login ke portal lalu buka `https://<nama-portal>/status-ad` dengan role yang
+  memiliki `execution.run`.
+- Pastikan pemeriksaan CA, bind, base DN, OU kelola, quarantine OU, role groups,
+  dan CISO sesuai konfigurasi.
+- Pastikan dua skrip uji AD berhasil dan email/outbox production siap.
+- Alur manager → CISO tetap wajib sebelum worker menjalankan perubahan.
+- Setelah pemilik AD menyetujui akun service dan OU, set
+  `AD_LDAP_WRITE_ENABLED=true` di `.env.production.local`, lalu
+  `podman compose -f compose.production.yml up -d`.
+- Mulai dari pilot OU yang tercantum di `AD_MANAGED_OUS`; pantau halaman
+  `/status-ad`, log container, IIS, dan event Windows.
 
-- Buka `https://<nama-portal>/status-ad` dengan akun portal berizin
-  `execution.run`. Status diagnostik menunjukkan konfigurasi, CA, bind, DN,
-  OU, dan mode tulis.
-- Pastikan hasil `ad:check` dan `ad:service-check` juga berhasil.
-- Uji alur approval yang sudah berlaku di lingkungan uji; approval manager lalu
-  CISO tetap menjadi prasyarat eksekusi.
-- Setelah pemilik AD menyetujui OU dan hak akun service, ubah
-  `AD_LDAP_WRITE_ENABLED=true`, lalu restart service. Mulai dengan satu OU
-  pilot yang termasuk `AD_MANAGED_OUS`.
-- Pantau Windows Event Viewer, log NSSM, IIS, dan halaman `/status-ad`.
+## Backup dan restore
 
-## Backup data
-
-Store JSON, sesi, serta outbox berada di bawah `data` kecuali path environment
-diubah. Jalankan:
+`backup-data.ps1` menghentikan portal sementara agar ekspor volume konsisten,
+menghasilkan arsip tar bertimestamp di `C:\hc-portal\backups`, menyalakan
+kembali portal, dan menghapus arsip lebih lama dari 30 hari:
 
 ```powershell
 .\deploy\windows\backup-data.ps1
 ```
 
-Skrip membuat ZIP bertimestamp, menghapus arsip lebih lama dari 30 hari, dan
-menyediakan contoh pendaftaran Task Scheduler. Uji pemulihan backup secara
-berkala. Simpan backup di lokasi terpisah yang juga dibatasi ACL; backup berisi
-data pegawai dan sesi.
+Skrip menyertakan contoh pendaftaran Task Scheduler harian. Untuk restore:
+
+1. Hentikan portal: `podman compose -f compose.production.yml down`.
+2. Simpan salinan volume saat ini atau ekspor kondisi saat ini terlebih dahulu.
+3. Hapus volume `hc-data` hanya setelah memastikan arsip dan lokasi yang dipilih
+   benar, lalu buat kembali: `podman volume rm hc-data` dan
+   `podman volume create hc-data`.
+4. Import arsip: `podman volume import hc-data C:\hc-portal\backups\hc-data-<timestamp>.tar`.
+5. Jalankan `podman compose -f compose.production.yml up -d` dan verifikasi
+   login, `/status-ad`, data, serta antrean.
+
+Backup berisi data pegawai dan sesi; lindungi ACL dan salin ke media terpisah.
+Uji restore berkala di lingkungan terisolasi.
 
 ## Update aplikasi
 
-1. Pastikan backup baru tersedia.
-2. Hentikan service dari Services atau `nssm stop HCUserManagement`.
-3. Perbarui source ke versi yang disetujui, jalankan `npm ci`, lalu
-   `npm run build`.
-4. Jangan menimpa `.env.production.local`, `data`, `certs`, atau `logs`.
-5. Jalankan uji service-check bila ada perubahan koneksi atau izin AD.
-6. Mulai service dan verifikasi `/status-ad`, login, worker, dan IIS.
-7. Bila update gagal, pulihkan paket aplikasi sebelumnya dan backup data yang
-   konsisten.
+Jalankan sebagai akun pemilik Podman machine:
 
-Jangan menjalankan dua instance, bahkan sementara saat update atau uji coba.
-Penjadwal worker dan store berkas JSON mengasumsikan satu proses penulis.
+```powershell
+.\deploy\windows\update-portal.ps1
+```
+
+Skrip menjalankan `git pull`, menyalakan/memeriksa Podman machine, build image
+production memakai `.env.production.local` untuk build args brand,
+memperbarui container, dan menampilkan status compose serta healthcheck. Pastikan backup terbaru
+sebelum update. Jangan menimpa `.env.production.local`, `certs`, atau volume
+`hc-data`. Bila gagal, pulihkan versi aplikasi sebelumnya dan data dari backup
+yang konsisten.
+
+## Batas deployment
+
+Hanya satu container/instance portal boleh berjalan terhadap volume `hc-data`.
+Worker, outbox, dan penguncian store JSON berada dalam satu proses; beberapa
+instance dapat memproses pekerjaan yang sama atau merusak konsistensi berkas.
+Jangan scale service, menjalankan container kedua untuk update, atau
+menghubungkan volume yang sama dari host lain.

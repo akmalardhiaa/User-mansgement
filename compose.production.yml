@@ -1,0 +1,31 @@
+services:
+  portal:
+    image: hc-portal:latest
+    container_name: hc-portal
+    build:
+      context: .
+      dockerfile: Containerfile.production
+      args:
+        NEXT_PUBLIC_BRAND_NAME: ${NEXT_PUBLIC_BRAND_NAME:-User Management}
+        NEXT_PUBLIC_BRAND_LOGO: ${NEXT_PUBLIC_BRAND_LOGO:-/brand/logo.svg}
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: always
+    env_file:
+      - .env.production.local
+    environment:
+      NODE_ENV: production
+    volumes:
+      # A named volume keeps the JSON store on the Linux VM filesystem, where
+      # atomic rename works reliably; do not replace this with a Windows bind mount.
+      - hc-data:/app/data
+      # CA bundle is a read-only host file. Add :Z only if the Linux host needs SELinux relabeling.
+      - ./certs/corp-root-ca.pem:/run/certs/corp-root-ca.pem:ro
+      # USER_FOLDER_ROOT=/app/data/user-folders is already persisted by hc-data.
+      # If using a separate share, mount it here and set USER_FOLDER_ROOT to its
+      # container path. This is optional and does not affect the JSON store.
+      # - ./user-folders:/mnt/user-folders
+
+volumes:
+  hc-data:
+    name: hc-data
