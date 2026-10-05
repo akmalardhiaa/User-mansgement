@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useT } from "@/components/i18n/LocaleProvider";
 import { Button } from "@/components/ui/Button";
-import { Card, TextareaField } from "@/components/ui/Field";
+import { Card } from "@/components/ui/Field";
 import { FormAlert } from "@/components/ui/FormAlert";
 import { IconCheck, IconClose } from "@/components/ui/Icons";
 import { postJson } from "@/lib/client/accountsApi";
@@ -40,12 +40,12 @@ export function TokenDecisionForm({
    * fetching the URL decides nothing, and the decision is credited to the owner
    * of the link — narrower than a GET that mutates, and not zero.
    *
-   * "REJECTED" never auto-submits. A rejection requires a reason, the requester
-   * reads it, and there is nothing to submit until somebody writes one.
+   * "REJECTED" never auto-submits, though it asks for no reason any more: one
+   * more click confirms it. Without that click, the same link scanners that
+   * can approve by opening a link would reject every request they opened.
    */
   initial?: "APPROVED" | "REJECTED";
 }) {
-  const [reason, setReason] = useState("");
   const [rejecting, setRejecting] = useState(initial === "REJECTED");
   const t = useT();
   const [busy, setBusy] = useState<"APPROVED" | "REJECTED" | null>(null);
@@ -58,7 +58,7 @@ export function TokenDecisionForm({
 
     const result = await postJson<{ requestId: string; status: string; decision: string }>(
       "/api/approval-actions",
-      { token, decision, reason: reason.trim() || undefined },
+      { token, decision },
     );
 
     if (result.ok) {
@@ -132,17 +132,7 @@ export function TokenDecisionForm({
         <FormAlert tone="error">{error}</FormAlert>
 
 
-        {rejecting ? (
-          <TextareaField
-            label={t.approval.rejectReason}
-            name="reason"
-            rows={3}
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            placeholder={t.approval.rejectReasonPlaceholder}
-            hint={t.approval.rejectReasonHint}
-          />
-        ) : null}
+        {rejecting ? <p className="text-sm text-ink">{t.approval.rejectConfirm}</p> : null}
 
         <div className="flex flex-wrap gap-2.5">
           {rejecting ? (
@@ -151,7 +141,7 @@ export function TokenDecisionForm({
                 variant="danger"
                 icon={<IconClose />}
                 loading={busy === "REJECTED"}
-                disabled={reason.trim().length === 0 || busy !== null}
+                disabled={busy !== null}
                 onClick={() => decide("REJECTED")}
               >
                 {t.approval.sendRejection}

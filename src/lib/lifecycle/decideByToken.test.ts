@@ -156,11 +156,14 @@ describe("what the link refuses", () => {
     await expect(decideByToken(token, { decision: "APPROVED" })).rejects.toThrow(/tidak berlaku/);
   });
 
-  it("refuses a rejection with no reason", async () => {
+  it("does not refuse a rejection for having no reason", async () => {
+    // The company decided a rejection stands on its own.
     await raise();
     const token = await tokenFromOutbox("MANAGER");
 
-    await expect(decideByToken(token, { decision: "REJECTED" })).rejects.toThrow(/Alasan/);
+    const rejected = await decideByToken(token, { decision: "REJECTED" });
+
+    expect(rejected.status).toBe("REJECTED");
   });
 
   it("rejects a value nobody issued", async () => {

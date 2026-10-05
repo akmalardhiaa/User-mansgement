@@ -255,27 +255,14 @@ function buildCard(payload: ApprovalMailPayload, actionUrl: string): unknown {
         headers: [{ name: "Content-Type", value: "application/json" }],
       },
       {
-        /*
-         * A rejection collects its reason in the card. The requester is going to
-         * read it, and "rejected, no reason given" is how a request comes back
-         * unchanged — so the field is part of the action rather than something
-         * to chase afterwards.
-         */
+        // No reason is asked for: the company decided a rejection stands on
+        // its own, and the requester follows up in person when they need to.
         type: "Action.Http",
         title: "Tolak",
         method: "POST",
         url: actionUrl,
-        body: JSON.stringify({ token: payload.token, decision: "REJECTED", reason: "{{reason.value}}" }),
+        body: JSON.stringify({ token: payload.token, decision: "REJECTED" }),
         headers: [{ name: "Content-Type", value: "application/json" }],
-        inputs: [
-          {
-            type: "Input.Text",
-            id: "reason",
-            isMultiline: true,
-            isRequired: true,
-            title: "Alasan penolakan",
-          },
-        ],
       },
     ],
   };

@@ -561,10 +561,7 @@ export async function decide(
       );
     }
 
-    if (input.decision === "REJECTED" && !input.reason?.trim()) {
-      throw new LifecycleError("INVALID", "Alasan penolakan wajib diisi.");
-    }
-
+    // A rejection needs no reason: the company decided it stands on its own.
     applyDecision(draft, request, step, input, actor, "PORTAL");
     return request;
   });
@@ -749,9 +746,7 @@ export async function decideByToken(
         "Isi pengajuan tidak cocok dengan sidik jari yang disetujui.",
       );
     }
-    if (input.decision === "REJECTED" && !input.reason?.trim()) {
-      throw new LifecycleError("INVALID", "Alasan penolakan wajib diisi.");
-    }
+    // A rejection needs no reason; one sent along is still recorded.
 
     // Consumed here, inside the same transaction as the decision below. If any
     // of it fails, nothing is written and the link is still usable.

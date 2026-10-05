@@ -234,12 +234,13 @@ describe("deciding", () => {
     ).rejects.toThrow(LifecycleError);
   });
 
-  it("requires a reason to reject", async () => {
+  it("rejects without a reason", async () => {
+    // The company decided a rejection stands on its own.
     const request = await raise(termination());
 
-    await expect(
-      decide(request.id, { version: 1, stage: "MANAGER", decision: "REJECTED" }, MANAGER),
-    ).rejects.toThrow(/Alasan penolakan/);
+    const rejected = await decide(request.id, { version: 1, stage: "MANAGER", decision: "REJECTED" }, MANAGER);
+
+    expect(rejected.status).toBe("REJECTED");
   });
 
   it("ends the request on rejection, with the reason recorded", async () => {

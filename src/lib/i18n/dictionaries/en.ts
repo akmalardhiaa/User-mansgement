@@ -382,9 +382,7 @@ export const en: Dictionary = {
     managerScope: "You are approving that the division needs this change.",
     cisoScope:
       "You are approving what it does to access. This authorises the change; it does not carry it out.",
-    rejectReason: "Reason for rejecting",
-    rejectReasonPlaceholder: "Say what needs to change before this is raised again.",
-    rejectReasonHint: "Required. The requester reads this.",
+    rejectConfirm: "Reject this request? The requester will be told it was rejected.",
     sendRejection: "Send the rejection",
     approve: "Approve",
     reject: "Reject",

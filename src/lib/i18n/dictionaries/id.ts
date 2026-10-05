@@ -403,9 +403,7 @@ export const id = {
     managerScope: "Anda menyetujui kebutuhan divisi atas perubahan ini.",
     cisoScope:
       "Anda menyetujui dampak aksesnya. Persetujuan ini mengesahkan perubahan, bukan menjalankannya.",
-    rejectReason: "Alasan penolakan",
-    rejectReasonPlaceholder: "Jelaskan apa yang perlu diperbaiki sebelum diajukan ulang.",
-    rejectReasonHint: "Wajib diisi. Pemohon membaca alasan ini.",
+    rejectConfirm: "Tolak pengajuan ini? Pemohon akan diberi tahu bahwa pengajuannya ditolak.",
     sendRejection: "Kirim penolakan",
     approve: "Setujui",
     reject: "Tolak",
