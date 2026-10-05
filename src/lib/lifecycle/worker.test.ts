@@ -5,8 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetAdDriver } from "@/lib/ad";
-import { readMockDirectory } from "@/lib/ad/mockAd";
-import type { AdAccountState } from "@/lib/ad/types";
+import { installTestDirectory, type TestAccount, type TestDirectory } from "@/lib/ad/testDirectory";
 import type { StoreShape } from "@/lib/db/store";
 
 import { accessProfileGroups, accessProfileOu } from "./accessProfiles";
@@ -25,6 +24,10 @@ import type { LifecyclePayload, LifecycleRequest, LifecycleStatus } from "./type
 
 let workspace: string;
 let storePath: string;
+let dir: TestDirectory;
+
+/** The directory hands out canonical GUIDs, so the fixtures use one too. */
+const RIZKY_GUID = "4b0c7a62-7a6e-4c1e-9a43-3f6a1d2b5e10";
 
 const ONBOARDING: LifecyclePayload = {
   kind: "ONBOARDING",
@@ -83,11 +86,10 @@ function employee(overrides: Partial<StoreShape["employees"][number]> = {}) {
   };
 }
 
-function adAccount(overrides: Partial<AdAccountState> = {}): AdAccountState {
+function adAccount(overrides: Partial<TestAccount> = {}): TestAccount {
   return {
-    objectGUID: "guid-rizky",
+    objectGUID: RIZKY_GUID,
     sAMAccountName: "rizky.maulana",
-    userPrincipalName: "rizky.maulana@example.com",
     displayName: "Rizky Maulana",
     mail: "rizky.maulana@example.com",
     department: "IT — Engineering",
@@ -100,7 +102,7 @@ function adAccount(overrides: Partial<AdAccountState> = {}): AdAccountState {
   };
 }
 
-async function seed(store: Partial<StoreShape>, ad: AdAccountState[] = []): Promise<void> {
+async function seed(store: Partial<StoreShape>, ad: TestAccount[] = []): Promise<void> {
   const full: StoreShape = {
     employees: [],
     requests: [],
@@ -114,7 +116,7 @@ async function seed(store: Partial<StoreShape>, ad: AdAccountState[] = []): Prom
     ...store,
   };
   await writeFile(storePath, JSON.stringify(full, null, 2), "utf8");
-  await writeFile(path.join(workspace, "mock-ad.json"), JSON.stringify({ accounts: ad }, null, 2), "utf8");
+  for (const account of ad) dir.addAccount(account);
 }
 
 async function store(): Promise<StoreShape> {
@@ -125,10 +127,12 @@ beforeEach(async () => {
   workspace = await mkdtemp(path.join(tmpdir(), "hc-worker-"));
   storePath = path.join(workspace, "store.json");
   vi.stubEnv("HC_DATA_FILE", storePath);
-  vi.stubEnv("AD_MOCK_FILE", path.join(workspace, "mock-ad.json"));
-  vi.stubEnv("AD_DRIVER", "mock");
-  vi.stubEnv("AD_MOCK_FAULT", "none");
   resetAdDriver();
+  // The real LDAP driver over a fake directory, with the two people these
+  // requests name as manager already in it.
+  dir = installTestDirectory();
+  dir.addManager("sarah.wijaya", "Sarah Wijaya");
+  dir.addManager("bagus.nugroho", "Bagus Nugroho");
 });
 
 afterEach(async () => {
@@ -152,7 +156,7 @@ describe("onboarding, start to finish", () => {
     expect(created?.status).toBe("ACTIVE");
     expect(created?.objectGUID).toBeTruthy();
 
-    const [account] = await readMockDirectory();
+    const [account] = await dir.accounts();
     expect(account.enabled).toBe(true);
     expect(account.groups).toEqual(accessProfileGroups("engineering"));
   });
@@ -198,8 +202,7 @@ describe("onboarding, start to finish", () => {
 describe("a job that fails part-way", () => {
   it("leaves the account disabled and creates no employee record", async () => {
     // Groups fail after the account has been created.
-    vi.stubEnv("AD_MOCK_FAULT", "partial-groups");
-    resetAdDriver();
+    dir.fail("partial-groups");
     await seed({ lifecycleRequests: [request({ payload: ONBOARDING })] });
 
     const report = await runDueJobs({ workerId: "w1" });
@@ -210,22 +213,20 @@ describe("a job that fails part-way", () => {
     // Nothing may claim this person exists in the directory of record.
     expect(after.employees).toHaveLength(0);
 
-    const [account] = await readMockDirectory();
+    const [account] = await dir.accounts();
     // The account exists but cannot be used, which is the safe half-state.
     expect(account.enabled).toBe(false);
     expect(account.groups).toEqual([]);
   });
 
   it("resumes from the checkpoint instead of creating a second account", async () => {
-    vi.stubEnv("AD_MOCK_FAULT", "partial-groups");
-    resetAdDriver();
+    dir.fail("partial-groups");
     await seed({ lifecycleRequests: [request({ payload: ONBOARDING })] });
     await runDueJobs({ workerId: "w1" });
 
     // The outage clears. A retry must not re-run create-account: doing so would
     // either make a second account or fail on CONFLICT.
-    vi.stubEnv("AD_MOCK_FAULT", "none");
-    resetAdDriver();
+    dir.fail("none");
     const after = await store();
     after.lifecycleRequests[0].status = "QUEUED";
     await writeFile(storePath, JSON.stringify(after, null, 2), "utf8");
@@ -233,7 +234,7 @@ describe("a job that fails part-way", () => {
     const second = await runDueJobs({ workerId: "w1" });
     expect(second.completed).toBe(1);
 
-    expect(await readMockDirectory()).toHaveLength(1);
+    expect(await dir.accounts()).toHaveLength(1);
     const final = await store();
     expect(final.lifecycleRequests[0].status).toBe("COMPLETED");
     expect(final.executionJobs[0].attempt).toBe(2);
@@ -242,14 +243,13 @@ describe("a job that fails part-way", () => {
 
 describe("a permission failure", () => {
   it("fails without retrying, and writes nothing", async () => {
-    vi.stubEnv("AD_MOCK_FAULT", "permission");
-    resetAdDriver();
+    dir.fail("permission");
     await seed({ lifecycleRequests: [request({ payload: ONBOARDING })] });
 
     const report = await runDueJobs({ workerId: "w1" });
 
     expect(report.outcomes[0].errorCode).toBe("AD_PERMISSION");
-    expect(await readMockDirectory()).toHaveLength(0);
+    expect(await dir.accounts()).toHaveLength(0);
     expect((await store()).employees).toHaveLength(0);
   });
 });
@@ -270,7 +270,7 @@ describe("drift", () => {
     await seed(
       {
         // Somebody moved them to Finance after the request was approved.
-        employees: [employee({ department: "Finance", objectGUID: "guid-rizky" })],
+        employees: [employee({ department: "Finance", objectGUID: RIZKY_GUID })],
         lifecycleRequests: [
           request({
             payload: movement,
@@ -294,7 +294,7 @@ describe("drift", () => {
     expect(report.outcomes[0].errorCode).toBe("DRIFT");
     // Not a directory failure and not retryable: the approval was given for a
     // situation that no longer holds.
-    const [account] = await readMockDirectory();
+    const [account] = await dir.accounts();
     expect(account.department).toBe("IT — Engineering");
     expect((await store()).employees[0].department).toBe("Finance");
   });
@@ -344,7 +344,7 @@ describe("an employee never linked to a directory object", () => {
     const report = await runDueJobs({ workerId: "w1" });
 
     expect(report.completed).toBe(1);
-    expect((await readMockDirectory())[0].enabled).toBe(false);
+    expect((await dir.accounts())[0].enabled).toBe(false);
   });
 });
 
@@ -359,7 +359,7 @@ describe("termination", () => {
 
     await seed(
       {
-        employees: [employee({ objectGUID: "guid-rizky" })],
+        employees: [employee({ objectGUID: RIZKY_GUID })],
         lifecycleRequests: [request({ payload: termination, employeeId: "emp_1" })],
       },
       [adAccount()],
@@ -368,7 +368,7 @@ describe("termination", () => {
     const report = await runDueJobs({ workerId: "w1" });
     expect(report.completed).toBe(1);
 
-    const [account] = await readMockDirectory();
+    const [account] = await dir.accounts();
     expect(account.enabled).toBe(false);
     expect(account.groups).toEqual([]);
     expect((await store()).employees[0].status).toBe("DISABLED");
@@ -388,15 +388,14 @@ describe("a read that fails mid-job", () => {
 
     await seed(
       {
-        employees: [employee({ objectGUID: "guid-rizky" })],
+        employees: [employee({ objectGUID: RIZKY_GUID })],
         lifecycleRequests: [request({ payload: termination, employeeId: "emp_1" })],
       },
       [adAccount()],
     );
 
     // Fails every call, including the reads that used to escape the try/catch.
-    vi.stubEnv("AD_MOCK_FAULT", "permission");
-    resetAdDriver();
+    dir.fail("permission");
 
     const report = await runDueJobs({ workerId: "w1" });
 
@@ -485,7 +484,7 @@ describe("scheduling", () => {
     expect(report.ran).toBe(0);
     expect((await store()).lifecycleRequests[0].status).toBe("SCHEDULED");
     // The account is untouched: still enabled, nobody disabled early.
-    const [account] = await readMockDirectory();
+    const [account] = await dir.accounts();
     expect(account.enabled).toBe(true);
   });
 

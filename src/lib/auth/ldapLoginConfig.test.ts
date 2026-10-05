@@ -31,8 +31,8 @@ describe("LDAP login configuration", () => {
     ).toBe("ldaps://dc.corp.example.com");
   });
 
-  it("reports whether an LDAP endpoint is configured without treating mock login as AD", () => {
-    expect(isLdapLoginConfigured({ MOCK_AD_LOGIN: "true" })).toBe(false);
+  it("reports whether an LDAP endpoint is configured", () => {
+    expect(isLdapLoginConfigured({})).toBe(false);
     expect(isLdapLoginConfigured({ AD_LDAP_URL: "ldaps://dc.corp.example.com" })).toBe(true);
   });
 

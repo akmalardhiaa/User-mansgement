@@ -103,7 +103,7 @@ echo  ==========================================================
 echo   Portal berjalan di  http://localhost:3000
 echo  ==========================================================
 echo.
-echo   Login:  admin / admin12345   atau   ayu.prameswari / mock12345
+echo   Login:  admin / admin12345   - selama AD belum disambungkan
 echo.
 echo   Melihat log      :  matikan-podman.bat tidak perlu; jalankan
 echo                       wsl -d %MESIN% -u root -- sh -lc "cd '%DIRLINUX%' && podman logs -f hc-portal"

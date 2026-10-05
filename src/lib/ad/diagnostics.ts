@@ -131,18 +131,16 @@ export async function runAdDiagnostics({
     } catch (error) {
       checks.push({ id: "config", status: "fail", message: errorMessage(error, password) });
     }
-  } else if (driver === "mock") {
-    checks.push({
-      id: "driver",
-      status: production ? "fail" : "warn",
-      message: production ? "Driver mock tidak boleh dipakai di production." : "Driver mock aktif; tidak terhubung ke AD.",
-    });
-    checks.push({ id: "config", status: "skip", message: "Konfigurasi LDAP tidak berlaku untuk driver mock." });
   } else {
+    // A fail in every environment: without the LDAP driver the worker cannot
+    // carry out anything, and there is no simulated directory to fall back on.
     checks.push({
       id: "driver",
-      status: production ? "fail" : "warn",
-      message: "AD_DRIVER harus disetel ke ldap atau mock.",
+      status: "fail",
+      message:
+        driver === "mock"
+          ? "AD_DRIVER=mock sudah tidak ada: direktori simulasi telah dihapus. Ganti menjadi AD_DRIVER=ldap."
+          : "AD_DRIVER belum disetel ke ldap, jadi worker tidak bisa menjalankan perubahan apa pun.",
     });
     checks.push({ id: "config", status: "skip", message: "Konfigurasi LDAP tidak dapat diperiksa." });
   }

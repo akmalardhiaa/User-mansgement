@@ -1,7 +1,6 @@
 import { AdConfigurationError } from "./configError";
 import { LdapAdDriver } from "./ldapAd";
 import { readLdapAdConfig } from "./ldapConnection";
-import { MockAdDriver, type FaultMode } from "./mockAd";
 import type { AdDriver } from "./types";
 
 /**
@@ -11,30 +10,14 @@ import type { AdDriver } from "./types";
  * said which directory it is acting on is a deployment nobody has decided
  * about, and defaulting to the safe-sounding option would hide that.
  *
- * Production refuses the mock outright. The plan is explicit that a
- * misconfigured environment must fail to start rather than run in simulation
- * while looking real — a demo driver in production would report accounts as
- * created and disabled that no directory has ever heard of.
+ * There is one answer, `ldap`. The simulated directory that used to be the
+ * other one is gone: every account the worker reports on is an account a real
+ * domain controller holds, in development as much as in production. Tests get
+ * their directory from fakeLdapDirectory.ts, through the real driver, by way of
+ * setAdDriverForTests below.
  */
 
-export type AdDriverName = "mock" | "ldap";
-
 let cached: AdDriver | undefined;
-
-function parseFault(): FaultMode {
-  const raw = process.env.AD_MOCK_FAULT?.trim().toLowerCase();
-  if (!raw || raw === "none") return { kind: "none" };
-  if (raw === "partial-groups") return { kind: "partial-groups" };
-  if (raw === "timeout-after-write") return { kind: "timeout-after-write" };
-  if (raw === "permission") return { kind: "permission" };
-
-  const transient = /^transient:(\d+)$/.exec(raw);
-  if (transient) return { kind: "transient", count: Number.parseInt(transient[1], 10) };
-
-  throw new Error(
-    `AD_MOCK_FAULT="${raw}" tidak dikenal. Pilihan: none, transient:<n>, partial-groups, timeout-after-write, permission.`,
-  );
-}
 
 export { AdConfigurationError } from "./configError";
 
@@ -42,12 +25,9 @@ export function getAdDriver(): AdDriver {
   if (cached) return cached;
 
   const configured = process.env.AD_DRIVER?.trim().toLowerCase();
-  const production = process.env.NODE_ENV === "production";
 
   if (configured === "ldap") {
     /*
-     * The real directory.
-     *
      * The configuration is read here rather than inside the driver so a
      * deployment that is missing a variable fails when the driver is asked for
      * — at the first submit or the first sweep, with every missing name in one
@@ -64,17 +44,16 @@ export function getAdDriver(): AdDriver {
   }
 
   if (configured === "mock") {
-    if (production) {
-      throw new AdConfigurationError(
-        "AD_DRIVER=mock ditolak di production. Driver simulasi tidak boleh berjalan di lingkungan sungguhan.",
-      );
-    }
-    cached = new MockAdDriver(parseFault());
-    return cached;
+    // Named outright, because a .env written before the simulated directory
+    // was removed still says this, and "not set" would send its owner looking
+    // in the wrong place.
+    throw new AdConfigurationError(
+      "AD_DRIVER=mock sudah tidak ada: direktori simulasi telah dihapus dari aplikasi ini. Ganti menjadi AD_DRIVER=ldap dan isi konfigurasi AD (template: .env.onprem.example).",
+    );
   }
 
   throw new AdConfigurationError(
-    "AD_DRIVER belum diset. Isi `mock` untuk demo, atau `ldap` setelah worker on-premise tersedia.",
+    "AD_DRIVER belum diset. Isi AD_DRIVER=ldap beserta konfigurasi AD (template: .env.onprem.example).",
   );
 }
 
@@ -83,9 +62,19 @@ export function isAdConfigured(): boolean {
   return Boolean(process.env.AD_DRIVER?.trim());
 }
 
-/** Drops the cached driver. Tests and fault-mode changes need this. */
+/** Drops the cached driver, so the next call reads AD_DRIVER again. */
 export function resetAdDriver(): void {
   cached = undefined;
+}
+
+/**
+ * Test seam: getAdDriver() returns this driver until resetAdDriver().
+ *
+ * How a test runs the worker against fakeLdapDirectory.ts through the real
+ * LdapAdDriver. Nothing in the application calls it.
+ */
+export function setAdDriverForTests(driver: AdDriver): void {
+  cached = driver;
 }
 
 export type { AdDriver } from "./types";

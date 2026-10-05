@@ -30,8 +30,8 @@ export async function POST() {
   } catch (error) {
     if (error instanceof AdConfigurationError) {
       // Misconfiguration, not a runtime fault: the deployment has not said
-      // which directory it acts on, or has asked for a simulated one in
-      // production. Both must be visible rather than worked around.
+      // which directory it acts on, or still asks for the simulated one that
+      // no longer exists. Both must be visible rather than worked around.
       return fail(error.message, 503, { code: "AD_NOT_CONFIGURED" });
     }
     console.error("[worker/run]", error);

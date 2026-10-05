@@ -16,9 +16,8 @@ import { EmailError, type EmailAcceptance, type EmailDriver, type EmailMessage }
  * what that means: a file on disk is exactly as "delivered" as a 202 from
  * Graph, which is to say not at all.
  *
- * A fault mode exists for the same reason the AD mock has one — the retry,
- * backoff and dead-letter paths are the parts worth rehearsing, and they are
- * unreachable if sending always works.
+ * A fault mode exists because the retry, backoff and dead-letter paths are the
+ * parts worth rehearsing, and they are unreachable if sending always works.
  */
 
 export type MailFaultMode =

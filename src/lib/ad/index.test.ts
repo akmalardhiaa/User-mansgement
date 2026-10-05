@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AdConfigurationError, getAdDriver, resetAdDriver } from "./index";
+import { AdConfigurationError, getAdDriver, resetAdDriver, setAdDriverForTests } from "./index";
+import type { AdDriver } from "./types";
 
 /**
  * Which directory the worker is handed.
  *
- * The rule being pinned here is the one that matters most in this file: a
- * deployment can end up talking to a simulated directory only by asking for
- * one. There is no fallback, no inference from NODE_ENV, and no "ldap is not
- * ready yet, use the mock" path — that last one existed, and is what these
- * tests replace.
+ * One answer: the LDAP driver, and only when AD_DRIVER says so. There is no
+ * fallback and no inference from NODE_ENV. The simulated directory that used
+ * to be the other answer has been removed, and a configuration that still asks
+ * for it is refused by name rather than read as "not set".
  */
 
 const LDAP_ENV: Record<string, string> = {
@@ -45,30 +45,27 @@ describe("choosing a driver", () => {
     expect(() => getAdDriver()).toThrowError(AdConfigurationError);
   });
 
-  it("gives the simulated driver only when it is asked for by name", () => {
+  it("refuses AD_DRIVER=mock in development, and says the simulated directory is gone", () => {
     process.env.AD_DRIVER = "mock";
 
-    const driver = getAdDriver();
-    expect(driver.name).toBe("mock");
-    expect(driver.simulated).toBe(true);
+    expect(() => getAdDriver()).toThrowError(AdConfigurationError);
+    expect(() => getAdDriver()).toThrowError(/dihapus/);
   });
 
-  it("never gives the simulated driver in production", () => {
+  it("refuses AD_DRIVER=mock in production the same way", () => {
     process.env.AD_DRIVER = "mock";
     // NODE_ENV is read-only in the framework typings, hence the stub.
     vi.stubEnv("NODE_ENV", "production");
 
-    expect(() => getAdDriver()).toThrowError(/production/);
+    expect(() => getAdDriver()).toThrowError(/dihapus/);
   });
 });
 
 describe("AD_DRIVER=ldap", () => {
-  it("returns the real driver, and says it is not a simulation", () => {
+  it("returns the real driver", () => {
     Object.assign(process.env, LDAP_ENV);
 
-    const driver = getAdDriver();
-    expect(driver.name).toBe("ldap");
-    expect(driver.simulated).toBe(false);
+    expect(getAdDriver().name).toBe("ldap");
   });
 
   it("is constructed without touching the network", () => {
@@ -88,11 +85,23 @@ describe("AD_DRIVER=ldap", () => {
     expect(() => getAdDriver()).toThrowError(/AD_BIND_DN/);
   });
 
-  it("does not fall back to the mock when its configuration is wrong", () => {
+  it("does not fall back to anything when its configuration is wrong", () => {
     process.env.AD_DRIVER = "ldap";
 
     // The one outcome that must never happen: a deployment reporting accounts
     // as created and disabled that no directory has heard of.
+    expect(() => getAdDriver()).toThrowError(AdConfigurationError);
+  });
+});
+
+describe("the test seam", () => {
+  it("hands out the installed driver until it is reset, whatever AD_DRIVER says", () => {
+    const installed = { name: "fake" } as AdDriver;
+    setAdDriverForTests(installed);
+
+    expect(getAdDriver()).toBe(installed);
+
+    resetAdDriver();
     expect(() => getAdDriver()).toThrowError(AdConfigurationError);
   });
 });

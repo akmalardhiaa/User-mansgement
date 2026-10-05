@@ -33,44 +33,6 @@ persetujuan demo dirutekan.
 Akun demo ditolak di production: di sana `LDAP_URL` yang belum diisi adalah
 kesalahan konfigurasi, bukan alasan untuk meloloskan siapa pun.
 
-### Masuk lewat direktori simulasi
-
-Pilihan tengah antara daftar di atas dan AD sungguhan, dan alasan memilihnya
-bukan kenyamanan: peran diambil dari **keanggotaan group** tiap akun, lewat
-`rolesFromGroups` yang sama persis dengan yang membaca `memberOf` dari domain
-controller. `devUsers.ts` menuliskan peran per akun, jadi login lewat daftar itu
-tidak pernah sekali pun menjalankan pemetaan yang menentukan wewenang di
-deployment sungguhan — salah isi `AD_GROUP_*` baru ketahuan pada hari AD asli
-dihubungkan.
-
-```bash
-MOCK_AD_LOGIN=true
-MOCK_AD_PASSWORD=mock12345
-```
-
-Direktori hasil seed hanya membawa group **akses** (`CN=HC-Base`), bukan group
-**peran**. Tanpa langkah berikut semua akun masuk tanpa wewenang apa pun dan
-hanya melihat profilnya sendiri — benar, bukan rusak:
-
-```bash
-npm run mock-ad:roles          # beri group peran ke tiga akun
-npm run mock-ad:roles -- --undo  # kembalikan tepat yang ditambahkannya
-npm run mock-ad:roles -- --super # satu akun memegang seluruh peran portal
-```
-
-| Akun | Peran yang didapat |
-| --- | --- |
-| `ayu.prameswari` | `HC_REQUESTER` + `SYSTEM_ADMIN` |
-| `sarah.wijaya` | *(tidak ada — group manager tidak lagi memberi peran portal)* |
-| `bagus.nugroho` | *(tidak ada — group CISO tidak lagi memberi peran portal)* |
-
-DN yang ditulis dibaca dari `AD_GROUP_*`, jadi direktori dan konfigurasi cocok
-secara konstruksi. Nama yang tidak dikenal direktori simulasi **jatuh ke daftar
-demo di atas**, sehingga menyalakan ini tidak pernah mengunci siapa pun keluar.
-Akun yang dinonaktifkan tidak bisa masuk — itulah yang membuat Termination
-terlihat utuh: login berhenti bekerja sebagai *akibat* pengajuan, bukan sebagai
-langkah terpisah yang harus diingat seseorang. **Ditolak di production.**
-
 ## Menjalankan tanpa container
 
 Untuk menjalankan lokal tanpa container, aplikasi ini hanya memerlukan Node.js.
@@ -115,8 +77,8 @@ dengan konfigurasi di `compose.yaml`. Urutan lengkapnya ada di MENJALANKAN.md.
 **Konfigurasi bertumpuk dua lapis.** `env_file` membaca
 `.env.development` — yang ikut di-commit, berisi bawaan demo, tanpa rahasia —
 lalu `.env.podman` yang **opsional** dan menimpa nilai apa pun yang diisinya.
-Hasilnya: hasil `git clone` yang belum punya `.env.podman` tetap menyala dengan
-direktori simulasi dan email ditulis ke berkas, sedangkan mesin yang sudah
+Hasilnya: hasil `git clone` yang belum punya `.env.podman` tetap menyala tanpa
+AD dan dengan email ditulis ke berkas, sedangkan mesin yang sudah
 mengisi SMTP tetap memakai SMTP. Untuk salinan baru, jalankan
 `Copy-Item .env.development .env.podman`, lalu isi placeholder rahasia di
 dalamnya.
@@ -133,19 +95,11 @@ apa-apa, jadi menghentikannya dulu bukan langkah opsional.
 `--build` hanya perlu ketika `package.json` atau lockfile berubah, karena
 dependency dipasang ke dalam image, bukan di-mount.
 
-**Run pertama mengisi dirinya sendiri.** Direktori karyawan sudah punya data
-awal, tetapi direktori simulasi dulu mulai kosong — dan setiap Movement atau
-Termination untuk karyawan bawaan gagal pada akun yang tidak pernah dibuat.
-Perbaikannya sebelumnya adalah memanggil `POST /api/admin/seed-mock-ad` sendiri,
-yang wajar bila Anda tahu itu ada dan jadi jebakan bila Anda baru menyalin
-repositori ini. Kini `src/lib/ad/bootstrapMockAd.ts` melakukannya saat boot
-pertama: satu akun per karyawan, tertaut lewat `objectGUID`, aktif mengikuti
-status karyawan — lalu satu group role (`AD_GROUP_HC`) diberikan ke akun
-Human Capital, sehingga halaman login yang mengundang akun Active Directory
-tidak menolak semuanya. Dua syarat, dan keduanya penting: driver harus yang
-simulasi, dan berkas direktorinya belum ada. Berkas yang ada tapi kosong adalah
-keadaan demo milik seseorang — mungkin akun sengaja dihapus untuk menunjukkan
-kegagalan — dan memulihkannya diam-diam adalah kejutan tersendiri.
+**Run pertama mengisi dirinya sendiri** — direktori karyawan sudah punya data
+awal. Akun AD-nya tidak: direktori simulasi yang dulu diisi saat boot sudah
+dihapus, jadi Movement dan Termination untuk karyawan bawaan baru bisa
+dijalankan setelah AD disambungkan. Worker menautkan karyawan ke akun AD-nya
+sendiri lewat nama akun saat pertama kali menyentuhnya.
 
 ### Pindah ke komputer lain
 
@@ -162,10 +116,9 @@ tanpa koneksi. Dengan Podman, yang perlu dipasang hanya **Podman CLI**
 podman compose up
 ```
 
-Data terbentuk sendiri: enam karyawan, satu akun direktori simulasi untuk
-masing-masing, dan login lewat akun Active Directory simulasi
-(`ayu.prameswari` / `mock12345`). Akun manager seperti `sarah.wijaya` ditolak,
-karena portal ini memang hanya untuk Human Capital.
+Data terbentuk sendiri: enam karyawan, dan login `admin` / `admin12345`. Akun
+manager seperti `sarah` ditolak, karena portal ini memang hanya untuk Human
+Capital.
 
 **Membawa data yang sudah ada** — matikan dulu portal di komputer lama
 (`podman compose down`) supaya tidak ada yang sedang menulis, salin folder
@@ -190,11 +143,10 @@ untuk itu. Bila portal dibuka dari perangkat lain lewat alamat IP, sesuaikan
 `APP_BASE_URL` — setiap tautan persetujuan di email dibangun dari nilai itu.
 
 **Container ini sengaja berjalan dalam mode development**, dan itu bukan
-kemalasan. Aplikasi ini memuat sembilan penjagaan produksi, dan konfigurasi demo
+kemalasan. Aplikasi ini memuat sejumlah penjagaan produksi, dan konfigurasi demo
 melanggar hampir semuanya: tanpa `LDAP_URL`, `authenticateAD` **melempar error**
-alih-alih menurunkan mutu — tidak ada yang bisa masuk sama sekali; `AD_DRIVER=mock`,
-`MOCK_AD_LOGIN`, `EMAIL_DRIVER=file`, dan `EMAIL_REDIRECT_TO` masing-masing
-ditolak; dan cookie sesi menyalakan `secure`, sehingga browser tidak akan
+alih-alih menurunkan mutu — tidak ada yang bisa masuk sama sekali;
+`EMAIL_DRIVER=file` dan `EMAIL_REDIRECT_TO` masing-masing ditolak; dan cookie sesi menyalakan `secure`, sehingga browser tidak akan
 mengirimnya lewat `http://localhost` dan login tidak pernah nempel tanpa TLS.
 `next start` akan menghasilkan container yang menyala bersih lalu menolak setiap
 login — lebih buruk daripada tidak ada container, karena ia tampak berfungsi.
@@ -211,11 +163,9 @@ layer berikutnya menghapusnya. `.env*` memuat App Password yang hidup, dan
 persetujuan. Keduanya masuk saat runtime: rahasia lewat `env_file`, state lewat
 bind mount.
 
-Satu volume menutupi semuanya, karena keempat berkas yang ditulis aplikasi —
-`hc-store.json`, `hc-sessions.json`, `mock-ad.json`, dan `outbox-mail/` — berada
-di bawah `data/`. Mengikatnya ke host juga yang membuat container melihat akun
-yang sudah di-seed `npm run mock-ad:roles`, bukan direktori kosong yang tidak
-bisa dimasuki siapa pun.
+Satu volume menutupi semuanya, karena ketiga berkas yang ditulis aplikasi —
+`hc-store.json`, `hc-sessions.json`, dan `outbox-mail/` — berada di bawah
+`data/`.
 
 **Berkas data yang "hilang" tidak pernah dianggap kosong.** Pada 22 September 2026
 store sempat tak terlihat sesaat dari dalam container (folder `data/` dibagi dari
@@ -234,7 +184,7 @@ yang sama berarti satu email persetujuan bisa terkirim dua kali.
 **Portal hanya menerima koneksi dari komputernya sendiri.** `compose.yaml`
 mempublikasikan port ke `127.0.0.1:3000`, bukan ke `0.0.0.0`. Alasannya bukan
 kerapian: aplikasi ini berjalan dalam mode development, tanpa TLS, dengan
-direktori simulasi dan akun demo yang kata sandinya tertulis di README ini —
+akun demo yang kata sandinya tertulis di README ini —
 begitu port-nya terbuka ke jaringan, siapa pun di jaringan yang sama bisa masuk
 sebagai HC. Untuk mendemokan dari ponsel atau laptop lain, ubah ke
 `"0.0.0.0:3000:3000"` **dan** sesuaikan `APP_BASE_URL` ke alamat itu, karena
@@ -256,7 +206,7 @@ outbox & worker), sehingga kunci yang disimpan di variabel modul sebenarnya
 tiga kunci. Pada 22 September 2026 uji ujung-ke-ujung menangkap akibatnya:
 persetujuan manager dijawab 200, lalu penjadwal outbox — yang sudah membaca
 store beberapa milidetik sebelumnya — menyimpan "email terkirim" di atasnya,
-dan persetujuannya hilang. Kunci ketiga store (data, sesi, mock AD) kini
+dan persetujuannya hilang. Kunci kedua store (data dan sesi) kini
 disimpan di `globalThis` (`src/lib/db/processShared.ts`) sehingga semua salinan
 mengantre di kunci yang sama; `processShared.test.ts` mereproduksi kasusnya
 dengan dua salinan modul.
@@ -362,7 +312,6 @@ Kontrol yang sebenarnya ada di dua tempat, dan keduanya membaca catatan sesi:
 | `POST` | `/api/lifecycle-requests/:id/retry` | `execution.run` |
 | `POST` | `/api/admin/migrate-legacy` | `system.migrate` |
 | `POST` | `/api/worker/run` | `execution.run` |
-| `POST` | `/api/admin/seed-mock-ad` | `system.migrate` |
 | `POST` | `/api/outbox/dispatch` | `execution.run` |
 | `POST` | `/api/approval-actions` | token sekali pakai |
 
@@ -501,9 +450,11 @@ Aturan yang ditegakkan kode:
 - Hanya group yang diterbitkan katalog yang dicabut. Keanggotaan yang ditambahkan
   manual bukan milik aplikasi ini untuk dihapus.
 
-Demo memakai `AD_DRIVER=mock` — direktori simulasi di berkas terpisah, dengan
-injeksi kegagalan lewat `AD_MOCK_FAULT` untuk melatih jalur yang justru paling
-perlu dibuktikan. **Production menolak driver mock.**
+Tidak ada lagi direktori simulasi: `AD_DRIVER=ldap` satu-satunya driver, di
+development maupun production. Jalur kegagalan worker tetap dibuktikan, tetapi
+di tes — lewat `LdapAdDriver` yang asli di atas direktori palsu
+(`src/lib/ad/testDirectory.ts`), dengan kegagalan disuntikkan di tingkat klien
+LDAP sehingga klasifikasi error driver ikut teruji.
 
 ### Active Directory sungguhan (`AD_DRIVER=ldap`)
 
@@ -593,8 +544,9 @@ JSON lokal.
 
 Ikuti gerbang bertahap; jangan membuka penulisan AD sebelum pilot disetujui:
 
-1. **Demo awal:** di PC kantor, jalankan `podman compose up` dengan konfigurasi
-   simulasi. Pastikan portal dan alur approval demo jalan.
+1. **Demo awal:** di PC kantor, jalankan `jalankan-podman.bat` tanpa AD.
+   Pastikan portal, pengajuan, dan alur approval lewat email jalan; worker
+   belum menjalankan perubahan apa pun.
 2. **Uji baca:** salin nilai dari `.env.onprem.example` ke `.env.local`, isi DC,
    CA, akun layanan, serta group peran yang telah disediakan tim AD. Biarkan
    `AD_LDAP_WRITE_ENABLED=false` dan `AD_MANAGED_OUS` kosong. Jalankan
@@ -692,24 +644,6 @@ Satu koneksi dibuka, di-bind, dan ditutup per operasi. Client yang dikumpulkan
 akan menghemat satu handshake per langkah, dan juga berarti socket yang mati
 diam-diam di antara dua langkah menggagalkan langkah kedua karena alasan yang
 tidak ada hubungannya dengan langkah itu.
-
-### Menyiapkan direktori simulasi
-
-Demo bermula dari daftar karyawan dengan direktori kosong — keadaan yang tidak
-pernah dialami deployment sungguhan, di mana akunnya sudah ada lebih dulu.
-Tanpa disiapkan, setiap Movement dan Termination gagal pada objek yang tidak
-ditemukan, dan yang tampak seperti worker rusak sebenarnya fixture kosong.
-
-Jalankan sekali sebagai administrator sistem:
-
-```
-POST /api/admin/seed-mock-ad
-```
-
-Ia membuat akun simulasi untuk tiap karyawan **dan menautkannya** lewat
-`objectGUID` — tautan itulah yang dipakai eksekusi, jadi membuat akun tanpa
-mencatatnya tidak menyelesaikan apa pun. Aman dipanggil berulang, dan ditolak
-bila driver-nya bukan simulasi.
 
 ## Email persetujuan
 
@@ -908,8 +842,6 @@ npm run typecheck
 npm test            # unit + integrasi domain lifecycle
 npm run ad:check    # uji konektivitas LDAP
 npm run gmail:auth  # tukar consent Google jadi refresh token, sekali saja
-npm run mock-ad:roles          # beri group peran di direktori simulasi
-npm run mock-ad:roles -- --undo  # kembalikan tepat yang ditambahkannya
 ```
 
 `NEXT_DIST_DIR` memindahkan keluaran build ke direktori lain. Berguna justru

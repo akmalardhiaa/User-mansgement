@@ -233,7 +233,7 @@ describe("read-only AD diagnostics", () => {
     expect(connect).not.toHaveBeenCalled();
   });
 
-  it("fails production plaintext URLs and the mock driver", async () => {
+  it("fails production plaintext URLs and the removed mock driver", async () => {
     const env = ldapEnv(await caFile(), {
       AD_DRIVER: "mock",
       AD_LDAP_URL: "ldap://dc.corp.example.com:389",
@@ -242,6 +242,18 @@ describe("read-only AD diagnostics", () => {
 
     expect(check(report, "login-url").status).toBe("fail");
     expect(check(report, "driver").status).toBe("fail");
+    expect(check(report, "driver").message).toMatch(/dihapus/);
+  });
+
+  // Not a warning in development any more: there is no simulated directory
+  // for the worker to fall back on, so without LDAP it can do nothing at all.
+  it("fails a missing or removed driver outside production as well", async () => {
+    for (const driver of ["mock", ""]) {
+      const report = await runAdDiagnostics({ env: { NODE_ENV: "development", AD_DRIVER: driver } });
+
+      expect(check(report, "driver").status).toBe("fail");
+      expect(report.overall).toBe("fail");
+    }
   });
 
   it("warns when LDAP writes are disabled", async () => {

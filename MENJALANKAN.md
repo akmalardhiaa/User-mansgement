@@ -1,8 +1,9 @@
 # Menjalankan portal & menyambungkannya ke AD on-premise
 
-Dua hal, dan urutannya penting: jalankan dulu dengan direktori simulasi, baru
-sambungkan ke Active Directory sungguhan. Berkas ini satu-satunya yang perlu
-dibuka untuk keduanya.
+Dua hal, dan urutannya penting: jalankan dulu tanpa AD — portal, pengajuan, dan
+persetujuan lewat email sudah bisa dicoba — baru sambungkan ke Active Directory
+sungguhan, yang dibutuhkan worker untuk benar-benar mengubah akun. Berkas ini
+satu-satunya yang perlu dibuka untuk keduanya.
 
 > README.md menjelaskan **kenapa** portal ini dibangun begini. Berkas ini
 > menjelaskan **caranya menjalankan**. Kalau keduanya bertentangan, yang di
@@ -29,8 +30,11 @@ Lalu **klik dua kali `jalankan-podman.bat`**. Skrip itu membuat mesin Podman
 bila belum ada, memasang `podman-compose` di dalamnya, lalu menjalankan portal.
 Berhenti dengan `hentikan-podman.bat`.
 
-Portal terbuka di **http://localhost:3000**. Login: `admin` / `admin12345`
-atau `ayu.prameswari` / `mock12345`.
+Portal terbuka di **http://localhost:3000**. Login: `admin` / `admin12345`.
+
+Tanpa AD, pengajuan bisa dibuat dan disetujui, tetapi **worker tidak menjalankan
+perubahan apa pun** — tidak ada lagi direktori simulasi sebagai gantinya. Itu
+baru jalan setelah AD disambungkan (Bagian 2).
 
 **Kalau Docker Desktop masih terpasang di PC yang sama**, dia akan menyuntikkan
 WSL integration-nya ke distro milik Podman dan merusaknya. Gejalanya:
@@ -166,7 +170,7 @@ atau hak yang belum benar.
 
 Login ke portal. Yang harus benar:
 
-- Bisa masuk dengan akun AD sungguhan (bukan `admin`/`mock`).
+- Bisa masuk dengan akun AD sungguhan (bukan `admin`).
 - Peran portalnya benar — kalau kosong, `AD_GROUP_*` belum cocok dengan group
   yang sebenarnya dipegang akun itu.
 - Direktori karyawan terbaca.
@@ -218,7 +222,7 @@ Bedanya dengan mode demo bukan sekadar optimasi:
 | | demo | production |
 |---|---|---|
 | Perintah | `next dev` | `next build` + `next start` |
-| Direktori | simulasi | AD sungguhan — mock **ditolak** |
+| Direktori | belum ada — worker diam sampai AD disambungkan | AD sungguhan, wajib |
 | Email | ditulis ke berkas | SMTP — `file` **ditolak** |
 | Login | daftar demo boleh | tanpa `LDAP_URL` **melempar error** |
 | Cookie sesi | biasa | `secure` — **butuh TLS di depannya** |

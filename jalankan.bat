@@ -47,7 +47,7 @@ if not exist "node_modules\next" (
 
 echo.
 echo  Portal berjalan di  http://localhost:3000
-echo  Login: admin / admin12345   atau   ayu.prameswari / mock12345
+echo  Login: admin / admin12345   - selama AD belum disambungkan
 echo  Tekan Ctrl+C untuk menghentikan.
 echo.
 

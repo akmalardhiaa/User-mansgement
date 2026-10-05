@@ -8,7 +8,7 @@ import { AdError } from "./types";
 /**
  * What only the real driver has to get right.
  *
- * The behaviour shared with the simulated directory lives in
+ * What the worker relies on from any driver lives in
  * adDriverContract.test.ts. This file is the other half: the guards, the
  * translations, and the refusals — the things that decide whether a bug here
  * is a failed request or a change nobody asked for in a production directory.

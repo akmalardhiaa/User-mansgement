@@ -68,7 +68,6 @@ set "KURANG="
 if not exist "%TUJUAN%\package.json"            set "KURANG=%KURANG% package.json"
 if not exist "%TUJUAN%\node_modules\next"       set "KURANG=%KURANG% node_modules"
 if not exist "%TUJUAN%\data\hc-store.json"      set "KURANG=%KURANG% data\hc-store.json"
-if not exist "%TUJUAN%\data\mock-ad.json"       set "KURANG=%KURANG% data\mock-ad.json"
 if not exist "%TUJUAN%\jalankan.bat"            set "KURANG=%KURANG% jalankan.bat"
 if not exist "%TUJUAN%\.env.development"        set "KURANG=%KURANG% .env.development"
 if not exist "%TUJUAN%\compose.yaml"            set "KURANG=%KURANG% compose.yaml"
@@ -118,7 +117,7 @@ echo   Node.js belum ada dan tidak punya hak admin? Unduh Node 22 versi
 echo   .zip dari nodejs.org, ekstrak jadi folder "node" di sebelah
 echo   jalankan.bat. Tidak perlu dipasang.
 echo.
-echo   Login:  admin / admin12345   atau   ayu.prameswari / mock12345
+echo   Login:  admin / admin12345   - selama AD belum disambungkan
 echo.
 echo   JANGAN menyalakan portal di dua komputer sekaligus pada data yang
 echo   sama: dua penjadwal outbox berarti satu email persetujuan terkirim

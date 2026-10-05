@@ -1,11 +1,11 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetAdDriver } from "@/lib/ad";
-import type { AdAccountState } from "@/lib/ad/types";
+import { installTestDirectory, type TestAccount, type TestDirectory } from "@/lib/ad/testDirectory";
 import type { PortalSession } from "@/lib/auth/session";
 import type { StoreShape } from "@/lib/db/store";
 
@@ -22,6 +22,7 @@ import { createDraft, submitRequest } from "./service";
 
 let workspace: string;
 let storePath: string;
+let dir: TestDirectory;
 
 const GROUP = "CN=IT Security Approvers,OU=Groups,DC=corp,DC=example,DC=com";
 
@@ -35,40 +36,41 @@ const HC: PortalSession = {
   absoluteExpiresAt: "2026-09-17T00:00:00.000Z",
 };
 
-function account(name: string, overrides: Partial<AdAccountState> = {}): AdAccountState {
+const SECURITY_OU = "OU=Security,DC=corp,DC=example,DC=com";
+
+function account(name: string, overrides: Partial<TestAccount> = {}): TestAccount {
   const handle = name.toLowerCase();
   return {
-    objectGUID: `guid-${handle}`,
     sAMAccountName: handle,
-    userPrincipalName: `${handle}@example.com`,
     displayName: name,
     mail: `${handle}@example.com`,
     department: "IT — Security",
     title: "Security Analyst",
     enabled: true,
-    ou: "OU=Security,DC=corp,DC=example,DC=com",
+    ou: SECURITY_OU,
     groups: [GROUP],
     ...overrides,
   };
 }
 
-async function directory(accounts: AdAccountState[]): Promise<void> {
-  await writeFile(path.join(workspace, "mock-ad.json"), JSON.stringify({ accounts }), "utf8");
+/** The team's group and the people in or near it, put there as an administrator would. */
+function directory(accounts: TestAccount[]): void {
+  dir.directory.addOu(SECURITY_OU);
+  dir.directory.addGroup(GROUP);
+  for (const entry of accounts) dir.addAccount(entry);
 }
 
 beforeEach(async () => {
   workspace = await mkdtemp(path.join(tmpdir(), "hc-ciso-group-"));
   storePath = path.join(workspace, "store.json");
   vi.stubEnv("HC_DATA_FILE", storePath);
-  vi.stubEnv("AD_DRIVER", "mock");
-  vi.stubEnv("AD_MOCK_FILE", path.join(workspace, "mock-ad.json"));
-  vi.stubEnv("AD_MOCK_FAULT", "none");
   vi.stubEnv("CISO_APPROVER_GROUP", GROUP);
   vi.stubEnv("CISO_EXCLUDE_EMAILS", "kepala@example.com");
   vi.stubEnv("NODE_ENV", "test");
   resetAdDriver();
+  dir = installTestDirectory();
 
-  await directory([
+  directory([
     account("Rina"),
     account("Budi"),
     account("Kepala"), // the head of the function: in the group, never asked
@@ -87,7 +89,9 @@ afterEach(async () => {
 describe("reading the team from the directory", () => {
   it("takes enabled members of exactly that group, minus the head", async () => {
     const team = await resolveCisoTeamForSubmit();
-    expect(team.map((member) => member.name)).toEqual(["Rina", "Budi"]);
+    // In account-name order: the driver sorts, because a domain controller
+    // promises no order at all.
+    expect(team.map((member) => member.name)).toEqual(["Budi", "Rina"]);
   });
 
   it("is what a submitted request is routed to", async () => {
@@ -105,8 +109,8 @@ describe("reading the team from the directory", () => {
     const request = await submitRequest(draft.id, draft.version, HC);
 
     expect(request.approvals[1].pool?.map((member) => member.email)).toEqual([
-      "rina@example.com",
       "budi@example.com",
+      "rina@example.com",
     ]);
   });
 
@@ -122,8 +126,7 @@ describe("reading the team from the directory", () => {
       },
       HC,
     );
-    vi.stubEnv("AD_MOCK_FAULT", "permission");
-    resetAdDriver();
+    dir.fail("permission");
 
     await expect(submitRequest(draft.id, draft.version, HC)).rejects.toThrow(RoutingError);
 

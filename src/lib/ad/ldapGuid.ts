@@ -18,10 +18,9 @@ import { AdError } from "./types";
  * order rather than merely round-tripping (a round trip passes happily with the
  * bytes reversed both ways).
  *
- * The canonical form produced here is lower-case and unbraced, matching the
- * `randomUUID()` the simulated directory hands out — so a store written against
- * the mock and one written against a real domain controller hold GUIDs of the
- * same shape.
+ * The canonical form produced here is lower-case and unbraced — the shape
+ * `randomUUID()` produces, and the shape every GUID already in the store has,
+ * including those written while this portal still had a simulated directory.
  */
 
 const GUID_BYTES = 16;

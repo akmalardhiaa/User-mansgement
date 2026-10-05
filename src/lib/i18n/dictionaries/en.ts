@@ -43,7 +43,7 @@ export const en: Dictionary = {
     withAd: "Sign in with your Active Directory account.",
     demoTitle: "Demo mode — Active Directory is not connected",
     demoBody:
-      "Sign in as admin with the password admin12345, or through the simulated directory as ayu.prameswari with mock12345. This portal is for Human Capital only: managers and the CISO team approve from email, not from here. The full list of demo accounts is in the README.",
+      "Sign in as admin with the password admin12345. This portal is for Human Capital only: managers and the CISO team approve from email, not from here. The full list of demo accounts is in the README.",
     demoEnvHint: "Set AD_LDAP_URL, LDAP_BASE_DN, and LDAP_CA_CERT_PATH to switch on Active Directory sign-in.",
     notConfiguredTitle: "Sign-in is not configured",
     notConfiguredBody:

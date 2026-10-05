@@ -22,18 +22,4 @@ export async function register(): Promise<void> {
   // having to press "Jalankan worker".
   const { startWorkerSchedulerFromEnv } = await import("@/lib/lifecycle/workerScheduler");
   startWorkerSchedulerFromEnv();
-
-  /*
-   * A first run fills the simulated directory from the roster, so a freshly
-   * cloned copy can demonstrate a Movement or a Termination rather than
-   * failing on an account that was never created. Deliberately not awaited:
-   * `register` must return before the server accepts requests, and a fixture
-   * is not worth delaying that for. Failures are logged and nothing else —
-   * the portal runs perfectly well with an empty directory, and an onboarding
-   * creates its own account.
-   */
-  const { seedMockAdOnFirstRun } = await import("@/lib/ad/bootstrapMockAd");
-  void seedMockAdOnFirstRun().catch((error) => {
-    console.error("[bootstrap] pengisian direktori simulasi gagal", error);
-  });
 }

@@ -81,7 +81,6 @@ const USER_OBJECT_CLASS = ["top", "person", "organizationalPerson", "user"];
 
 export class LdapAdDriver implements AdDriver {
   readonly name = "ldap";
-  readonly simulated = false;
 
   /**
    * `connect` is injectable so the driver can be tested against a fake

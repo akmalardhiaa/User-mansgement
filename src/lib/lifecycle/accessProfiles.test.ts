@@ -40,7 +40,7 @@ describe("Active Directory access-profile configuration", () => {
     expect(() => quarantineOu()).toThrowError(AdConfigurationError);
   });
 
-  it("keeps the development defaults available to the simulated directory", () => {
+  it("keeps the development defaults when no real directory is configured", () => {
     vi.stubEnv("NODE_ENV", "test");
     vi.stubEnv("AD_OU_STANDARD", "");
     vi.stubEnv("AD_ACCESS_GROUP_BASE", "");

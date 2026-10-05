@@ -40,6 +40,8 @@ export const RESULT = {
   insufficientAccessRights: 50,
   unwillingToPerform: 53,
   entryAlreadyExists: 68,
+  /** AD's catch-all refusal. ldapErrors.ts maps it to UNKNOWN: never retried. */
+  other: 80,
 } as const;
 
 export class FakeLdapError extends Error {

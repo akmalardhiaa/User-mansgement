@@ -44,7 +44,7 @@ export const id = {
     withAd: "Masuk dengan akun Active Directory Anda.",
     demoTitle: "Mode demo — Active Directory belum tersambung",
     demoBody:
-      "Masuk sebagai admin dengan kata sandi admin12345, atau lewat direktori simulasi sebagai ayu.prameswari dengan mock12345. Portal ini hanya untuk Human Capital: manager dan tim CISO menyetujui dari email, bukan dari sini. Daftar akun demo ada di README.",
+      "Masuk sebagai admin dengan kata sandi admin12345. Portal ini hanya untuk Human Capital: manager dan tim CISO menyetujui dari email, bukan dari sini. Daftar akun demo ada di README.",
     demoEnvHint: "Isi AD_LDAP_URL, LDAP_BASE_DN, dan LDAP_CA_CERT_PATH untuk mengaktifkan login Active Directory.",
     notConfiguredTitle: "Login belum dikonfigurasi",
     notConfiguredBody:

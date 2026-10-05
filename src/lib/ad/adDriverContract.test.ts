@@ -1,28 +1,20 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { FakeLdapDirectory } from "./fakeLdapDirectory";
 import { LdapAdDriver } from "./ldapAd";
 import type { LdapAdConfig } from "./ldapConnection";
-import { MockAdDriver, seedMockDirectory } from "./mockAd";
-import { AdError, type AdAccountState, type AdDriver } from "./types";
+import { AdError, type AdDriver } from "./types";
 
 /**
- * One set of expectations, run against both drivers.
+ * What the worker relies on from a directory driver, stated once.
  *
- * The interface in types.ts was written for a real directory so that the mock
- * could not offer conveniences the real thing cannot. That is a claim, and a
- * claim about two implementations is only worth anything if the same test
- * proves it of both — so everything here is phrased in terms of `AdDriver` and
- * knows nothing about JSON files or LDAP.
+ * Phrased in terms of `AdDriver` and nothing else, and run against the real
+ * LdapAdDriver over a fake directory. It used to run against a simulated
+ * driver as well; that driver is gone, and the harness list below is where a
+ * second implementation would be added if one ever returned.
  *
- * The behaviour each driver has on its own — how the simulated one injects
- * faults, how the real one escapes a filter or refuses an OU — is tested in
- * mockAd.test.ts and ldapAd.test.ts respectively. What lives here is the part
- * the worker depends on and must not differ.
+ * How the LDAP driver escapes a filter or refuses an OU is tested in
+ * ldapAd.test.ts. What lives here is the behaviour the worker depends on.
  */
 
 const KARYAWAN = "OU=Karyawan,DC=corp,DC=example,DC=com";
@@ -82,46 +74,6 @@ function ldapConfig(): LdapAdConfig {
   };
 }
 
-function mockHarness(): Harness {
-  let workspace: string;
-
-  return {
-    driver: new MockAdDriver(),
-    async setUp() {
-      workspace = await mkdtemp(path.join(tmpdir(), "hc-contract-mock-"));
-      process.env.AD_MOCK_FILE = path.join(workspace, "mock-ad.json");
-      await seedMockDirectory([]);
-    },
-    async tearDown() {
-      delete process.env.AD_MOCK_FILE;
-      await rm(workspace, { recursive: true, force: true });
-    },
-    async seed(account) {
-      const existing = await readMock();
-      const created: AdAccountState = {
-        objectGUID: crypto.randomUUID(),
-        sAMAccountName: account.sAMAccountName,
-        userPrincipalName: `${account.sAMAccountName}@corp.example.com`,
-        displayName: account.displayName,
-        mail: account.mail,
-        department: account.department ?? "",
-        title: account.title ?? "",
-        manager: account.manager,
-        enabled: account.enabled ?? true,
-        ou: account.ou,
-        groups: [...(account.groups ?? [])].sort(),
-      };
-      await seedMockDirectory([...existing, created]);
-      return created.objectGUID;
-    },
-  };
-}
-
-async function readMock(): Promise<AdAccountState[]> {
-  const { readMockDirectory } = await import("./mockAd");
-  return readMockDirectory();
-}
-
 function ldapHarness(): Harness {
   const directory = new FakeLdapDirectory();
   const driver = new LdapAdDriver(ldapConfig(), async () => directory.client());
@@ -161,10 +113,7 @@ function ldapHarness(): Harness {
   };
 }
 
-const HARNESSES: ReadonlyArray<[string, () => Harness]> = [
-  ["mock", mockHarness],
-  ["ldap", ldapHarness],
-];
+const HARNESSES: ReadonlyArray<[string, () => Harness]> = [["ldap", ldapHarness]];
 
 describe.each(HARNESSES)("AdDriver contract: %s", (_name, build) => {
   let harness: Harness;

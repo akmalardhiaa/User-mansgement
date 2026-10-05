@@ -1,10 +1,10 @@
 /**
  * The contract every Active Directory driver implements.
  *
- * Two of them will exist: the mock that backs the demo, and a real one that
- * talks to a domain controller from a worker inside the corporate network. The
- * interface is written for the real one — that is the whole point of having it —
- * so the mock cannot quietly offer conveniences the real thing could not.
+ * One implementation: LdapAdDriver, talking to a domain controller over LDAPS.
+ * The interface stays separate from it so a test can run the worker against
+ * fakeLdapDirectory.ts through that same driver, and so nothing above this
+ * line knows anything about LDAP.
  *
  * Note what the interface does NOT expose: no free-text command, no script
  * path, no distinguished name supplied by a caller, no password. A driver
@@ -105,8 +105,6 @@ export class AdError extends Error {
 export interface AdDriver {
   /** Which implementation this is, for logs and for the status screen. */
   readonly name: string;
-  /** True for a driver that only simulates. Production refuses to run one. */
-  readonly simulated: boolean;
 
   findByAccountName(sAMAccountName: string): Promise<AdAccountState | undefined>;
   findByGuid(objectGUID: string): Promise<AdAccountState | undefined>;

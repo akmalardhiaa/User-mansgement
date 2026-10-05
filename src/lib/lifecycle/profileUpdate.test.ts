@@ -1,12 +1,11 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetAdDriver } from "@/lib/ad";
-import { readMockDirectory } from "@/lib/ad/mockAd";
-import type { AdAccountState } from "@/lib/ad/types";
+import { installTestDirectory, type TestAccount } from "@/lib/ad/testDirectory";
 import type { PortalSession } from "@/lib/auth/session";
 import type { StoreShape } from "@/lib/db/store";
 import { parseLifecycleRequestInput } from "@/lib/validation/lifecycleRequestInput";
@@ -66,6 +65,8 @@ const CISO: PortalSession = {
 
 /** Rizky, from the seed roster. His manager of record is Sarah. */
 const RIZKY = "emp_seed_002";
+/** Canonical, the form the directory hands out. */
+const RIZKY_GUID = "4b0c7a62-7a6e-4c1e-9a43-3f6a1d2b5e10";
 
 const RIZKY_NOW: ProfileFields = {
   firstName: "Rizky",
@@ -264,15 +265,13 @@ describe("executing it", () => {
   });
 
   it("changes the directory and the record only after both approvals and a verified read-back", async () => {
-    vi.stubEnv("AD_DRIVER", "mock");
-    vi.stubEnv("AD_MOCK_FAULT", "none");
-    vi.stubEnv("AD_MOCK_FILE", path.join(workspace, "mock-ad.json"));
-    resetAdDriver();
+    // The real LDAP driver over a fake directory, holding Rizky and his manager.
+    const dir = installTestDirectory();
+    dir.addManager("sarah.wijaya", "Sarah Wijaya");
 
-    const account: AdAccountState = {
-      objectGUID: "guid-rizky",
+    const account: TestAccount = {
+      objectGUID: RIZKY_GUID,
       sAMAccountName: "rizky.maulana",
-      userPrincipalName: "rizky.maulana@example.com",
       displayName: "Rizky Maulana",
       mail: "rizky.maulana@example.com",
       department: "IT — Engineering",
@@ -282,11 +281,7 @@ describe("executing it", () => {
       ou: accessProfileOu("engineering"),
       groups: accessProfileGroups("engineering"),
     };
-    await writeFile(
-      path.join(workspace, "mock-ad.json"),
-      JSON.stringify({ accounts: [account] }),
-      "utf8",
-    );
+    dir.addAccount(account);
 
     const request = await raise(
       update({ department: "IT — Platform", jobTitle: "Platform Engineer", locationType: "CABANG", branchName: "Surabaya" }),
@@ -300,7 +295,7 @@ describe("executing it", () => {
     const report = await runDueJobs({ workerId: "w1" });
     expect(report.completed).toBe(1);
 
-    const [after] = await readMockDirectory();
+    const [after] = await dir.accounts();
     expect(after).toMatchObject({
       department: "IT — Platform",
       title: "Platform Engineer",
@@ -316,7 +311,7 @@ describe("executing it", () => {
       jobTitle: "Platform Engineer",
       locationType: "CABANG",
       branchName: "Surabaya",
-      objectGUID: "guid-rizky",
+      objectGUID: RIZKY_GUID,
       // Unchanged: a profile update cannot move the manager.
       managerEmail: "sarah.wijaya@example.com",
     });
