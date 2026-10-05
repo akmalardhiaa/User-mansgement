@@ -13,22 +13,11 @@ satu-satunya yang perlu dibuka untuk keduanya.
 
 ## Bagian 1 — Menjalankan di PC
 
-Tiga cara. Pilih satu.
-
-### A. Dengan Podman (disarankan)
-
-Podman menggantikan Docker Desktop karena lisensinya: Docker Desktop berbayar
-untuk perusahaan besar, Podman tidak. Containernya sama.
-
-Sekali saja, pasang Podman:
-
-```powershell
-winget install -e --id RedHat.Podman
-```
-
-Lalu **klik dua kali `jalankan-podman.bat`**. Skrip itu membuat mesin Podman
-bila belum ada, memasang `podman-compose` di dalamnya, lalu menjalankan portal.
-Berhenti dengan `hentikan-podman.bat`.
+Satu cara, tanpa container dan tanpa hak admin: **klik dua kali
+`jalankan.bat`.** Seluruh portal — halaman, API, worker, dan pengirim email —
+berjalan di satu proses Node di jendela itu. Biarkan jendelanya terbuka; tutup
+dengan **Ctrl+C** untuk mematikan portal. Setelah PC di-restart, klik dua kali
+lagi.
 
 Portal terbuka di **http://localhost:3000**. Login: `admin` / `admin12345`.
 
@@ -36,48 +25,27 @@ Tanpa AD, pengajuan bisa dibuat dan disetujui, tetapi **worker tidak menjalankan
 perubahan apa pun** — tidak ada lagi direktori simulasi sebagai gantinya. Itu
 baru jalan setelah AD disambungkan (Bagian 2).
 
-**Kalau Docker Desktop masih terpasang di PC yang sama**, dia akan menyuntikkan
-WSL integration-nya ke distro milik Podman dan merusaknya. Gejalanya:
-
-```
-CreateFile \\.\pipe\podman-machine-default: All pipe instances are busy
-Error: machine did not transition into running state: ssh error
-```
-
-Dialog Docker Desktop akan muncul menawarkan restart — pilih
-**"Skip podman-machine-default WSL distro"**. Atau matikan Docker Desktop
-sekalian, termasuk service-nya:
-
-```powershell
-Get-Service com.docker.service | Stop-Service -Force
-```
-
-`jalankan-podman.bat` sendiri sudah melewati jembatan yang rusak itu: ia
-memanggil podman **di dalam** mesinnya, bukan dari sisi Windows.
-
-### B. Tanpa container
-
-Tidak butuh Podman, tidak butuh hak admin. **Klik dua kali `jalankan.bat`.**
-
 Node.js belum ada dan tidak boleh memasang apa pun? Unduh Node 22 versi **.zip**
 dari nodejs.org, ekstrak jadi folder `node` di sebelah `jalankan.bat`. Skrip itu
 memakainya tanpa perlu dipasang.
 
 Jaringan kantor memblokir npm? Salin folder `node_modules` dari komputer lain —
-lihat bagian C.
+lihat bagian B.
 
-### C. Memindahkan ke komputer lain
+### B. Memindahkan ke komputer lain
 
 **Klik dua kali `siapkan-pindah.bat`**, isi tujuannya (mis. `E:\portal-hc`).
 
 Yang ikut: kode, `node_modules`, `data/`, dan berkas `.env`. Yang tidak: `.next`
-(cache build, dibuat ulang sendiri) dan `.git`. Hasilnya sekitar 490 MB.
+(cache build, dibuat ulang sendiri), `.git`, dan cadangan `*.bak-*`. Hasilnya
+sekitar 490 MB. Skrip itu menolak menyalin selama portal masih menyala, supaya
+salinan `data/` tidak setengah jadi — tutup dulu jendela `jalankan.bat`.
 
 Tiga hal yang mudah terlewat:
 
 - **Jangan nyalakan di dua komputer sekaligus** pada data yang sama. Dua
   penjadwal outbox berarti satu email persetujuan terkirim dua kali.
-- `.env.podman` dan `.env.local` berisi kata sandi. Pindahkan lewat **jalur
+- `.env.local` berisi kata sandi dan kunci outbox. Pindahkan lewat **jalur
   pribadi**, jangan lewat chat atau repositori.
 - Tanpa berkas itu pun portal jalan: email ditulis sebagai berkas ke
   `data/outbox-mail/` dan seluruh alurnya tetap bisa didemokan.
@@ -116,8 +84,8 @@ ke Domain Admins. Itu justru yang sedang dijaga oleh `AD_MANAGED_OUS`.
 
 ### Langkah 2 — Isi berkasnya
 
-Satu template per keadaan. Kuncinya sama; yang berbeda adalah path-nya, karena
-di server portal berjalan di dalam container:
+Satu template per keadaan. Kuncinya sama; template server berisi pengaturan
+yang hanya berlaku di production:
 
 | Berkas | Untuk |
 |---|---|
@@ -207,15 +175,11 @@ mengisinya, lalu langkah itu diulang dari titik yang sama.
 
 ## Bagian 3 — Di server, mode production
 
-Bagian 1 menjalankan mode demo (`next dev`). Server internal memakai mode
-production dengan berkasnya sendiri — `Containerfile.production` dan
-`compose.production.yml` — dan **satu panduan langkah demi langkah:
+Bagian 1 menjalankan mode demo (`next dev`). Server internal menjalankan mode
+production sebagai **Windows Service** — Node menjalankan `next start`, diawasi
+NSSM, menyala sendiri saat boot — dengan **satu panduan langkah demi langkah:
 [deploy/windows/README.md](deploy/windows/README.md)**. Bagian ini hanya
 menjelaskan apa bedanya.
-
-Di server Linux, `compose.production.yml` yang sama jalan dengan
-`docker compose` — **Docker Engine CE itu gratis**; yang berbayar untuk
-perusahaan besar hanya Docker *Desktop*.
 
 Bedanya dengan mode demo bukan sekadar optimasi:
 
@@ -226,9 +190,9 @@ Bedanya dengan mode demo bukan sekadar optimasi:
 | Email | ditulis ke berkas | SMTP — `file` **ditolak** |
 | Login | daftar demo boleh | tanpa `LDAP_URL` **melempar error** |
 | Cookie sesi | biasa | `secure` — **butuh TLS di depannya** |
-| Pengguna di container | root | `node`, tanpa source & toolchain |
+| Cara jalan | jendela `jalankan.bat` | Windows Service, akun virtual tanpa password |
 
-**TLS tidak ada di dalam compose itu, dan itu bukan kelupaan.** Cookie sesi
+**TLS tidak ada di dalam service itu, dan itu bukan kelupaan.** Cookie sesi
 membawa `secure`, jadi browser tidak akan mengirimnya balik lewat http dan
 tidak ada yang bisa tetap login. Terminasi TLS di depannya — IIS, nginx, apa
 pun yang sudah dipakai perusahaan — lalu arahkan `APP_BASE_URL` ke alamat
@@ -241,7 +205,7 @@ satu job yang sama.
 ### Mendirikan AD uji coba sendiri
 
 Seluruh jalur on-premise di Bagian 2 sudah dibuktikan ke domain controller
-sungguhan — Samba AD DC, berjalan di bawah Podman, bukan simulasi:
+sungguhan — Samba AD DC, bukan simulasi:
 
 ```
 ✓ bind akun layanan berhasil
@@ -290,4 +254,5 @@ data yang sama bisa saling tabrak.
 | `… di luar AD_MANAGED_OUS` | Objek atau OU tujuan di luar daftar yang diizinkan |
 | `Group … tidak diterbitkan katalog akses` | DN group tidak cocok `AD_ACCESS_GROUP_*` |
 | Login berhasil tapi semua menu kosong | `AD_GROUP_*` tidak cocok group yang dipegang akun itu |
-| `All pipe instances are busy` saat menjalankan Podman | Docker Desktop merusak distro Podman — lihat Bagian 1A |
+| Portal tidak menjawab setelah PC di-restart | Normal — klik dua kali `jalankan.bat` lagi |
+| Service `HCUserManagement` tidak mau start | Lihat `logs\service.err.log` di folder aplikasi |

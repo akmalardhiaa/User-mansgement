@@ -22,17 +22,14 @@ import type { EmploymentType } from "./types";
  * summary to `C:\Users\Asus\Documents\KaryawanBaru`. That worked on exactly one
  * machine. Everywhere else it either created a folder under somebody else's
  * user profile — which Windows refuses without admin rights — or, inside the
- * container, a directory whose name contained backslashes, thrown away when the
- * container was. Both failures were swallowed and logged, so the feature simply
+ * Linux container the portal used to run in, a directory whose name contained
+ * backslashes. Both failures were swallowed and logged, so the feature simply
  * did not happen and said nothing. Hence: one mechanism, one configured root,
  * and a path that is correct on any machine because nothing about the machine
  * is written down here.
  *
- * Under Docker the root is a path INSIDE the container, and something has to be
- * mounted there — see docker-compose.yml, which maps the folder above the
- * project. A path that is not mounted is a folder created inside a container
- * that is thrown away with it, which looks like it worked and leaves nothing
- * behind.
+ * A relative root is resolved against the application folder, which is where
+ * both jalankan.bat and the Windows service start the portal.
  */
 
 /** What goes in the summary. Exactly the approved payload, nothing derived. */
