@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { accessProfileGroups, quarantineOu } from "./accessProfiles";
+import { accessProfileGroups, accessProfileOu, quarantineOu } from "./accessProfiles";
 import { accountNameFor, buildPlan, type StepKey } from "./plan";
 import type { MovementPayload, OnboardingPayload, TerminationPayload } from "./types";
 
@@ -135,5 +135,81 @@ describe("account naming", () => {
 
   it("strips anything a directory would not accept", () => {
     expect(accountNameFor("Budi+Tag@example.com")).toBe("buditag");
+  });
+});
+
+describe("the OU follows the division", () => {
+  const ENGINEERING = "OU=Engineering,OU=Karyawan,DC=corp,DC=example,DC=com";
+  const SECURITY = "OU=Security,OU=Karyawan,DC=corp,DC=example,DC=com";
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function mapDivisions(): void {
+    vi.stubEnv("AD_DEPARTMENT_OUS", `IT — Engineering=>${ENGINEERING};IT — Security=>${SECURITY}`);
+  }
+
+  const noProfile: OnboardingPayload = { ...onboarding, accessProfileId: undefined };
+  const createParams = (plan: ReturnType<typeof buildPlan>) =>
+    plan.steps.find((step) => step.key === "create-account")!.params;
+
+  it("creates a new account in its division's OU, and checks it lands there", () => {
+    mapDivisions();
+    const plan = buildPlan(noProfile);
+
+    expect(createParams(plan).ou).toBe(ENGINEERING);
+    expect(plan.postconditions.ou).toBe(ENGINEERING);
+  });
+
+  it("falls back to the standard OU for a division with no OU of its own", () => {
+    mapDivisions();
+    const plan = buildPlan({ ...noProfile, department: "Legal" });
+
+    expect(createParams(plan).ou).toBe(accessProfileOu("standard"));
+  });
+
+  it("keeps the profile's OU for a request that named one", () => {
+    // Raised before HC stopped choosing profiles, and approved for that OU.
+    vi.stubEnv("AD_DEPARTMENT_OUS", "IT — Engineering=>OU=Lain,DC=corp,DC=example,DC=com");
+    const plan = buildPlan(onboarding);
+
+    expect(createParams(plan).ou).toBe(accessProfileOu("engineering"));
+  });
+
+  it("names the account with the User ID and carries first and last name", () => {
+    const params = createParams(buildPlan({ ...noProfile, userId: "citra.w" }));
+
+    expect(params.sAMAccountName).toBe("citra.w");
+    expect(params.givenName).toBe("Citra");
+    expect(params.sn).toBe("Wulandari");
+  });
+
+  const quietMove: MovementPayload = { ...movement, accessProfileId: undefined };
+
+  it("moves the account into the new division's OU, without touching groups", () => {
+    mapDivisions();
+    const before = { groups: accessProfileGroups("engineering"), ou: ENGINEERING };
+    const plan = buildPlan(quietMove, before);
+
+    expect(keys(plan.steps)).toEqual(["set-attributes", "move-ou", "verify"]);
+    expect(plan.steps.find((step) => step.key === "move-ou")!.params.ou).toBe(SECURITY);
+    expect(plan.postconditions.ou).toBe(SECURITY);
+    expect(plan.postconditions.requiredGroups).toEqual(accessProfileGroups("engineering"));
+  });
+
+  it("does not move an account already in that OU, however the DN is spelled", () => {
+    mapDivisions();
+    const plan = buildPlan(quietMove, { groups: [], ou: "ou=security, OU=Karyawan,DC=corp,DC=example,DC=com" });
+
+    expect(keys(plan.steps)).toEqual(["set-attributes", "verify"]);
+  });
+
+  it("leaves the account where it is when the new division has no OU of its own", () => {
+    mapDivisions();
+    const plan = buildPlan({ ...quietMove, toDepartment: "Legal" }, { groups: [], ou: ENGINEERING });
+
+    expect(keys(plan.steps)).toEqual(["set-attributes", "verify"]);
+    expect(plan.postconditions.ou).toBe(ENGINEERING);
   });
 });

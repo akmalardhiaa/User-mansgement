@@ -438,6 +438,12 @@ Keamanannya bukan opsi yang bisa dimatikan:
   `AD_ACCESS_GROUP_FINANCE`, dan `AD_ACCESS_GROUP_SECURITY` dengan DN yang
   disetujui tim AD. Seluruh OU tujuan, termasuk `AD_QUARANTINE_OU`, harus ada
   di `AD_MANAGED_OUS`.
+- **OU mengikuti divisi.** `AD_DEPARTMENT_OUS` (`Divisi=>DN OU;…`) dan/atau
+  `AD_DEPARTMENT_OU_PARENT` (OU bernama sama dengan divisi di bawah OU induk)
+  menentukan OU akun baru dari divisi yang dipilih di form, dan pindah divisi
+  ikut memindahkan akunnya. Divisi yang tidak tercakup masuk `AD_OU_STANDARD`.
+  Akun dibuat dengan `sAMAccountName` = User ID dari form,
+  `userPrincipalName` = User ID @ `LDAP_DOMAIN`, serta `givenName` dan `sn`.
 - **`AD_LDAP_WRITE_ENABLED` default mati.** Selama mati, setiap operasi tulis
   ditolak dengan pesan jelas — bahkan sebelum koneksi dibuka — sementara
   pembacaan tetap jalan. Itu keadaan untuk memverifikasi koneksi, hak, dan OU

@@ -266,3 +266,65 @@ describe("read-only AD diagnostics", () => {
     expect(check(report, "write").status).toBe("warn");
   });
 });
+
+describe("division OUs", () => {
+  const FINANCE = `OU=Finance,${OU}`;
+  const LEGAL = `OU=Legal,${OU}`;
+
+  async function run(overrides: LdapEnv, existing: string[] = [BASE_DN, OU, QUARANTINE, CISO, FINANCE]) {
+    const { client } = fakeDirectory(existing);
+    return runAdDiagnostics({ env: ldapEnv(await caFile(), overrides), connect: async () => client });
+  }
+
+  it("is skipped, and says where accounts go instead, when nothing is configured", async () => {
+    const result = check(await run({}), "department-ous");
+
+    expect(result.status).toBe("skip");
+    expect(result.message).toMatch(/AD_OU_STANDARD/);
+  });
+
+  it("passes when every mapped OU exists inside AD_MANAGED_OUS", async () => {
+    expect(check(await run({ AD_DEPARTMENT_OUS: `Finance=>${FINANCE}` }), "department-ous").status).toBe("ok");
+  });
+
+  it("fails an OU outside AD_MANAGED_OUS, naming the division", async () => {
+    const result = check(
+      await run({ AD_DEPARTMENT_OUS: "Finance=>OU=Finance,OU=Lain,DC=corp,DC=example,DC=com" }),
+      "department-ous",
+    );
+
+    expect(result.status).toBe("fail");
+    expect(result.message).toMatch(/Finance/);
+  });
+
+  it("fails a mapped OU the directory does not have - answered the way AD answers it", async () => {
+    const { client } = fakeDirectory([BASE_DN, OU, QUARANTINE, CISO, FINANCE]);
+    // A real domain controller throws noSuchObject for a base that is not there.
+    const strict: LdapClientLike = {
+      ...client,
+      async search(dn, options) {
+        if (dn === LEGAL) throw Object.assign(new Error("No Such Object"), { code: 32 });
+        return client.search(dn, options);
+      },
+    };
+    const report = await runAdDiagnostics({
+      env: ldapEnv(await caFile(), { AD_DEPARTMENT_OUS: `Finance=>${FINANCE};Legal=>${LEGAL}` }),
+      connect: async () => strict,
+    });
+
+    expect(check(report, "department-ous").status).toBe("fail");
+    expect(check(report, "department-ous").message).toMatch(/Legal/);
+  });
+
+  it("warns, listing them, about divisions the naming convention points at a missing OU", async () => {
+    const result = check(await run({ AD_DEPARTMENT_OU_PARENT: OU }), "department-ous");
+
+    expect(result.status).toBe("warn");
+    expect(result.message).toMatch(/Legal/);
+    expect(result.message).not.toMatch(/Finance \(/);
+  });
+
+  it("fails a mapping it cannot read", async () => {
+    expect(check(await run({ AD_DEPARTMENT_OUS: "Finance OU=Finance" }), "department-ous").status).toBe("fail");
+  });
+});

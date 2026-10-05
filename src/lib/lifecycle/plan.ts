@@ -1,4 +1,10 @@
-import { accessProfileGroups, accessProfileOu, quarantineOu } from "@/lib/lifecycle/accessProfiles";
+import { dnEquals } from "@/lib/ad/ldapDn";
+import {
+  accessProfileGroups,
+  accessProfileOu,
+  departmentOu,
+  quarantineOu,
+} from "@/lib/lifecycle/accessProfiles";
 
 import type { LifecyclePayload } from "./types";
 
@@ -122,7 +128,15 @@ export function buildPlan(payload: LifecyclePayload, before?: PlanBefore): Execu
      */
     const profile = payload.accessProfileId ?? "standard";
     const groups = accessProfileGroups(profile);
-    const ou = accessProfileOu(profile);
+    /*
+     * The division decides the OU. A request that names a profile - one raised
+     * before HC stopped choosing them - keeps that profile's OU, because that
+     * is what was approved. A division with no OU of its own lands in the
+     * standard one.
+     */
+    const ou = payload.accessProfileId
+      ? accessProfileOu(payload.accessProfileId)
+      : (departmentOu(payload.department) ?? accessProfileOu("standard"));
 
     return {
       steps: [
@@ -134,6 +148,8 @@ export function buildPlan(payload: LifecyclePayload, before?: PlanBefore): Execu
             // for a request raised before that field existed.
             sAMAccountName: payload.userId ?? accountNameFor(payload.email),
             displayName: payload.displayName,
+            givenName: payload.firstName,
+            sn: payload.lastName,
             mail: payload.email,
             ou,
           },
@@ -175,12 +191,15 @@ export function buildPlan(payload: LifecyclePayload, before?: PlanBefore): Execu
 
   if (payload.kind === "MOVEMENT") {
     /*
-     * A move with no profile named does not touch access at all — no groups
-     * granted, none revoked, no OU change. The attributes move; the access
-     * stays where somebody else put it. That is the shape of a move now that
-     * HC no longer chooses a profile, and it is deliberately the quiet option:
-     * a move that silently stripped the groups a person holds would be a
-     * partial termination wearing a move's name.
+     * A move with no profile named does not touch access — no groups granted,
+     * none revoked. The attributes move, and the account follows its new
+     * division into that division's OU when the division has one of its own
+     * and it is not where the account already is. A division with no OU of
+     * its own leaves the account where it is: moving it to the standard OU
+     * because a mapping is missing would be a change nobody asked for.
+     *
+     * Groups stay deliberately quiet: a move that silently stripped the groups
+     * a person holds would be a partial termination wearing a move's name.
      */
     if (!payload.accessProfileId) {
       const attributes = {
@@ -188,6 +207,9 @@ export function buildPlan(payload: LifecyclePayload, before?: PlanBefore): Execu
         title: payload.toJobTitle,
         manager: accountNameFor(payload.toManagerEmail),
       };
+      const divisionOu = departmentOu(payload.toDepartment);
+      const moveTo =
+        divisionOu && !(before?.ou && dnEquals(before.ou, divisionOu)) ? divisionOu : undefined;
       return {
         steps: [
           {
@@ -195,17 +217,21 @@ export function buildPlan(payload: LifecyclePayload, before?: PlanBefore): Execu
             label: "Memperbarui divisi, jabatan, dan manager",
             params: attributes,
           },
+          ...(moveTo
+            ? [{ key: "move-ou" as const, label: "Memindahkan objek ke OU divisi baru", params: { ou: moveTo } }]
+            : []),
           { key: "verify", label: "Membaca ulang hasil dari direktori", params: {} },
         ],
         postconditions: {
           /*
            * Access is pinned to how the account was found rather than left
-           * unchecked: the read-back still has to say the OU is the same and
-           * every group the person held is still held. A move that quietly
-           * moved somebody out of their OU is what this catches.
+           * unchecked: the read-back still has to say every group the person
+           * held is still held, and that the OU is the one intended - the
+           * division's, or the one it was in. A move that quietly moved
+           * somebody anywhere else is what this catches.
            */
           enabled: before?.enabled ?? true,
-          ou: before?.ou ?? accessProfileOu("standard"),
+          ou: moveTo ?? before?.ou ?? accessProfileOu("standard"),
           requiredGroups: [...(before?.groups ?? [])],
           forbiddenGroups: [],
           attributes,

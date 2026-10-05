@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { getAdDriver } from "@/lib/ad";
+import { dnEquals } from "@/lib/ad/ldapDn";
 import { AdError, type AdAccountState, type AdDriver } from "@/lib/ad/types";
 import { recordActivityInDraft } from "@/lib/db/repository";
 import { mutateStore, readStore, type StoreShape } from "@/lib/db/store";
@@ -241,10 +242,23 @@ async function applyStep(
     case "create-account": {
       const payload = context.request.payload;
       if (payload.kind !== "ONBOARDING") throw new Error("create-account bukan untuk jenis ini.");
+      /*
+       * The account name is the plan's: the User ID HC typed, or the one
+       * derived from the address for a request raised before that field
+       * existed. This used to derive it from the address unconditionally, so
+       * the User ID on the form never reached the directory.
+       *
+       * The UPN is that name at LDAP_DOMAIN - the form the portal's own login
+       * binds with - and the address only when no domain is configured.
+       */
+      const accountName = String(step.params.sAMAccountName ?? accountNameFor(payload.email));
+      const domain = process.env.LDAP_DOMAIN?.trim();
       const created = await driver.createAccount({
-        sAMAccountName: accountNameFor(payload.email),
-        userPrincipalName: payload.email,
+        sAMAccountName: accountName,
+        userPrincipalName: domain ? `${accountName}@${domain}` : payload.email,
         displayName: payload.displayName,
+        givenName: step.params.givenName as string | undefined,
+        sn: step.params.sn as string | undefined,
         mail: payload.email,
         department: payload.department,
         title: payload.jobTitle,
@@ -292,13 +306,21 @@ function verify(plan: ExecutionPlan, state: AdAccountState | undefined): string 
   if (state.enabled !== post.enabled) {
     return `enabled seharusnya ${post.enabled}, terbaca ${state.enabled}.`;
   }
-  if (state.ou !== post.ou) return `OU seharusnya ${post.ou}, terbaca ${state.ou}.`;
+  /*
+   * DNs are compared as DNs. The OU and group names in the plan come from
+   * configuration somebody typed, and the directory answers in its own
+   * spelling - `ou=Finance, OU=Karyawan` and `OU=Finance,OU=Karyawan` are one
+   * container. Comparing them as strings failed a job AFTER its writes had
+   * landed, which is the worst moment to be wrong about a spelling.
+   */
+  if (!state.ou || !dnEquals(state.ou, post.ou)) return `OU seharusnya ${post.ou}, terbaca ${state.ou}.`;
 
+  const holds = (group: string) => state.groups.some((held) => dnEquals(held, group));
   for (const group of post.requiredGroups) {
-    if (!state.groups.includes(group)) return `Group wajib belum ada: ${group}.`;
+    if (!holds(group)) return `Group wajib belum ada: ${group}.`;
   }
   for (const group of post.forbiddenGroups) {
-    if (state.groups.includes(group)) return `Group seharusnya dicabut masih ada: ${group}.`;
+    if (holds(group)) return `Group seharusnya dicabut masih ada: ${group}.`;
   }
   if (post.attributes.displayName && state.displayName !== post.attributes.displayName) {
     return `displayName seharusnya ${post.attributes.displayName}, terbaca ${state.displayName}.`;

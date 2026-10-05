@@ -12,6 +12,7 @@
  */
 
 import { AdConfigurationError } from "@/lib/ad/configError";
+import { escapeDnValue } from "@/lib/ad/ldapDn";
 
 export interface AccessProfile {
   id: string;
@@ -134,6 +135,86 @@ export function quarantineOu(): string {
     throw new AdConfigurationError("AD_QUARANTINE_OU wajib diisi saat driver Active Directory nyata digunakan.");
   }
   return "OU=Karantina,DC=corp,DC=example,DC=com";
+}
+
+/* -------------------------------------------------------------------------- */
+/* The OU a division's accounts live in                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One division's OU, as configured.
+ *
+ * HC picks the division on the form; the OU follows from it, so nobody filling
+ * in a request ever types or chooses a distinguished name. Two ways to say
+ * where each division lives, usable together:
+ *
+ *   AD_DEPARTMENT_OUS        explicit pairs, `Division=>OU DN`, separated by
+ *                            `;` - the same separator AD_MANAGED_OUS uses,
+ *                            and a character a DN does not contain unescaped.
+ *   AD_DEPARTMENT_OU_PARENT  a convention for every division not listed: the
+ *                            OU named after the division, under this parent.
+ *
+ * A division neither one covers has no OU of its own; the caller decides what
+ * that means (a new account goes to AD_OU_STANDARD, a move stays put).
+ */
+export interface DepartmentOu {
+  department: string;
+  ou: string;
+}
+
+type DepartmentEnv = Record<string, string | undefined>;
+
+function departmentPairs(env: DepartmentEnv): DepartmentOu[] {
+  const raw = env.AD_DEPARTMENT_OUS?.trim();
+  if (!raw) return [];
+
+  return raw
+    .split(";")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const arrow = entry.indexOf("=>");
+      const department = arrow < 0 ? "" : entry.slice(0, arrow).trim();
+      const ou = arrow < 0 ? "" : entry.slice(arrow + 2).trim();
+      if (!department || !ou) {
+        throw new AdConfigurationError(
+          `AD_DEPARTMENT_OUS: "${entry}" bukan bentuk Divisi=>DN OU. Pisahkan tiap divisi dengan ;`,
+        );
+      }
+      return { department, ou };
+    });
+}
+
+/** Every explicitly mapped division, for the status page. */
+export function configuredDepartmentOus(env: DepartmentEnv = process.env): DepartmentOu[] {
+  return departmentPairs(env);
+}
+
+/** The parent OU of the naming convention, when one is set. */
+export function departmentOuParent(env: DepartmentEnv = process.env): string | undefined {
+  return env.AD_DEPARTMENT_OU_PARENT?.trim() || undefined;
+}
+
+/**
+ * The OU for a division: the explicit pair first, then the convention.
+ *
+ * Division names are matched ignoring case and surrounding space, because the
+ * form and the configuration are typed by different people.
+ */
+export function departmentOu(
+  department: string | undefined,
+  env: DepartmentEnv = process.env,
+): string | undefined {
+  const name = department?.trim();
+  if (!name) return undefined;
+
+  const explicit = departmentPairs(env).find(
+    (pair) => pair.department.toLowerCase() === name.toLowerCase(),
+  );
+  if (explicit) return explicit.ou;
+
+  const parent = departmentOuParent(env);
+  return parent ? `OU=${escapeDnValue(name)},${parent}` : undefined;
 }
 
 export function isAccessProfileId(value: unknown): boolean {

@@ -40,6 +40,9 @@ export interface AdCreateSpec {
   sAMAccountName: string;
   userPrincipalName: string;
   displayName: string;
+  /** First and last name, written as givenName and sn when present. */
+  givenName?: string;
+  sn?: string;
   mail: string;
   department: string;
   title: string;

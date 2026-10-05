@@ -205,6 +205,8 @@ export class LdapAdDriver implements AdDriver {
       const optional: Record<string, string | undefined> = {
         userPrincipalName: spec.userPrincipalName,
         displayName: spec.displayName,
+        givenName: spec.givenName,
+        sn: spec.sn,
         mail: spec.mail,
         department: spec.department,
         title: spec.title,

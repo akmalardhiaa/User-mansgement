@@ -1,5 +1,12 @@
 import { X509Certificate } from "node:crypto";
 
+import { DEPARTMENTS } from "@/lib/db/seed";
+import {
+  configuredDepartmentOus,
+  departmentOu,
+  departmentOuParent,
+} from "@/lib/lifecycle/accessProfiles";
+
 import { toAdError } from "./ldapErrors";
 import { isManaged } from "./ldapDn";
 import { ldapConnector, readLdapAdConfig, readLdapCa, type LdapClientLike, type LdapEnv } from "./ldapConnection";
@@ -16,6 +23,7 @@ export type AdDiagnosticCheckId =
   | "base-dn"
   | "managed-ous"
   | "quarantine-ou"
+  | "department-ous"
   | "ciso-group"
   | "write";
 
@@ -68,6 +76,94 @@ function checkDn(
     .catch((error: unknown) => {
       checks.push({ id, status: "fail", message: errorMessage(error, password) });
     });
+}
+
+/**
+ * Where each division's accounts will be created, checked before anybody is.
+ *
+ * Every OU a division can resolve to: the explicit pairs, and - when the
+ * naming convention is on - the OU named after every division the form
+ * offers. All of them must sit inside AD_MANAGED_OUS, or the driver refuses
+ * the write; all of them must exist, or the onboarding fails at its first
+ * step. A missing explicit OU is a failure, because somebody named it; a
+ * missing conventional one is a warning, because the division may simply
+ * never be used - but it says which divisions would fail.
+ */
+async function checkDepartmentOus(
+  checks: AdDiagnosticCheck[],
+  client: LdapClientLike,
+  env: LdapEnv,
+  managedOus: readonly string[],
+  password: string,
+): Promise<void> {
+  const id = "department-ous";
+  let targets: Array<{ department: string; ou: string; explicit: boolean }>;
+  try {
+    const pairs = configuredDepartmentOus(env);
+    const parent = departmentOuParent(env);
+    if (pairs.length === 0 && !parent) {
+      checks.push({
+        id,
+        status: "skip",
+        message: "AD_DEPARTMENT_OUS dan AD_DEPARTMENT_OU_PARENT kosong: semua akun baru masuk AD_OU_STANDARD.",
+      });
+      return;
+    }
+    const named = new Set(pairs.map((pair) => pair.department.toLowerCase()));
+    targets = [
+      ...pairs.map((pair) => ({ ...pair, explicit: true })),
+      ...(parent
+        ? DEPARTMENTS.filter((department) => !named.has(department.toLowerCase())).map((department) => ({
+            department,
+            ou: departmentOu(department, env)!,
+            explicit: false,
+          }))
+        : []),
+    ];
+  } catch (error) {
+    checks.push({ id, status: "fail", message: errorMessage(error, password) });
+    return;
+  }
+
+  const outside = targets.filter((target) => !isManaged(target.ou, managedOus));
+  if (outside.length > 0) {
+    checks.push({
+      id,
+      status: "fail",
+      message: `OU divisi berikut berada di luar AD_MANAGED_OUS: ${outside.map((target) => target.department).join(", ")}.`,
+    });
+    return;
+  }
+
+  const missing: typeof targets = [];
+  try {
+    for (const target of targets) {
+      // A domain controller answers a search based at a DN that does not
+      // exist with noSuchObject, not with an empty result.
+      const exists = await hasEntry(client, target.ou).catch((error: unknown) => {
+        if (toAdError(error, "read", target.ou).kind === "NOT_FOUND") return false;
+        throw error;
+      });
+      if (!exists) missing.push(target);
+    }
+  } catch (error) {
+    checks.push({ id, status: "fail", message: errorMessage(error, password) });
+    return;
+  }
+
+  const describe = (list: typeof targets) => list.map((target) => `${target.department} (${target.ou})`).join("; ");
+  const missingExplicit = missing.filter((target) => target.explicit);
+  if (missingExplicit.length > 0) {
+    checks.push({ id, status: "fail", message: `OU divisi tidak ditemukan: ${describe(missingExplicit)}.` });
+  } else if (missing.length > 0) {
+    checks.push({
+      id,
+      status: "warn",
+      message: `Divisi berikut belum punya OU, jadi onboarding-nya akan gagal: ${describe(missing)}.`,
+    });
+  } else {
+    checks.push({ id, status: "ok", message: `${targets.length} OU divisi ditemukan dan berada di AD_MANAGED_OUS.` });
+  }
 }
 
 export async function runAdDiagnostics({
@@ -238,6 +334,8 @@ export async function runAdDiagnostics({
             await checkDn(checks, client, "quarantine-ou", configuredQuarantine, password);
           }
 
+          await checkDepartmentOus(checks, client, env, config.managedOus, password);
+
           const cisoGroup = env.CISO_APPROVER_GROUP?.trim();
           if (!cisoGroup) {
             checks.push({ id: "ciso-group", status: "skip", message: "CISO_APPROVER_GROUP tidak disetel." });
@@ -249,6 +347,17 @@ export async function runAdDiagnostics({
         }
       }
     }
+  }
+
+  if (!checks.some((check) => check.id === "department-ous")) {
+    checks.push({
+      id: "department-ous",
+      status: "skip",
+      message:
+        env.AD_DEPARTMENT_OUS?.trim() || env.AD_DEPARTMENT_OU_PARENT?.trim()
+          ? "OU divisi tidak diperiksa karena koneksi LDAP tidak tersedia."
+          : "AD_DEPARTMENT_OUS dan AD_DEPARTMENT_OU_PARENT kosong: semua akun baru masuk AD_OU_STANDARD.",
+    });
   }
 
   if (!checks.some((check) => check.id === "ciso-group")) {

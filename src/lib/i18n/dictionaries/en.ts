@@ -630,6 +630,7 @@ export const en: Dictionary = {
       "base-dn": "Base DN",
       "managed-ous": "Managed OUs",
       "quarantine-ou": "Quarantine OU",
+      "department-ous": "Division OUs",
       "ciso-group": "CISO group",
       write: "Write mode",
     },

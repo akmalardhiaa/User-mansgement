@@ -518,3 +518,74 @@ describe("the audit trail", () => {
     expect((await store()).auditEvents.every((event) => event.source === "WORKER")).toBe(true);
   });
 });
+
+describe("one OU per division", () => {
+  const ENGINEERING = "OU=Engineering,OU=Karyawan,DC=corp,DC=example,DC=com";
+  const SECURITY = "OU=Security,OU=Karyawan,DC=corp,DC=example,DC=com";
+
+  it("creates the account in its division's OU under the User ID, however the OU is spelled", async () => {
+    // Typed by a person, in a spelling the directory does not use. The
+    // directory answers in its own; the read-back must still agree.
+    vi.stubEnv("AD_DEPARTMENT_OUS", "IT — Engineering=>ou=engineering, OU=Karyawan,DC=corp,DC=example,DC=com");
+    vi.stubEnv("LDAP_DOMAIN", "corp.example.com");
+    await seed({
+      lifecycleRequests: [request({ payload: { ...ONBOARDING, accessProfileId: undefined, userId: "citra.w" } })],
+    });
+
+    const report = await runDueJobs({ workerId: "w1" });
+    expect(report.outcomes[0]?.errorMessage).toBeUndefined();
+    expect(report.completed).toBe(1);
+
+    const [account] = await dir.accounts();
+    expect(account.sAMAccountName).toBe("citra.w");
+    expect(account.ou).toBe(ENGINEERING);
+    expect(account.enabled).toBe(true);
+
+    const dn = `CN=Citra Wulandari,${ENGINEERING}`;
+    expect(dir.directory.value(dn, "givenName")).toBe("Citra");
+    expect(dir.directory.value(dn, "sn")).toBe("Wulandari");
+    expect(dir.directory.value(dn, "userPrincipalName")).toBe("citra.w@corp.example.com");
+  });
+
+  it("moves an account into its new division's OU and leaves its groups alone", async () => {
+    vi.stubEnv("AD_DEPARTMENT_OUS", `IT — Engineering=>${ENGINEERING};IT — Security=>${SECURITY}`);
+    const move: LifecyclePayload = {
+      kind: "MOVEMENT",
+      employeeId: "emp_1",
+      toDepartment: "IT — Security",
+      toJobTitle: "Security Engineer",
+      toManagerName: "Bagus Nugroho",
+      toManagerEmail: "bagus.nugroho@example.com",
+      reason: "Rotasi internal.",
+    };
+    await seed(
+      {
+        employees: [employee({ objectGUID: RIZKY_GUID })],
+        lifecycleRequests: [
+          request({
+            payload: move,
+            employeeId: "emp_1",
+            beforeSnapshot: {
+              displayName: "Rizky Maulana",
+              email: "rizky.maulana@example.com",
+              department: "IT — Engineering",
+              jobTitle: "Senior Backend Engineer",
+              managerEmail: "sarah.wijaya@example.com",
+              status: "ACTIVE",
+            },
+          }),
+        ],
+      },
+      [adAccount({ ou: ENGINEERING })],
+    );
+
+    const report = await runDueJobs({ workerId: "w1" });
+    expect(report.outcomes[0]?.errorMessage).toBeUndefined();
+    expect(report.completed).toBe(1);
+
+    const [account] = await dir.accounts();
+    expect(account.ou).toBe(SECURITY);
+    expect(account.department).toBe("IT — Security");
+    expect(account.groups).toEqual(accessProfileGroups("engineering"));
+  });
+});

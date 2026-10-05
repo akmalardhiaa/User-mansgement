@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { LdapChange, LdapClientLike, LdapSearchOptions } from "./ldapConnection";
-import { containerOf, isWithin, normaliseDn } from "./ldapDn";
+import { containerOf, isWithin, normaliseDn, rdnOf } from "./ldapDn";
 import { guidToBytes } from "./ldapGuid";
 import type { DirectoryEntry } from "./ldapEntry";
 
@@ -224,6 +224,19 @@ export class FakeLdapDirectory {
     this.entries.set(normaliseDn(dn), { dn, attributes: map, guid: guidToBytes(guid) });
   }
 
+  /**
+   * A new object's DN, spelled the way its parent is stored.
+   *
+   * AD does this: an account added under `ou=finance, OU=Karyawan` is reported
+   * as being under `OU=Finance,OU=Karyawan`, because the parent already exists
+   * and keeps its own spelling. A fake that echoed back whatever spelling it
+   * was given would hide every comparison that treats DNs as plain strings.
+   */
+  private spelledAsParent(dn: string): string {
+    const parent = this.entries.get(normaliseDn(containerOf(dn)));
+    return parent ? `${rdnOf(dn)},${parent.dn}` : dn;
+  }
+
   /** The stored entry, for assertions. */
   entry(dn: string): { dn: string; attributes: Record<string, string[]> } | undefined {
     const found = this.entries.get(normaliseDn(dn));
@@ -379,7 +392,7 @@ export class FakeLdapDirectory {
           normalised.objectCategory = ["person"];
         }
         // A new object gets its GUID from the directory, as it would in AD.
-        this.put(dn, normalised);
+        this.put(this.spelledAsParent(dn), normalised);
       },
 
       modify: async (dn: string, changes: readonly LdapChange[]): Promise<void> => {
@@ -427,7 +440,7 @@ export class FakeLdapDirectory {
         }
 
         this.entries.delete(normaliseDn(dn));
-        entry.dn = newDn;
+        entry.dn = this.spelledAsParent(newDn);
         this.entries.set(normaliseDn(newDn), entry);
 
         // AD keeps referential integrity for group membership across a move.
@@ -436,7 +449,7 @@ export class FakeLdapDirectory {
           if (!members) continue;
           candidate.attributes.set(
             "member",
-            members.map((member) => (normaliseDn(member) === normaliseDn(dn) ? newDn : member)),
+            members.map((member) => (normaliseDn(member) === normaliseDn(dn) ? entry.dn : member)),
           );
         }
       },

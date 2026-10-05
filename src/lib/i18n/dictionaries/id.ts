@@ -658,6 +658,7 @@ export const id = {
       "base-dn": "Base DN",
       "managed-ous": "OU yang dikelola",
       "quarantine-ou": "OU karantina",
+      "department-ous": "OU per divisi",
       "ciso-group": "Group CISO",
       write: "Mode tulis",
     },

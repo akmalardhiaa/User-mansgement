@@ -75,12 +75,27 @@ sebelum ada satu pun objek direktori yang berubah.
 | Akun layanan + kata sandinya | `AD_BIND_DN`, `AD_BIND_PASSWORD` |
 | OU mana yang boleh ditulis portal | `AD_MANAGED_OUS` |
 | OU karantina untuk akun nonaktif | `AD_QUARANTINE_OU` |
-| Nama group untuk tiap profil akses | `AD_ACCESS_GROUP_*`, `AD_OU_*` |
+| OU default akun baru, dan group akses | `AD_OU_STANDARD`, `AD_ACCESS_GROUP_*` |
+| **OU tiap divisi** — daftar Divisi → OU, atau satu OU induk berisi OU bernama sama dengan divisinya | `AD_DEPARTMENT_OUS`, `AD_DEPARTMENT_OU_PARENT` |
+| Apakah domain mewajibkan password sebelum akun boleh aktif | lihat "Satu hal yang hanya bisa dijawab di sana" |
 | Group yang menentukan peran portal | `AD_GROUP_HC`, `AD_GROUP_ADMIN`, … |
 | Group tim CISO | `CISO_APPROVER_GROUP` |
 
 **Hak akun layanannya didelegasikan ke OU tertentu saja** — jangan dimasukkan
 ke Domain Admins. Itu justru yang sedang dijaga oleh `AD_MANAGED_OUS`.
+
+**OU per divisi.** Divisi yang dipilih HC di form menentukan OU akun barunya,
+dan pindah divisi memindahkan akunnya ke OU divisi baru. Contoh:
+
+```
+AD_DEPARTMENT_OUS=Finance=>OU=Finance,OU=Karyawan,DC=...;IT — Engineering=>OU=Engineering,OU=Karyawan,DC=...
+AD_DEPARTMENT_OU_PARENT=OU=Karyawan,DC=...
+```
+
+Baris pertama memetakan divisi satu per satu; baris kedua untuk divisi lain
+yang OU-nya bernama sama persis dengan nama divisinya. Divisi yang tidak
+tercakup masuk `AD_OU_STANDARD`. **Semua OU divisi harus ada di dalam
+`AD_MANAGED_OUS`**, dan akun layanan harus didelegasikan di sana juga.
 
 ### Langkah 2 — Isi berkasnya
 
@@ -142,6 +157,9 @@ Login ke portal. Yang harus benar:
 - Peran portalnya benar — kalau kosong, `AD_GROUP_*` belum cocok dengan group
   yang sebenarnya dipegang akun itu.
 - Direktori karyawan terbaca.
+- Di `/status-ad`, pemeriksaan **OU per divisi** hijau: setiap OU divisi ada di
+  AD dan berada di dalam `AD_MANAGED_OUS`. Divisi yang disebut "belum punya
+  OU" akan gagal saat onboarding sampai OU-nya dibuat atau dipetakan.
 
 ### Langkah 5 — Nyalakan sakelar tulis
 
