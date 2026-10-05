@@ -6,11 +6,10 @@ REM  Klik dua kali, lalu isi tujuannya (mis. E:\portal-hc) - atau jalankan
 REM  dengan tujuan sebagai argumen:  siapkan-pindah.bat E:\portal-hc
 REM
 REM  Yang ikut: kode, node_modules, data, dan berkas .env.
-REM  Yang tidak: .next (cache build, 700+ MB, dibuat ulang sendiri), .git, dan
-REM  cadangan .env lama (*.bak-*), yang berisi rahasia dan tidak dipakai.
+REM  Yang tidak: .next (cache build, 700+ MB, dibuat ulang sendiri) dan .git.
 REM
 REM  Kenapa node_modules ikut: di komputer yang jaringannya memblokir npm,
-REM  itulah satu-satunya cara portal bisa jalan tanpa memasang apa pun.
+REM  itulah satu-satunya cara portal bisa jalan tanpa Podman dan tanpa admin.
 REM
 REM  Dua hal di bawah ini ada karena pernah salah, bukan karena kehati-hatian:
 REM
@@ -46,9 +45,14 @@ echo  ==========================================================
 echo.
 
 REM Portal yang sedang menulis ke data\ bisa menghasilkan salinan setengah
-REM jadi. Ia berjalan di jendela jalankan.bat, yang hanya bisa ditutup oleh
-REM pemiliknya - jadi berkas ini menolak menyalin selama portal masih menjawab.
-echo  [1/4] Memastikan portal tidak sedang berjalan...
+REM jadi. Dimatikan lewat hentikan-podman.bat - bukan "podman compose down"
+REM dari Windows, karena jembatan SSH Windows ke mesin Podman tidak bisa
+REM diandalkan dan kegagalannya diam. "<nul" melewati pause di skrip itu.
+echo  [1/4] Menghentikan portal supaya tidak ada yang sedang menulis...
+call hentikan-podman.bat <nul >nul 2>&1
+
+REM Portal lewat jalankan.bat hanya bisa ditutup pemiliknya. Masih menjawab
+REM setelah Podman dihentikan berarti ada yang masih menulis: jangan menyalin.
 set "MENYALA=0"
 for /f %%a in ('powershell -NoProfile -Command "try { (Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 http://127.0.0.1:3000/login).StatusCode } catch { 0 }"') do set "MENYALA=%%a"
 if "%MENYALA%"=="200" (
@@ -78,6 +82,7 @@ if not exist "%TUJUAN%\node_modules\next"       set "KURANG=%KURANG% node_module
 if not exist "%TUJUAN%\data\hc-store.json"      set "KURANG=%KURANG% data\hc-store.json"
 if not exist "%TUJUAN%\jalankan.bat"            set "KURANG=%KURANG% jalankan.bat"
 if not exist "%TUJUAN%\.env.development"        set "KURANG=%KURANG% .env.development"
+if not exist "%TUJUAN%\compose.yaml"            set "KURANG=%KURANG% compose.yaml"
 
 if not "%KURANG%"=="" (
   echo.
@@ -104,11 +109,11 @@ if not "%ASAL%"=="%SALIN%" (
 echo        Lengkap.
 
 echo  [4/4] Memeriksa berkas rahasia...
-if exist "%TUJUAN%\.env.local" (
-  echo        .env.local ikut tersalin. Di dalamnya ada App Password Gmail dan
-  echo        kunci outbox - jangan pernah kirim lewat chat atau unggah ke repositori.
+if exist "%TUJUAN%\.env.podman" (
+  echo        .env.podman ikut tersalin. Di dalamnya ada App Password Gmail -
+  echo        jangan pernah kirim lewat chat atau unggah ke repositori.
 ) else (
-  echo        .env.local tidak ada. Tanpa berkas itu email ditulis sebagai
+  echo        .env.podman tidak ada. Tanpa berkas itu email ditulis sebagai
   echo        berkas ke data\outbox-mail\ dan seluruh alur tetap bisa didemokan.
 )
 
@@ -117,7 +122,8 @@ echo  ==========================================================
 echo   Selesai. Di komputer tujuan:
 echo  ==========================================================
 echo.
-echo   Klik dua kali jalankan.bat, lalu buka http://localhost:3000
+echo   Dengan Podman          ^>  klik dua kali jalankan-podman.bat
+echo   Tanpa container        ^>  klik dua kali jalankan.bat
 echo.
 echo   Node.js belum ada dan tidak punya hak admin? Unduh Node 22 versi
 echo   .zip dari nodejs.org, ekstrak jadi folder "node" di sebelah

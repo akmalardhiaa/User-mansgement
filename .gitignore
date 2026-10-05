@@ -40,8 +40,9 @@ yarn-error.log*
 # to be named too — without a line of its own, .env.onprem.example is ignored
 # like a real secrets file, and a template nobody can commit helps nobody.
 !.env.onprem.example
-# The demo defaults for `npm run dev`. Holds no secrets — placeholders only,
-# no directory — and is committed so a fresh clone runs without any setup.
+# The demo defaults for `npm run dev`, which the container also reads because
+# it runs `next dev`. Holds no secrets — placeholders only, no directory —
+# and is committed so a fresh clone runs without any setup.
 !.env.development
 
 # local JSON data store

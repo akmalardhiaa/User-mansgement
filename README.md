@@ -33,22 +33,19 @@ persetujuan demo dirutekan.
 Akun demo ditolak di production: di sana `LDAP_URL` yang belum diisi adalah
 kesalahan konfigurasi, bukan alasan untuk meloloskan siapa pun.
 
-## Menjalankan di PC
+## Menjalankan tanpa container
 
-Aplikasi ini hanya butuh Node.js: halaman, API, worker, dan pengirim email
-berjalan di **satu proses**, tanpa container dan tanpa database. Klik dua kali
-`jalankan.bat`, atau:
+Untuk menjalankan lokal tanpa container, aplikasi ini hanya memerlukan Node.js.
+Klik dua kali `jalankan.bat`, atau jalankan perintah terminal di bawah.
 
 ```bash
 npm install     # sekali saja
 npm run dev
 ```
 
-Lalu buka `http://localhost:3000`. Konfigurasinya dua lapis:
-`.env.development` — ikut di-commit, bawaan demo tanpa rahasia — lalu
-`.env.local` milik Anda, yang menimpa nilai apa pun yang diisinya. Hasil
-`git clone` yang belum punya `.env.local` tetap menyala tanpa AD, dengan email
-ditulis ke berkas.
+Lalu buka `http://localhost:3000`. Hasilnya identik dengan container, karena
+`.env.development` — ikut di-commit, tanpa rahasia — memuat bawaan yang sama
+dengan `.env.development`, dan `.env.local` Anda tetap menimpanya.
 
 **Bila komputernya tidak boleh memasang apa pun,** unduh Node.js versi
 *Windows Binary (.zip)* dari nodejs.org, ekstrak ke folder `node` di dalam
@@ -59,8 +56,44 @@ tersebut tanpa pemasangan dan tanpa hak admin.
 dari komputer yang sudah menjalankan `npm install`. Salinan antar-Windows
 kompatibel, dan `npm install` lalu tidak diperlukan sama sekali.
 
-Hot reload tidak selalu menangkap perubahan berkas di Windows. Bila kode baru
-tidak terpakai, tutup `jalankan.bat` (`Ctrl+C`) lalu jalankan lagi.
+Untuk mode container, yang dipasang hanya Podman CLI — tidak ada aplikasi
+desktop seperti Docker Desktop, dan tidak ada lisensi.
+
+## Menjalankan dengan Podman
+
+```bash
+podman compose up
+```
+
+Lalu buka `http://localhost:3000`. Satu perintah itu memang seluruh ceritanya,
+dan dua hal menjaganya tetap begitu.
+
+Pasang Podman sekali dengan `winget install -e --id RedHat.Podman` — itu CLI
+saja, bukan aplikasi desktop. Mesin Podman dan `podman-compose` dibuat sendiri
+oleh **`jalankan-podman.bat`**, jadi untuk pemakaian sehari-hari klik dua kali
+berkas itu dan lewati perintah di atas. Image dibangun dari `Containerfile`,
+dengan konfigurasi di `compose.yaml`. Urutan lengkapnya ada di MENJALANKAN.md.
+
+**Konfigurasi bertumpuk dua lapis.** `env_file` membaca
+`.env.development` — yang ikut di-commit, berisi bawaan demo, tanpa rahasia —
+lalu `.env.podman` yang **opsional** dan menimpa nilai apa pun yang diisinya.
+Hasilnya: hasil `git clone` yang belum punya `.env.podman` tetap menyala tanpa
+AD dan dengan email ditulis ke berkas, sedangkan mesin yang sudah
+mengisi SMTP tetap memakai SMTP. Untuk salinan baru, jalankan
+`Copy-Item .env.development .env.podman`, lalu isi placeholder rahasia di
+dalamnya.
+
+**Kode di-mount, jadi mengubah berkas tidak perlu `--build`.** Yang tidak
+di-mount hanya `node_modules` dan `.next`: yang pertama dipasang `npm ci` di
+dalam image dan harus tetap versi Linux, yang kedua milik siapa pun yang sedang
+menjalankan. Pemantau berkas Next **tidak** menerima notifikasi perubahan dari
+folder Windows lewat bind mount, jadi hot reload tidak menyala di Windows —
+hentikan (`Ctrl+C`) lalu `podman compose up` lagi, dan kode baru langsung
+terpakai. `podman compose up` pada container yang masih hidup tidak melakukan
+apa-apa, jadi menghentikannya dulu bukan langkah opsional.
+
+`--build` hanya perlu ketika `package.json` atau lockfile berubah, karena
+dependency dipasang ke dalam image, bukan di-mount.
 
 **Run pertama mengisi dirinya sendiri** — direktori karyawan sudah punya data
 awal. Akun AD-nya tidak: direktori simulasi yang dulu diisi saat boot sudah
@@ -70,68 +103,91 @@ sendiri lewat nama akun saat pertama kali menyentuhnya.
 
 ### Pindah ke komputer lain
 
-**Klik dua kali `siapkan-pindah.bat`** dan isi tujuannya: kode, `node_modules`,
-`data/`, dan `.env.local` ikut; `.next`, `.git`, dan cadangan `*.bak-*` tidak.
-Di komputer tujuan cukup klik dua kali `jalankan.bat` — tanpa hak admin, tanpa
-koneksi, tanpa langkah seeding. Skripnya menolak menyalin selama portal masih
-menyala, supaya `data/` tidak tersalin setengah jadi.
+Dua jalur, dan keduanya tidak butuh langkah seeding apa pun. Tanpa container:
+salin folder proyek beserta `node_modules`, lalu `jalankan.bat` — lihat
+**Menjalankan tanpa container** di atas, yang juga jalan tanpa hak admin dan
+tanpa koneksi. Dengan Podman, yang perlu dipasang hanya **Podman CLI**
+(`winget install -e --id RedHat.Podman`); mesin dan Compose disiapkan oleh
+`jalankan-podman.bat`, dan Node.js tidak perlu dipasang di host.
 
-**Mulai bersih** — salin repositori ini tanpa `node_modules` dan `.next`, lalu
-`npm install` dan `npm run dev`. Data terbentuk sendiri: enam karyawan, dan
-login `admin` / `admin12345`. Akun manager seperti `sarah` ditolak, karena
-portal ini memang hanya untuk Human Capital.
+**Mulai bersih** — salin repositori ini (tanpa `node_modules` dan `.next`), lalu:
 
-**Membawa data yang sudah ada** — tutup dulu `jalankan.bat` di komputer lama
-supaya tidak ada yang sedang menulis, salin folder `data/` apa adanya, lalu
-jalankan di komputer baru. Berkas `*.tmp` dan `*.bak-*` di dalamnya sisa lama
-dan tidak perlu ikut. Jangan menyalakan keduanya bersamaan: dua penjadwal
-outbox pada data yang sama berarti satu email persetujuan terkirim dua kali.
+```bash
+podman compose up
+```
+
+Data terbentuk sendiri: enam karyawan, dan login `admin` / `admin12345`. Akun
+manager seperti `sarah` ditolak, karena portal ini memang hanya untuk Human
+Capital.
+
+**Membawa data yang sudah ada** — matikan dulu portal di komputer lama
+(`podman compose down`) supaya tidak ada yang sedang menulis, salin folder
+`data/` apa adanya, lalu jalankan perintah yang sama. Berkas `*.tmp` dan
+`*.bak-*` di dalamnya sisa lama dan tidak perlu ikut. Jangan menyalakan
+keduanya bersamaan: dua penjadwal outbox pada data yang sama berarti satu email
+persetujuan terkirim dua kali.
 
 **Folder per karyawan baru mengikuti konfigurasi, bukan nama komputer.** Setiap
 akun yang selesai dibuat mendapat satu folder berisi ringkasan data yang
-disetujui, di bawah `USER_FOLDER_ROOT`. Isi di `.env.local` dengan path Windows
-biasa, atau path relatif terhadap folder proyek (`data/user-folders`).
+disetujui, di bawah `USER_FOLDER_ROOT`. Lewat Podman itu sudah diatur:
+`compose.yaml` memetakan folder **di atas** proyek, jadi di komputer mana
+pun foldernya muncul di sebelah folder proyek tanpa mengubah apa-apa. Tanpa
+container, isi `USER_FOLDER_ROOT` di `.env.local` dengan path Windows biasa.
 Dibiarkan kosong, fiturnya mati dan tidak ada yang dicatat.
 
-`.env.local` berisi App Password dan kunci outbox. Pindahkan lewat jalur
-pribadi, jangan lewat chat atau repositori. Tanpa berkas itu email ditulis
-sebagai berkas ke `data/outbox-mail/` dan seluruh alur tetap bisa didemokan.
-Bila portal dibuka dari perangkat lain lewat alamat IP, sesuaikan
+`.env.podman` **opsional**. Tanpa berkas itu email ditulis sebagai berkas ke
+`data/outbox-mail/` dan tidak ada yang keluar dari mesin — cukup untuk
+mendemokan seluruh alur. Untuk mengirim email sungguhan, isi `.env.podman`
+lewat jalur pribadi: di dalamnya ada App Password, dan repositori bukan tempat
+untuk itu. Bila portal dibuka dari perangkat lain lewat alamat IP, sesuaikan
 `APP_BASE_URL` — setiap tautan persetujuan di email dibangun dari nilai itu.
 
-**Demo sengaja berjalan dalam mode development**, dan itu bukan kemalasan.
-Aplikasi ini memuat sejumlah penjagaan produksi, dan konfigurasi demo melanggar
-hampir semuanya: tanpa `LDAP_URL`, `authenticateAD` **melempar error**
+**Container ini sengaja berjalan dalam mode development**, dan itu bukan
+kemalasan. Aplikasi ini memuat sejumlah penjagaan produksi, dan konfigurasi demo
+melanggar hampir semuanya: tanpa `LDAP_URL`, `authenticateAD` **melempar error**
 alih-alih menurunkan mutu — tidak ada yang bisa masuk sama sekali;
-`EMAIL_DRIVER=file` dan `EMAIL_REDIRECT_TO` masing-masing ditolak; dan cookie
-sesi menyalakan `secure`, sehingga browser tidak akan mengirimnya lewat
-`http://localhost` dan login tidak pernah nempel tanpa TLS. `next start` dengan
-konfigurasi demo akan menyala bersih lalu menolak setiap login — lebih buruk
-daripada tidak menyala, karena ia tampak berfungsi. Production adalah jalur
-tersendiri: Windows Service di belakang IIS, dengan domain controller dan
-mailbox sungguhan — lihat [deploy/windows/README.md](deploy/windows/README.md).
+`EMAIL_DRIVER=file` dan `EMAIL_REDIRECT_TO` masing-masing ditolak; dan cookie sesi menyalakan `secure`, sehingga browser tidak akan
+mengirimnya lewat `http://localhost` dan login tidak pernah nempel tanpa TLS.
+`next start` akan menghasilkan container yang menyala bersih lalu menolak setiap
+login — lebih buruk daripada tidak ada container, karena ia tampak berfungsi.
+
+Image produksi adalah artefak berbeda dengan masukan berbeda: domain controller
+sungguhan, mailbox sungguhan, kunci enkripsi yang dibangkitkan, dan proxy yang
+menerminasi TLS. Bukan berkas ini dengan satu flag dibalik.
+
+`.containerignore` adalah keamanan, bukan kerapian, dan merupakan berkas yang
+mencegah rahasia masuk ke image. Apa pun yang tersalin ke sebuah
+layer menetap di sana dan terbaca siapa pun yang bisa menarik image — sekalipun
+layer berikutnya menghapusnya. `.env*` memuat App Password yang hidup, dan
+`data/` memuat hash id sesi, payload outbox tersegel, serta tabel token
+persetujuan. Keduanya masuk saat runtime: rahasia lewat `env_file`, state lewat
+bind mount.
+
+Satu volume menutupi semuanya, karena ketiga berkas yang ditulis aplikasi —
+`hc-store.json`, `hc-sessions.json`, dan `outbox-mail/` — berada di bawah
+`data/`.
 
 **Berkas data yang "hilang" tidak pernah dianggap kosong.** Pada 22 September 2026
-store sempat tak terlihat sesaat dari dalam container yang dulu dipakai (folder
-`data/` dibagi dari Windows), sebuah penjadwal membacanya di saat itu, menganggapnya instalasi baru,
+store sempat tak terlihat sesaat dari dalam container (folder `data/` dibagi dari
+Windows), sebuah penjadwal membacanya di saat itu, menganggapnya instalasi baru,
 dan menulis data seed di atas 28 pengajuan. Kini berkas yang pernah terbaca lalu
 lenyap dibaca ulang beberapa kali, dan bila tetap tidak ada, operasinya **gagal
 tanpa menulis apa pun**; data awal hanya dibuat pada run pertama, dan tidak pernah
 di atas berkas yang ada (`src/lib/db/stateFile.ts`). Tetap simpan cadangan
 `data/` sebelum percobaan besar.
 
-**Jangan menjalankan dua portal pada `data/` yang sama** — dua jendela
-`jalankan.bat`, atau `jalankan.bat` di server yang service-nya hidup. Keduanya
-menulis `data/` yang sama, sedangkan kunci di `store.ts` hanyalah antrean per-proses dan
+Container dan `npm run dev` **tidak boleh jalan bersamaan**. Keduanya menulis
+`data/` yang sama, sedangkan kunci di `store.ts` hanyalah antrean per-proses dan
 tidak bisa menengahi dua proses — dan dua penjadwal outbox yang menyapu antrean
 yang sama berarti satu email persetujuan bisa terkirim dua kali.
 
-**Portal hanya menerima koneksi dari komputernya sendiri.** `npm run dev`
-mengikat ke `127.0.0.1:3000`, bukan ke `0.0.0.0`. Alasannya bukan kerapian: aplikasi ini berjalan dalam mode development, tanpa TLS, dengan
+**Portal hanya menerima koneksi dari komputernya sendiri.** `compose.yaml`
+mempublikasikan port ke `127.0.0.1:3000`, bukan ke `0.0.0.0`. Alasannya bukan
+kerapian: aplikasi ini berjalan dalam mode development, tanpa TLS, dengan
 akun demo yang kata sandinya tertulis di README ini —
 begitu port-nya terbuka ke jaringan, siapa pun di jaringan yang sama bisa masuk
-sebagai HC. Untuk mendemokan dari ponsel atau laptop lain, jalankan
-`npx next dev -H 0.0.0.0` **dan** sesuaikan `APP_BASE_URL` ke alamat itu, karena
+sebagai HC. Untuk mendemokan dari ponsel atau laptop lain, ubah ke
+`"0.0.0.0:3000:3000"` **dan** sesuaikan `APP_BASE_URL` ke alamat itu, karena
 setiap tautan persetujuan di email dibangun dari nilai tersebut; kembalikan
 setelah selesai.
 
@@ -475,9 +531,9 @@ Keamanannya bukan opsi yang bisa dimatikan:
 #### Menjalankan di Windows Server internal
 
 Satu panduan, satu tempat: **[deploy/windows/README.md](deploy/windows/README.md)**.
-Isinya urutan lengkap untuk server — Windows Service lewat NSSM, ekspor CA ke
-PEM, uji AD hanya-baca, IIS HTTPS, backup, update, serta jalur tanpa git atau
-tanpa akses npm. Konfigurasinya `deploy/windows/env.production.example`,
+Isinya urutan lengkap untuk server — Podman machine, ekspor CA ke PEM, uji AD
+hanya-baca, IIS HTTPS, startup otomatis, backup, update, serta jalur tanpa git
+atau tanpa akses npm. Konfigurasinya `deploy/windows/env.production.example`,
 disalin menjadi `.env.production.local` di server dan tidak pernah di-commit.
 Untuk awal, biarkan `AD_LDAP_WRITE_ENABLED=false`.
 
@@ -501,7 +557,7 @@ JSON lokal.
 
 Ikuti gerbang bertahap; jangan membuka penulisan AD sebelum pilot disetujui:
 
-1. **Demo awal:** di PC kantor, jalankan `jalankan.bat` tanpa AD.
+1. **Demo awal:** di PC kantor, jalankan `jalankan-podman.bat` tanpa AD.
    Pastikan portal, pengajuan, dan alur approval lewat email jalan; worker
    belum menjalankan perubahan apa pun.
 2. **Uji baca:** salin nilai dari `.env.onprem.example` ke `.env.local`, isi DC,
@@ -532,17 +588,46 @@ tidak membuat tebakan untuk nilai-nilai tersebut.
 
 Driver ini sudah dijalankan terhadap **Samba AD DC** — implementasi Active
 Directory yang sungguhan, lengkap dengan `sAMAccountName`, `objectGUID`,
-`userAccountControl`, dan LDAPS. Satu putaran terhadap direktori sungguhan
-menemukan hal yang tidak bisa ditemukan tes unit mana pun (lihat catatan
-`<GUID=...>` di [ldapFilter.ts](src/lib/ad/ldapFilter.ts)).
+`userAccountControl`, dan LDAPS — di sebuah container sekali pakai. Resepnya
+ditulis di sini karena satu putaran terhadap direktori sungguhan menemukan hal
+yang tidak bisa ditemukan tes unit mana pun (lihat catatan `<GUID=...>` di
+[ldapFilter.ts](src/lib/ad/ldapFilter.ts)).
 
-Untuk mengulanginya terhadap DC uji mana pun — Samba, atau AD Windows uji milik
-tim AD — isi `.env.local` dengan DC itu: OU dan group sesuai katalog akses
-(`OU=Karyawan`, `OU=Engineering,OU=Karyawan`, `OU=Karantina`, `OU=Groups` berisi
-`HC-Base` dan kawan-kawan), satu akun manager, dan akun layanan yang haknya
-didelegasikan ke OU uji saja — jangan dimasukkan ke Domain Admins, karena itu
-justru yang sedang ditunjukkan oleh `AD_MANAGED_OUS`. Nama host di `LDAP_URL`
-harus cocok dengan sertifikat DC. Baca dulu, tulis belakangan:
+```bash
+podman network create hc-ad-demo
+podman run -d --name samba-ad --hostname dc1 --privileged \
+  --network hc-ad-demo --network-alias dc1.corp.example.com \
+  -e REALM=CORP.EXAMPLE.COM -e DOMAIN=CORP \
+  -e ADMIN_PASS='<kata-sandi-administrator>' -e DNS_FORWARDER=8.8.8.8 \
+  diegogslomp/samba-ad-dc:latest
+```
+
+Satu hal yang perlu diperbaiki setelah provisioning: skrip image itu salah
+membaca nama interface (`eth0@ifNN`), sehingga Samba hanya mendengar di
+loopback. Perbaiki lalu mulai ulang:
+
+```bash
+podman exec samba-ad sed -i 's/interfaces = lo eth0@if[0-9]*/interfaces = lo eth0/' \
+  /usr/local/samba/etc/smb.conf
+podman restart samba-ad
+```
+
+Lalu buat OU dan group yang sama dengan katalog akses (`OU=Karyawan`,
+`OU=Engineering,OU=Karyawan`, `OU=Karantina`, `OU=Groups` berisi `HC-Base` dan
+kawan-kawan), satu akun manager, dan akun layanan `svc-hc-portal` — semuanya
+lewat `samba-tool`. Delegasikan haknya dengan `samba-tool dsacl set` pada OU
+yang dikelola saja, jangan dengan memasukkannya ke Domain Admins: itu justru
+yang sedang ditunjukkan oleh `AD_MANAGED_OUS`.
+
+Sertifikat CA-nya diambil dari direktorinya sendiri:
+
+```bash
+podman cp samba-ad:/usr/local/samba/private/tls/ca.pem ./ca.pem
+```
+
+Nama host harus cocok dengan sertifikat (`dc1.corp.example.com`) — itulah guna
+`--network-alias` di atas, dan alasan pemeriksaan dijalankan dari dalam
+container di jaringan yang sama. Baca dulu, tulis belakangan:
 
 ```bash
 npm run ad:service-check -- bagus.nugroho "CN=IT Security Approvers,OU=Groups,DC=corp,DC=example,DC=com"
@@ -688,9 +773,9 @@ dan tidak mengirim `Origin`. Pencocokannya berhenti di batas segmen —
 
 **Asal "diri sendiri" dibaca dari header `Host`**, bukan dari alamat yang dikira
 Next.js. Next selalu menganggap dirinya `localhost` (atau `0.0.0.0` di bawah
-`next dev -H 0.0.0.0`), apa pun alamat di browser — sehingga dulu setiap form
-yang dikirim dari `127.0.0.1` atau dari IP jaringan ditolak "berasal dari asal
-yang tidak dikenal", dan di bawah `-H 0.0.0.0` **semuanya** ditolak.
+`next dev -H 0.0.0.0` di container), apa pun alamat di browser — sehingga dulu setiap
+form yang dikirim dari `127.0.0.1`, dari IP jaringan, atau dari container ditolak
+"berasal dari asal yang tidak dikenal", dan di dalam container **semuanya** ditolak.
 Membaca `Host` tetap aman: request palsu dari situs lain dikirim browser dengan
 `Host` situs ini dan `Origin` situs penyerang, jadi tetap tidak cocok. Yang juga
 diterima: `APP_BASE_URL`, dan `X-Forwarded-Proto` dari proxy HTTPS (hanya
@@ -786,4 +871,5 @@ NEXT_DIST_DIR=.next-build npm run build   # dev server di .next tetap aman
 Pemeriksaan di atas dijalankan `.github/workflows/ci.yml` — **pada push ke
 `main` dan pada setiap pull request**, bukan pada setiap push. Push ke branch
 biasa tidak memicunya; bukalah pull request bila ingin diperiksa sebelum
-digabung. urutannya: `npm ci`, typecheck, lint, test, lalu build Next.
+digabung. urutannya: `npm ci`, typecheck, lint, test, build Next, lalu build image
+dengan Podman.

@@ -52,3 +52,13 @@ jobs:
           # The build must not depend on a real directory or mailbox. Anything
           # that needs them belongs in a deployment step, not here.
           EMAIL_DRIVER: file
+
+      # The image is not published anywhere; this only proves the Podman
+      # Containerfile and build context still work on Linux.
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes podman
+
+      - name: Build container image with Podman
+        run: podman build --tag hc-user-management:ci .
