@@ -147,6 +147,10 @@ export const id = {
     columnStatus: "Status",
     columnPending: "Pengajuan berjalan",
     columnActions: "Tindakan",
+    /** {count} more rows the next press shows. */
+    showMore: "Tampilkan {count} lagi",
+    /** {shown} rows on screen of {total} that match. */
+    showingOf: "Menampilkan {shown} dari {total}",
     detail: "Detail",
     detailHint: "Lihat profil detail karyawan",
     proposeChange: "Ajukan perubahan",

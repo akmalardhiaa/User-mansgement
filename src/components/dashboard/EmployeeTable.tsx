@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useState } from "react";
@@ -37,6 +37,9 @@ import { sortLabel } from "@/lib/i18n/labels";
 import type { PendingByEmployee } from "@/lib/lifecycle/pending";
 import { TRANSITION, TRANSITION_FAST } from "@/lib/motion";
 import type { Employee } from "@/lib/types";
+
+/** Rows drawn at once; "show more" adds another page. */
+const PAGE_SIZE = 50;
 
 interface EmployeeTableProps {
   /** Already filtered and sorted by the parent. */
@@ -154,6 +157,25 @@ export function EmployeeTable({
   const [drawerEmployee, setDrawerEmployee] = useState<Employee | null>(null);
   const [reportEmployee, setReportEmployee] = useState<Employee | null>(null);
 
+  /*
+   * A page at a time. Every row is an animated element, and every person is
+   * rendered twice — as a card below `lg` and as a table row above it — so a
+   * roster read from AD with a thousand people meant two thousand of them on
+   * every keystroke in the search box. Search, filter and sort still run over
+   * everybody (the list arrives filtered); only what is drawn is capped.
+   *
+   * Back to the first page whenever the list itself changes: a new search is a
+   * new list, and page four of the old one means nothing in it.
+   */
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [listFor, setListFor] = useState(employees);
+  if (listFor !== employees) {
+    setListFor(employees);
+    setLimit(PAGE_SIZE);
+  }
+  const shown = employees.length > limit ? employees.slice(0, limit) : employees;
+  const remaining = employees.length - shown.length;
+
   return (
     <div className="relative">
       <EmployeeDetailDrawer
@@ -180,7 +202,7 @@ export function EmployeeTable({
       {employees.length > 0 ? (
         <ul className="divide-y divide-hairline/60 lg:hidden">
           <AnimatePresence initial={false}>
-            {employees.map((employee, index) => {
+            {shown.map((employee, index) => {
               const marker = pending[employee.id];
               return (
                 <motion.li
@@ -289,7 +311,7 @@ export function EmployeeTable({
 
         <tbody>
           <AnimatePresence initial={false}>
-            {employees.map((employee, index) => {
+            {shown.map((employee, index) => {
               const marker = pending[employee.id];
               return (
                 <motion.tr
@@ -372,6 +394,19 @@ export function EmployeeTable({
         </tbody>
       </table>
       </div>
+
+      {remaining > 0 ? (
+        <div className="flex flex-col items-center gap-2 border-t border-hairline/60 px-4 py-4 sm:flex-row sm:justify-between">
+          <span className="text-xs text-ink-faint">
+            {t.directory.showingOf
+              .replace("{shown}", String(shown.length))
+              .replace("{total}", String(employees.length))}
+          </span>
+          <Button variant="ghost" size="sm" onClick={() => setLimit((current) => current + PAGE_SIZE)}>
+            {t.directory.showMore.replace("{count}", String(Math.min(PAGE_SIZE, remaining)))}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

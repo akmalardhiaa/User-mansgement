@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 
 import { useT } from "@/components/i18n/LocaleProvider";
 import { AnimatedNumber } from "@/components/motion/AnimatedNumber";

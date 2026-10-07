@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as motion } from "framer-motion";
 import { useSyncExternalStore } from "react";
 
 import { IconMoon, IconSun } from "@/components/ui/Icons";

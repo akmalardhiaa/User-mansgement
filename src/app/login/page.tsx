@@ -74,7 +74,7 @@ export default async function LoginPage({
           <p className="text-sm text-ink-muted">{t.login.subtitle}</p>
         </div>
 
-        <Card className="relative overflow-hidden p-6 sm:p-7 backdrop-blur-xl border-hairline-strong/70 shadow-[0_12px_40px_-15px_rgba(7,19,33,0.6)]">
+        <Card className="relative overflow-hidden p-6 sm:p-7 bg-surface/95 border-hairline-strong/70 shadow-[0_12px_40px_-15px_rgba(7,19,33,0.6)]">
           {/* Subtle accent sheen line on top of card */}
           <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-accent to-transparent opacity-80" />
 

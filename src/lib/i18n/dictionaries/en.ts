@@ -143,6 +143,8 @@ export const en: Dictionary = {
     columnStatus: "Status",
     columnPending: "Request in progress",
     columnActions: "Actions",
+    showMore: "Show {count} more",
+    showingOf: "Showing {shown} of {total}",
     detail: "Details",
     detailHint: "See this employee's full profile",
     proposeChange: "Raise a request",

@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 import { useMemo, useState } from "react";
 
 import { useT } from "@/components/i18n/LocaleProvider";
@@ -210,7 +210,7 @@ export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
             <section key={day}>
               {/* Sticky so the date stays visible while a long day scrolls past. */}
               {/* Sticky to the feed's own scroll box now, not to the page. */}
-              <h2 className="sticky top-0 z-10 border-y border-hairline bg-surface/95 px-4 py-2 text-xs font-medium tracking-wide text-ink-faint uppercase backdrop-blur-sm">
+              <h2 className="sticky top-0 z-10 border-y border-hairline bg-surface/95 px-4 py-2 text-xs font-medium tracking-wide text-ink-faint uppercase">
                 {day}
               </h2>
               <ul>

@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, type Variants } from "framer-motion";
+import { m as motion, type Variants } from "framer-motion";
 import { useMemo } from "react";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
@@ -31,8 +31,10 @@ export function Reveal({ children, delay = 0, whenVisible = false, ...props }: R
   // that beats the `transition` prop, so the delay has to go inside it.
   const variants = useMemo<Variants>(
     () => ({
-      hidden: { opacity: 0, y: 12, filter: "blur(6px)" },
-      visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { ...TRANSITION, delay } },
+      // Opacity and position only: both run on the compositor. The blur that
+      // used to come with them re-rasterised the whole block on every frame.
+      hidden: { opacity: 0, y: 10 },
+      visible: { opacity: 1, y: 0, transition: { ...TRANSITION, delay } },
     }),
     [delay],
   );

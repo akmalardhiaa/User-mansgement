@@ -154,8 +154,13 @@ export function Card({
        * and a hover is exactly the case where the browser can do it alone. The
        * curve is the shared one from globals.css, so a card rising matches a
        * card arriving even though different engines drive them.
+       *
+       * No backdrop-blur, for the reason StatsRow gives: a backdrop-filter
+       * re-rasterises everything behind it, and this is the card every page
+       * is built from — the directory table included, repainted on every
+       * scroll frame. `bg-surface/80` separates it from the ground on its own.
        */
-      className={`rounded-2xl border border-hairline bg-surface/80 backdrop-blur-sm ${
+      className={`rounded-2xl border border-hairline bg-surface/80 ${
         interactive
           ? // `pointer-glow` without the hook that steers it, which leaves the
             // highlight resting in the middle of the card: a warm bloom under

@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 
 import { useT } from "@/components/i18n/LocaleProvider";
 import { IconApprovals, IconCheck, IconUser } from "@/components/ui/Icons";
@@ -47,7 +47,7 @@ export function LoginAside() {
   const t = useT();
 
   return (
-    <div className="relative hidden overflow-hidden rounded-3xl border border-hairline-strong/80 bg-surface/70 p-9 backdrop-blur-xl lg:block shadow-[0_20px_50px_rgba(7,19,33,0.5)]">
+    <div className="relative hidden overflow-hidden rounded-3xl border border-hairline-strong/80 bg-surface/90 p-9 lg:block shadow-[0_20px_50px_rgba(7,19,33,0.5)]">
       {/* Ambient background glowing orbs */}
       {ORBS.map((orb) => (
         <motion.div
@@ -106,7 +106,7 @@ export function LoginAside() {
               variants={staggerItem}
               whileHover={{ x: 6, scale: 1.015 }}
               transition={TRANSITION_FAST}
-              className="group flex items-start gap-3.5 rounded-2xl border border-hairline/70 bg-canvas/60 p-4 backdrop-blur-md transition-all duration-300 hover:border-accent/50 hover:bg-canvas/90 hover:shadow-[0_8px_25px_-8px_rgba(253,183,19,0.2)]"
+              className="group flex items-start gap-3.5 rounded-2xl border border-hairline/70 bg-canvas/80 p-4 transition-all duration-300 hover:border-accent/50 hover:bg-canvas/90 hover:shadow-[0_8px_25px_-8px_rgba(253,183,19,0.2)]"
             >
               <div className="grid size-9 shrink-0 place-items-center rounded-xl border border-accent/30 bg-accent/15 text-accent shadow-[0_0_12px_rgba(253,183,19,0.2)] transition-transform duration-300 group-hover:scale-110">
                 <item.icon className="size-4" />

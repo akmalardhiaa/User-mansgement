@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as motion } from "framer-motion";
 import React, { useEffect, useRef, useState, type ReactNode, type SelectHTMLAttributes } from "react";
 
 import { CONTROL_CLASSES, FieldShell, LeadingIcon, describedBy } from "@/components/ui/Field";

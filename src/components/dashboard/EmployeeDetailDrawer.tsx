@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, m as motion } from "framer-motion";
 import Link from "next/link";
 
 import { useT } from "@/components/i18n/LocaleProvider";
