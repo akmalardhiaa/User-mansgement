@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "ad:check": "node scripts/ad-check.mjs",
     "ad:service-check": "node scripts/ad-service-check.mjs",
+    "mfa:reset": "node scripts/mfa-reset.mjs",
     "gmail:auth": "node scripts/gmail-auth.mjs"
   },
   "dependencies": {

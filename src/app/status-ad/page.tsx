@@ -1,11 +1,13 @@
 import { AccessDenied } from "@/components/auth/AccessDenied";
 import { AdStatusRefresh } from "@/components/ad/AdStatusRefresh";
-import { AdStatusView } from "@/components/ad/AdStatusView";
+import { AdStatusView, CheckList, SecurityLogCard } from "@/components/ad/AdStatusView";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { runAdDiagnostics } from "@/lib/ad/diagnostics";
 import { requirePageSession } from "@/lib/auth/current";
+import { recentSecurityEvents } from "@/lib/auth/securityLog";
 import { hasPermission } from "@/lib/auth/roles";
 import { getTranslations } from "@/lib/i18n/server";
+import { runPortalChecks } from "@/lib/system/portalChecks";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +23,13 @@ export default async function AdStatusPage() {
     return <AccessDenied roles={session.roles} need={t.adStatus.title} />;
   }
 
-  const report = await runAdDiagnostics();
+  // Independent of each other: an SMTP server that is slow to answer should
+  // not make the directory checks wait.
+  const [report, portalChecks, securityEvents] = await Promise.all([
+    runAdDiagnostics(),
+    runPortalChecks(),
+    recentSecurityEvents(30),
+  ]);
   return (
     <div className="space-y-4">
       <PageHeader
@@ -31,6 +39,8 @@ export default async function AdStatusPage() {
         actions={<AdStatusRefresh label={t.adStatus.refresh} />}
       />
       <AdStatusView report={report} />
+      <CheckList title={t.adStatus.portalTitle} checks={portalChecks} />
+      <SecurityLogCard events={securityEvents} />
     </div>
   );
 }

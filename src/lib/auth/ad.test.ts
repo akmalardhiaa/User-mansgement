@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   authenticateAD,
+  isAuthConfigured,
+  isDemoLoginEnabled,
   isInvalidCredentials,
   isLdapConfigured,
   LdapUnavailableError,
@@ -48,7 +50,8 @@ afterEach(() => {
 });
 
 describe("the demo accounts, outside production", () => {
-  it("signs in a demo account", async () => {
+  it("signs in a demo account when DEMO_LOGIN asks for them", async () => {
+    vi.stubEnv("DEMO_LOGIN", "on");
     const user = await authenticateAD("admin", "admin12345");
 
     expect(user?.username).toBe("admin");
@@ -56,7 +59,24 @@ describe("the demo accounts, outside production", () => {
   });
 
   it("refuses a wrong password", async () => {
+    vi.stubEnv("DEMO_LOGIN", "on");
     expect(await authenticateAD("admin", "salah")).toBeNull();
+  });
+
+  it("stays shut when nobody asked for them, even with the AD address missing", async () => {
+    // The office .env with a blank or mistyped AD_LDAP_URL used to open the
+    // portal to admin/admin12345, with the admin role.
+    vi.stubEnv("DEMO_LOGIN", "");
+    vi.stubEnv("AD_LDAP_URL", "");
+    vi.stubEnv("LDAP_URL", "");
+
+    expect(isDemoLoginEnabled()).toBe(false);
+    expect(isAuthConfigured()).toBe(false);
+    await expect(authenticateAD("admin", "admin12345")).rejects.toBeInstanceOf(LdapUnavailableError);
+  });
+
+  it("cannot be asked for in production", () => {
+    expect(isDemoLoginEnabled({ NODE_ENV: "production", DEMO_LOGIN: "on" })).toBe(false);
   });
 });
 

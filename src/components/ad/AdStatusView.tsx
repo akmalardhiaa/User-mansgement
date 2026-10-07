@@ -1,6 +1,7 @@
 "use client";
 
-import type { AdDiagnosticReport, AdCheckStatus } from "@/lib/ad/diagnostics";
+import type { AdDiagnosticCheck, AdDiagnosticReport, AdCheckStatus } from "@/lib/ad/diagnostics";
+import type { SecurityEvent } from "@/lib/auth/securityLog";
 
 import { useT } from "@/components/i18n/LocaleProvider";
 import { Card } from "@/components/ui/Field";
@@ -32,12 +33,6 @@ export function AdStatusView({ report }: { report: AdDiagnosticReport }) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(report.checkedAt));
-  const labels: Record<AdCheckStatus, string> = {
-    ok: t.adStatus.statusOk,
-    warn: t.adStatus.statusWarn,
-    fail: t.adStatus.statusFail,
-    skip: t.adStatus.statusSkip,
-  };
 
   return (
     <div className="space-y-4">
@@ -65,26 +60,86 @@ export function AdStatusView({ report }: { report: AdDiagnosticReport }) {
         </dl>
       </Card>
 
-      <Card className="p-5">
-        <h2 className="text-sm font-semibold text-ink">{t.adStatus.checks}</h2>
-        <ul className="mt-3 divide-y divide-hairline">
-          {report.checks.map((check) => (
-            <li key={check.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <h3 className="text-sm font-medium text-ink">
-                  {t.adStatus.checkNames[check.id] ?? check.id}
-                </h3>
-                <p className="mt-1 break-words text-sm text-ink-muted">{check.message}</p>
-              </div>
-              <span
-                className={`inline-flex w-fit shrink-0 items-center rounded-full border px-2.5 py-1 text-xs font-medium ${STATUS_CLASS[check.status]}`}
-              >
-                {labels[check.status]}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Card>
+      <CheckList title={t.adStatus.checks} checks={report.checks} />
     </div>
+  );
+}
+
+/** A titled list of checks, for the directory and for email and sign-in alike. */
+export function CheckList({ title, checks }: { title: string; checks: AdDiagnosticCheck[] }) {
+  const t = useT();
+  const labels: Record<AdCheckStatus, string> = {
+    ok: t.adStatus.statusOk,
+    warn: t.adStatus.statusWarn,
+    fail: t.adStatus.statusFail,
+    skip: t.adStatus.statusSkip,
+  };
+
+  return (
+    <Card className="p-5">
+      <h2 className="text-sm font-semibold text-ink">{title}</h2>
+      <ul className="mt-3 divide-y divide-hairline">
+        {checks.map((check) => (
+          <li key={check.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <h3 className="text-sm font-medium text-ink">
+                {t.adStatus.checkNames[check.id] ?? check.id}
+              </h3>
+              <p className="mt-1 break-words text-sm text-ink-muted">{check.message}</p>
+            </div>
+            <span
+              className={`inline-flex w-fit shrink-0 items-center rounded-full border px-2.5 py-1 text-xs font-medium ${STATUS_CLASS[check.status]}`}
+            >
+              {labels[check.status]}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+/** The newest sign-ins and the sessions the AD check ended. Never a password or a code. */
+export function SecurityLogCard({ events }: { events: SecurityEvent[] }) {
+  const t = useT();
+  const format = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    dateStyle: "short",
+    timeStyle: "medium",
+  });
+
+  return (
+    <Card className="p-5">
+      <h2 className="text-sm font-semibold text-ink">{t.adStatus.securityLogTitle}</h2>
+      {events.length === 0 ? (
+        <p className="mt-3 text-sm text-ink-muted">{t.adStatus.securityLogEmpty}</p>
+      ) : (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[36rem] text-left text-sm">
+            <thead className="text-xs text-ink-muted">
+              <tr>
+                <th className="py-2 pr-3 font-medium">{t.adStatus.securityLogWhen}</th>
+                <th className="py-2 pr-3 font-medium">{t.adStatus.securityLogAccount}</th>
+                <th className="py-2 pr-3 font-medium">{t.adStatus.securityLogEvent}</th>
+                <th className="py-2 font-medium">{t.adStatus.securityLogFrom}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-hairline">
+              {events.map((event, index) => (
+                <tr key={`${event.at}-${index}`} className="align-top">
+                  <td className="py-2 pr-3 whitespace-nowrap text-ink-muted">{format.format(new Date(event.at))}</td>
+                  <td className="py-2 pr-3 text-ink">{event.username ?? "—"}</td>
+                  <td className="py-2 pr-3 text-ink">
+                    {t.adStatus.securityTypes[event.type] ?? event.type}
+                    {event.detail ? <span className="block text-xs text-ink-muted">{event.detail}</span> : null}
+                  </td>
+                  <td className="py-2 whitespace-nowrap text-ink-muted">{event.ip ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   );
 }

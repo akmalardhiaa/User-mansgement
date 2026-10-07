@@ -26,6 +26,9 @@ beforeEach(async () => {
   vi.stubEnv("HC_DATA_FILE", path.join(workspace, "store.json"));
   vi.stubEnv("NODE_ENV", "test");
   vi.stubEnv("LDAP_URL", "");
+  vi.stubEnv("AD_LDAP_URL", "");
+  vi.stubEnv("DEMO_LOGIN", "on");
+  vi.stubEnv("HC_SECURITY_LOG_FILE", path.join(workspace, "security.jsonl"));
 });
 
 afterEach(async () => {

@@ -42,6 +42,21 @@ const securityHeaders = [
   // Nothing here is meant to be framed. Clickjacking an Approve button is a
   // real thing to prevent on a page whose whole purpose is a decision.
   { key: "X-Frame-Options", value: "DENY" },
+  // A window this portal opens cannot reach back into it, nor it into them.
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  // Nothing here uses a camera, a microphone or a location; a script that
+  // somehow ran here could not either.
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
+  /*
+   * HTTPS only, remembered by the browser, in production — where the portal is
+   * behind TLS (IIS on the office server). Ignored by browsers on plain http,
+   * so `next dev` and a production build tried on http://localhost are
+   * unaffected. No includeSubDomains: other internal sites under the same
+   * domain are not this portal's to decide for.
+   */
+  ...(process.env.NODE_ENV === "production"
+    ? [{ key: "Strict-Transport-Security", value: "max-age=15552000" }]
+    : []),
   /*
    * Content-Security-Policy is NOT here.
    *

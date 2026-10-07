@@ -27,7 +27,14 @@ export type AdDiagnosticCheckId =
   | "department-ous"
   | "ciso-group"
   | "employee-sync"
-  | "write";
+  | "write"
+  // Not the directory's, but listed on the same page: see lib/system/portalChecks.ts.
+  | "email"
+  | "outbox"
+  | "login-2fa"
+  | "demo-login"
+  | "session-recheck"
+  | "https";
 
 export interface AdDiagnosticCheck {
   id: AdDiagnosticCheckId;

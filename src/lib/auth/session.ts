@@ -226,6 +226,23 @@ export async function revokeSession(id: string | undefined, reason = "logout"): 
   });
 }
 
+/**
+ * Everybody signed in right now, with the roles their sessions carry — what
+ * the periodic recheck against AD (sessionRecheck.ts) compares with the
+ * directory.
+ */
+export async function liveSessionUsers(): Promise<Array<{ userId: string; username: string; roles: PortalRole[] }>> {
+  const now = Date.now();
+  const users = new Map<string, { userId: string; username: string; roles: PortalRole[] }>();
+  for (const record of await readSessions()) {
+    if (!isLive(record, now) || portalRolesOf(record.roles).length === 0) continue;
+    users.set(record.userId, { userId: record.userId, username: record.username, roles: portalRolesOf(record.roles) });
+  }
+  return [...users.values()];
+}
+
+export { sameRoles };
+
 /** Ends every session a person holds — deactivation, or a forced sign-out. */
 export async function revokeSessionsForUser(userId: string, reason: string): Promise<number> {
   const now = Date.now();
@@ -242,17 +259,32 @@ export async function revokeSessionsForUser(userId: string, reason: string): Pro
 }
 
 /**
+ * Whether cookies carry `secure`: in production, unless the portal is
+ * explicitly published at an http:// address.
+ *
+ * That exception is for the first hour on the office server, before IIS and
+ * its certificate exist, when the portal is tried at http://localhost:3000. A
+ * secure cookie there is simply never sent back and nobody can sign in, while
+ * leaving it off weakens nothing — on a plain-http site the cookie travels in
+ * the clear either way. The status page reports such a portal as failing its
+ * HTTPS check until APP_BASE_URL is https://.
+ */
+export function cookiesAreSecure(env: Record<string, string | undefined> = process.env): boolean {
+  if (env.NODE_ENV !== "production") return false;
+  return !/^http:\/\//i.test(env.APP_BASE_URL?.trim() ?? "");
+}
+
+/**
  * Cookie attributes.
  *
  * httpOnly keeps the id away from injected script; sameSite=lax stops another
- * origin's form post riding the session. `secure` is on outside development,
- * where there is no HTTPS to attach it to.
+ * origin's form post riding the session. `secure` — see cookiesAreSecure.
  */
 export function sessionCookieOptions(maxAge: number) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    secure: cookiesAreSecure(),
     path: "/",
     maxAge,
   };

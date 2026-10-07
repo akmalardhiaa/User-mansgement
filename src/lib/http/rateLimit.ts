@@ -68,15 +68,28 @@ export function resetRateLimit(key: string): void {
 }
 
 /**
- * Best-effort client identity.
+ * Best-effort client address.
  *
- * `x-forwarded-for` is set by the proxy in front of the app and can be forged
- * when nothing trustworthy sets it, so this is a throttle, not an
- * authorisation check. Behind a CDN, prefer the platform's verified client-IP
- * header instead.
+ * The LAST entry of `x-forwarded-for`, not the first. Each proxy appends the
+ * address it received the request from, so the first entry is whatever the
+ * client wrote — and taking it let a script send a new made-up address with
+ * every attempt and never be limited. The last entry is the one written by the
+ * hop nearest this server: IIS in front of the portal on the office server.
+ *
+ * Reached directly, with nothing in front, even the last entry is the client's
+ * to write. That is why the login route also limits per account
+ * (loginThrottle.ts), which no header can spread out.
  */
+export function clientAddress(request: Request): string {
+  const forwarded = request.headers
+    .get("x-forwarded-for")
+    ?.split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .at(-1);
+  return forwarded || request.headers.get("x-real-ip")?.trim() || "unknown";
+}
+
 export function clientKey(request: Request, scope: string): string {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const ip = forwarded || request.headers.get("x-real-ip") || "unknown";
-  return `${scope}:${ip}`;
+  return `${scope}:${clientAddress(request)}`;
 }

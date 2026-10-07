@@ -6,7 +6,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { BrandMark } from "@/components/ui/BrandMark";
 import { Card } from "@/components/ui/Field";
 import { IconAlert } from "@/components/ui/Icons";
-import { isAuthConfigured, isLdapConfigured } from "@/lib/auth/ad";
+import { isAuthConfigured, isDemoLoginEnabled, isLdapConfigured } from "@/lib/auth/ad";
 import { getSession } from "@/lib/auth/current";
 import { getTranslations } from "@/lib/i18n/server";
 
@@ -50,7 +50,7 @@ export default async function LoginPage({
   if (await getSession()) redirect(destination);
   const configured = isAuthConfigured();
   // No LDAP server wired up yet: the app is running on its local demo accounts.
-  const demoMode = !isLdapConfigured() && process.env.NODE_ENV !== "production";
+  const demoMode = !isLdapConfigured() && isDemoLoginEnabled();
 
   return (
     // `content-center` rather than `flex-1`: the shell's <main> is not a flex

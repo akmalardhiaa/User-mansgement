@@ -37,6 +37,9 @@ import { clientKey, rateLimit } from "@/lib/http/rateLimit";
 const PUBLIC_PATHS = [
   "/login",
   "/api/auth/login",
+  // The code step, between a correct password and a session. Its own short
+  // cookie (pendingLogin.ts) is what authenticates it.
+  "/api/auth/mfa",
   "/api/auth/logout",
   "/persetujuan",
   "/api/approval-actions",

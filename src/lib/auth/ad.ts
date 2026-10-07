@@ -63,10 +63,14 @@ export async function loginTlsOptions(
  * in AD but in none of the mapped groups signs in and gets their own profile,
  * not the directory.
  *
- * When no `LDAP_URL` or `AD_LDAP_URL` is set, a small local list (devUsers.ts) stands in so the
- * portal runs before a real AD server is available. That fallback is refused in
- * production: there, a missing LDAP_URL is a configuration error, not a reason
- * to let anyone in with a demo password.
+ * When no `LDAP_URL` or `AD_LDAP_URL` is set AND `DEMO_LOGIN=on`, a small local
+ * list (devUsers.ts) stands in so the portal can be shown before a real AD
+ * server is available. Both conditions, on purpose: the fallback used to switch
+ * itself on whenever the AD address was missing, so a blank or mistyped line in
+ * an office .env opened the portal to admin/admin12345 — with the admin role.
+ * Now a missing address is a portal nobody can sign in to, and the demo is
+ * something the laptop's .env.development asks for by name. Production refuses
+ * it either way.
  *
  * `ldapts` is imported dynamically so the app builds and runs in dev without it
  * installed; it is only loaded on the real LDAP path.
@@ -87,9 +91,16 @@ export function isLdapConfigured(): boolean {
   return isLdapLoginConfigured();
 }
 
-/** True when the portal can authenticate anyone at all (real AD, or dev fallback). */
+/** `DEMO_LOGIN=on`, never in production: the demo accounts may sign in. */
+export function isDemoLoginEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  if (env.NODE_ENV === "production") return false;
+  const raw = env.DEMO_LOGIN?.trim().toLowerCase();
+  return raw === "on" || raw === "true" || raw === "1" || raw === "yes";
+}
+
+/** True when the portal can authenticate anyone at all (real AD, or the asked-for demo). */
 export function isAuthConfigured(): boolean {
-  return isLdapConfigured() || process.env.NODE_ENV !== "production";
+  return isLdapConfigured() || isDemoLoginEnabled();
 }
 
 export async function authenticateAD(username: string, password: string): Promise<AdUser | null> {
@@ -101,6 +112,12 @@ export async function authenticateAD(username: string, password: string): Promis
   if (process.env.NODE_ENV === "production") {
     throw new Error(
       "AD_LDAP_URL/LDAP_URL belum diset. Login Active Directory tidak bisa dijalankan di production tanpa alamat server AD.",
+    );
+  }
+
+  if (!isDemoLoginEnabled()) {
+    throw new LdapUnavailableError(
+      "Login Active Directory belum dikonfigurasi (AD_LDAP_URL/LDAP_URL kosong) dan DEMO_LOGIN tidak dinyalakan.",
     );
   }
 

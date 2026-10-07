@@ -27,4 +27,9 @@ export async function register(): Promise<void> {
   // it appear in the portal without anybody typing them in.
   const { startDirectorySyncFromEnv } = await import("@/lib/lifecycle/directorySyncScheduler");
   startDirectorySyncFromEnv();
+
+  // And the sessions, matched against AD, so somebody disabled or taken out of
+  // the HC group is signed out within minutes rather than at the end of the day.
+  const { startSessionRecheckFromEnv } = await import("@/lib/auth/sessionRecheck");
+  startSessionRecheckFromEnv();
 }

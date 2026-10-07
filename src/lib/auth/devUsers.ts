@@ -1,7 +1,8 @@
 import type { PortalRole } from "./roles";
 
 /**
- * Local fallback accounts, used ONLY when no LDAP server is configured.
+ * Local fallback accounts, used ONLY when no LDAP server is configured and
+ * `DEMO_LOGIN=on` asks for them (.env.development does).
  *
  * The app is meant to authenticate against Active Directory (see ad.ts). Until
  * an `LDAP_URL` or `AD_LDAP_URL` is set, these let the portal be opened and demoed locally.
