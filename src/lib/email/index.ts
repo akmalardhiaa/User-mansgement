@@ -2,7 +2,7 @@ import { FileEmailDriver, type MailFaultMode } from "./fileDriver";
 import { GmailEmailDriver, gmailConfig, missingGmailConfig } from "./gmailDriver";
 import { GraphEmailDriver, graphConfig, missingGraphConfig } from "./graphDriver";
 import { RedirectingEmailDriver, isValidRedirect, redirectTarget } from "./redirect";
-import { SmtpEmailDriver, missingSmtpConfig, smtpConfig } from "./smtpDriver";
+import { SmtpEmailDriver, missingSmtpConfig, smtpConfig, smtpConfigProblem } from "./smtpDriver";
 import type { EmailDriver } from "./types";
 
 /**
@@ -105,6 +105,8 @@ function buildDriver(production: boolean): EmailDriver {
   }
 
   if (configured === "smtp") {
+    const problem = smtpConfigProblem();
+    if (problem) throw new EmailConfigurationError(problem);
     const config = smtpConfig();
     if (!config) {
       throw new EmailConfigurationError(

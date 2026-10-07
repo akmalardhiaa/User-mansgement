@@ -81,6 +81,22 @@ describe("one pass at a time", () => {
 
     // Free again once the run finished.
     await scheduler.tick();
+    expect(dispatch).toHaveBeenCalledTimes(3);
+  });
+
+  it("runs once more after a pass that a kick arrived during", async () => {
+    // The running pass read the queue before the new mail was in it. Without
+    // the extra pass that mail would wait for the next poll.
+    const gate = deferred<DispatchReport>();
+    const dispatch = vi.fn().mockReturnValueOnce(gate.promise).mockResolvedValue(report());
+    const scheduler = createOutboxScheduler(1_000, deps({ dispatch }));
+
+    const first = scheduler.tick();
+    void scheduler.tick();
+    void scheduler.tick(); // several kicks still mean one follow-up pass
+    gate.resolve(report());
+    await first;
+
     expect(dispatch).toHaveBeenCalledTimes(2);
   });
 

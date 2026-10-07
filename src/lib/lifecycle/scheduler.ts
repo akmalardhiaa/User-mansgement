@@ -3,6 +3,7 @@ import { clearInterval, setInterval, setTimeout } from "node:timers";
 import { EmailConfigurationError } from "@/lib/email";
 
 import { dispatchDueEmails, type DispatchReport } from "./dispatcher";
+import { registerOutboxKick } from "./outboxKick";
 
 /**
  * Sending what the outbox owes, without anybody pressing anything.
@@ -76,6 +77,9 @@ export interface OutboxScheduler {
 export function createOutboxScheduler(intervalMs: number, deps: SchedulerDeps): OutboxScheduler {
   let inFlight = false;
   let stopped = false;
+  // A kick that arrived while a pass was running. That pass read the queue
+  // before the new mail was in it, so one more pass follows straight after.
+  let again = false;
   let timer: ReturnType<typeof setInterval> | undefined;
 
   function stop(): void {
@@ -90,7 +94,11 @@ export function createOutboxScheduler(intervalMs: number, deps: SchedulerDeps): 
      * message and a pass handles up to twenty-five — so without this the next
      * tick starts while the last is still working the same queue.
      */
-    if (inFlight || stopped) return;
+    if (stopped) return;
+    if (inFlight) {
+      again = true;
+      return;
+    }
     inFlight = true;
 
     try {
@@ -113,6 +121,10 @@ export function createOutboxScheduler(intervalMs: number, deps: SchedulerDeps): 
       deps.onError("Satu putaran pengiriman gagal; penjadwal tetap berjalan.", error);
     } finally {
       inFlight = false;
+    }
+    if (again && !stopped) {
+      again = false;
+      await tick();
     }
   }
 
@@ -155,11 +167,18 @@ export function startOutboxSchedulerFromEnv(): void {
 
   if (seconds === undefined) return;
 
-  createOutboxScheduler(seconds * 1000, {
+  const scheduler = createOutboxScheduler(seconds * 1000, {
     dispatch: () => dispatchDueEmails(),
     log: (message) => console.log(`[outbox-scheduler] ${message}`),
     onError: (message, error) => console.error(`[outbox-scheduler] ${message}`, error),
-  }).start();
+  });
+  scheduler.start();
 
-  console.log(`[outbox-scheduler] aktif, memeriksa antrean tiap ${seconds} detik.`);
+  // Mail queued by a request goes out now rather than at the next poll. On the
+  // next turn of the event loop, so the write that queued it has finished.
+  registerOutboxKick(() => {
+    setTimeout(() => void scheduler.tick(), 0).unref();
+  });
+
+  console.log(`[outbox-scheduler] aktif, memeriksa antrean tiap ${seconds} detik; email baru dikirim saat itu juga.`);
 }

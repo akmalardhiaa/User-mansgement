@@ -7,6 +7,7 @@ import { processLock } from "@/lib/db/processShared";
 import { createStateFileIfAbsent, markStateFileSeen, readStateFile } from "@/lib/db/stateFile";
 import type { ApprovalTokenRecord } from "@/lib/lifecycle/approvalToken";
 import type { ExecutionJob } from "@/lib/lifecycle/executionTypes";
+import { requestOutboxDispatch } from "@/lib/lifecycle/outboxKick";
 import type { EmailDelivery, OutboxEvent } from "@/lib/lifecycle/outboxTypes";
 import type { AuditEvent, LifecycleRequest } from "@/lib/lifecycle/types";
 import type { Employee, AccessRequest, ActivityEntry } from "@/lib/types";
@@ -176,12 +177,17 @@ export function readStore(): Promise<StoreShape> {
 /**
  * Read-modify-write under the lock. `mutator` receives a live draft; whatever
  * it returns is handed back to the caller once the draft has been persisted.
+ *
+ * A write that queued mail also wakes the sender, here rather than at every
+ * place that queues it, so no new path can forget to: see outboxKick.ts.
  */
 export function mutateStore<T>(mutator: (draft: StoreShape) => T | Promise<T>): Promise<T> {
   return withLock(async () => {
     const draft = await load();
+    const queuedBefore = draft.outboxEvents.length;
     const result = await mutator(draft);
     await persist(draft);
+    if (draft.outboxEvents.length > queuedBefore) requestOutboxDispatch();
     return result;
   });
 }

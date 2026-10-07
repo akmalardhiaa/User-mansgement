@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { classifySmtpError, missingSmtpConfig, smtpConfig } from "./smtpDriver";
+import {
+  classifySmtpError,
+  missingSmtpConfig,
+  smtpConfig,
+  smtpConfigProblem,
+  smtpTransportOptions,
+} from "./smtpDriver";
 
 /**
  * Which SMTP failures are worth trying again, and how the port is read.
@@ -97,9 +103,86 @@ describe("reading the configuration", () => {
   });
 
   it("refuses to guess when something essential is absent", () => {
-    stub({ SMTP_HOST: "smtp.gmail.com", SMTP_USER: "", SMTP_PASSWORD: "" });
+    stub({ SMTP_HOST: "", SMTP_USER: "", SMTP_PASSWORD: "", SMTP_SENDER: "" });
 
     expect(smtpConfig()).toBeUndefined();
-    expect(missingSmtpConfig()).toEqual(["SMTP_USER", "SMTP_PASSWORD"]);
+    expect(missingSmtpConfig()).toEqual(["SMTP_HOST", "SMTP_SENDER"]);
+  });
+
+  it("takes a company relay with no login, as long as it says who is sending", () => {
+    stub({
+      SMTP_HOST: "relay.corp.example",
+      SMTP_PORT: "25",
+      SMTP_USER: "",
+      SMTP_PASSWORD: "",
+      SMTP_SENDER: "hc-portal@corp.example",
+    });
+
+    expect(smtpConfig()).toMatchObject({ port: 25, auth: undefined, sender: "hc-portal@corp.example" });
+  });
+
+  it("treats half a login as a mistake, not as a relay", () => {
+    stub({ SMTP_HOST: "relay.corp.example", SMTP_USER: "svc", SMTP_PASSWORD: "", SMTP_SENDER: "" });
+    expect(smtpConfig()).toBeUndefined();
+    expect(missingSmtpConfig()).toEqual(["SMTP_PASSWORD"]);
+  });
+
+  it("never lets a password travel over plain SMTP", () => {
+    stub({ SMTP_HOST: "relay.corp.example", SMTP_USER: "svc", SMTP_PASSWORD: "x", SMTP_TLS: "off" });
+
+    expect(smtpConfig()).toBeUndefined();
+    expect(smtpConfigProblem()).toMatch(/SMTP_TLS=off ditolak/);
+  });
+
+  it("refuses a TLS mode it does not know rather than picking one", () => {
+    stub({ SMTP_HOST: "relay.corp.example", SMTP_USER: "svc", SMTP_PASSWORD: "x", SMTP_TLS: "maybe" });
+    expect(smtpConfigProblem()).toMatch(/SMTP_TLS="maybe"/);
+  });
+
+  it("reads the company CA path", () => {
+    stub({
+      SMTP_HOST: "relay.corp.example",
+      SMTP_SENDER: "hc@corp.example",
+      SMTP_USER: "",
+      SMTP_PASSWORD: "",
+      SMTP_CA_CERT_PATH: "/run/certs/corp-root-ca.pem",
+    });
+    expect(smtpConfig()?.caCertPath).toBe("/run/certs/corp-root-ca.pem");
+  });
+});
+
+describe("what the connection is allowed to be", () => {
+  const base = {
+    host: "relay.corp.example",
+    port: 587,
+    secure: false,
+    sender: "hc@corp.example",
+    tls: "required" as const,
+  };
+
+  it("requires STARTTLS by default, so a stripped offer stops the send", () => {
+    const options = smtpTransportOptions(base);
+    expect(options.requireTLS).toBe(true);
+    expect(options.ignoreTLS).toBe(false);
+    expect(options.tls).toMatchObject({ rejectUnauthorized: true, minVersion: "TLSv1.2", servername: base.host });
+  });
+
+  it("does not ask for STARTTLS on implicit TLS, which is already encrypted", () => {
+    expect(smtpTransportOptions({ ...base, port: 465, secure: true }).requireTLS).toBe(false);
+  });
+
+  it("logs in only when there is a login", () => {
+    expect(smtpTransportOptions(base).auth).toBeUndefined();
+    expect(smtpTransportOptions({ ...base, auth: { user: "svc", password: "x" } }).auth).toEqual({
+      user: "svc",
+      pass: "x",
+    });
+  });
+
+  it("trusts the company CA when given one, and never sends an address as SNI", () => {
+    const ca = Buffer.from("ca");
+    const options = smtpTransportOptions({ ...base, host: "10.0.0.25" }, ca);
+    expect(options.tls).toMatchObject({ ca });
+    expect(options.tls).not.toHaveProperty("servername");
   });
 });
