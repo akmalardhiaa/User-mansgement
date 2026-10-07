@@ -136,8 +136,12 @@ di server portal berjalan di dalam container:
 
 | Berkas | Untuk |
 |---|---|
-| `.env.onprem.example` | **PC kantor, uji coba** — salin isinya ke `.env.local`. |
-| `deploy/windows/env.production.example` | **Server internal, production** — salin jadi `.env.production.local`. Urutannya di [deploy/windows/README.md](deploy/windows/README.md). |
+| `deploy/windows/env.production.example` | **PC/server kantor yang dipakai sungguhan** — salin jadi `.env.production.local`. Panduan langkah demi langkah: **[PANDUAN-PC-KANTOR.md](PANDUAN-PC-KANTOR.md)**. |
+| `.env.onprem.example` | Uji coba **tanpa container** (`jalankan.bat`, Node langsung) — salin isinya ke `.env.local`. Container Podman **tidak** membaca `.env.local`. |
+
+Di kantor pakailah mode production, bukan mode demo laptop: akun demo mati,
+2FA aktif, cookie aman, email wajib SMTP, dan data lama laptop tidak ikut
+(production memakai volume `hc-data` yang mulai kosong).
 
 Template itu sudah berisi semua kunci yang dibutuhkan beserta keterangannya.
 `.env.example` adalah rujukan lengkap kalau ada yang ingin ditelusuri.

@@ -1,5 +1,9 @@
 # Deploy HC User Management di Podman Windows
 
+> Pertama kali memasang? Mulai dari **[PANDUAN-PC-KANTOR.md](../../PANDUAN-PC-KANTOR.md)**
+> — urutan langkah demi langkah dengan cek di setiap bagian. Dokumen ini
+> rinciannya.
+
 Production menjalankan satu container Linux di Podman machine (WSL2); IIS
 menangani HTTPS dan meneruskan request ke `127.0.0.1:3000`. Koneksi ke domain
 controller wajib memakai LDAPS port 636. Alur approval manager → CISO tetap
@@ -9,7 +13,10 @@ berjalan di aplikasi dan tidak berubah.
 
 - Windows Server 2022 dengan WSL2 dan virtualisasi diaktifkan. Windows Server
   2019 tidak didukung untuk prosedur Podman machine/WSL2 ini.
-- Podman Desktop/Podman CLI untuk Windows dan provider `podman compose`.
+- Podman Desktop/Podman CLI untuk Windows dan provider `podman compose`
+  (`winget install -e --id RedHat.Podman` dan
+  `winget install -e --id Docker.DockerCompose` — Compose CLI gratis, bukan
+  Docker Desktop).
 - IIS URL Rewrite, Application Request Routing (ARR), dan sertifikat HTTPS
   untuk nama portal.
 - Jaringan ke DNS kantor dan DC LDAPS, serta akun service AD dengan hak
@@ -232,6 +239,23 @@ dan WSL2 di keadaan itu hanya bisa dibuktikan di server itu sendiri.
   `podman compose -f compose.production.yml up -d`.
 - Mulai dari pilot OU yang tercantum di `AD_MANAGED_OUS`; pantau halaman
   `/status-ad`, log container, IIS, dan event Windows.
+
+## Login, 2FA, dan catatan keamanan
+
+- `LOGIN_2FA=on` (bawaan): login HC = kata sandi AD + kode authenticator. Login
+  pertama menampilkan QR. Kunci 2FA tersimpan terenkripsi di
+  `/app/data/hc-mfa.json` dengan `OUTBOX_ENCRYPTION_KEY` — kunci itu berubah,
+  semua HP harus didaftarkan ulang.
+- HP hilang/ganti: `podman exec hc-portal node scripts/mfa-reset.mjs <username>`;
+  daftar yang terdaftar: `... mfa-reset.mjs --list`.
+- Kode selalu salah untuk semua orang = jam Podman machine melenceng:
+  `podman machine stop`, `wsl --shutdown`, `podman machine start`.
+- Lima kali salah dalam 15 menit mengunci akun itu di portal 15 menit.
+- Sesi dicocokkan dengan AD tiap `SESSION_RECHECK_MINUTES` (bawaan 5).
+- Catatan login di `/app/data/hc-security-log.jsonl` dan di `/status-ad`.
+- Selama IIS belum ada, `APP_BASE_URL=http://localhost:3000` membuat cookie
+  tanpa atribut `secure` sehingga portal bisa diuji di PC itu sendiri;
+  `/status-ad` melaporkan HTTPS gagal sampai `APP_BASE_URL` menjadi `https://`.
 
 ## Backup dan restore
 

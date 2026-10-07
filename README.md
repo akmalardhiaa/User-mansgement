@@ -470,9 +470,9 @@ Login pengguna dan worker memakai host LDAPS/CA yang sama: `LDAP_URL` (atau
 pengguna; worker mengikat terpisah sebagai `AD_BIND_DN`. Akun tanpa salah satu
 group `AD_GROUP_HC`, `AD_GROUP_ADMIN`, `AD_GROUP_OPS`, atau `AD_GROUP_AUDITOR`
 ditolak masuk. Template tanpa rahasianya satu per keadaan: `.env.onprem.example`
-untuk PC pilot (salin ke `.env.local`), dan `deploy/windows/env.production.example`
-untuk server (salin menjadi `.env.production.local`, dengan ACL hanya untuk akun
-pemilik dan administrator). Isi keduanya hanya dengan nilai asli dari tim
+untuk uji coba tanpa container (salin ke `.env.local`), dan
+`deploy/windows/env.production.example` untuk PC/server kantor (salin menjadi
+`.env.production.local`, dengan ACL hanya untuk akun pemilik dan administrator). Isi keduanya hanya dengan nilai asli dari tim
 AD/infrastruktur.
 
 Keamanannya bukan opsi yang bisa dimatikan:
@@ -528,14 +528,38 @@ Keamanannya bukan opsi yang bisa dimatikan:
   ada dalam keadaan nonaktif dan tidak bisa dipakai. Yang memegang penerbitan
   password mengisinya, lalu langkah itu diulang dari titik yang sama.
 
-#### Menjalankan di Windows Server internal
+#### Keamanan login
 
-Satu panduan, satu tempat: **[deploy/windows/README.md](deploy/windows/README.md)**.
-Isinya urutan lengkap untuk server — Podman machine, ekspor CA ke PEM, uji AD
-hanya-baca, IIS HTTPS, startup otomatis, backup, update, serta jalur tanpa git
-atau tanpa akses npm. Konfigurasinya `deploy/windows/env.production.example`,
-disalin menjadi `.env.production.local` di server dan tidak pernah di-commit.
-Untuk awal, biarkan `AD_LDAP_WRITE_ENABLED=false`.
+- **Verifikasi 2 langkah (2FA)** dengan Microsoft/Google Authenticator: setelah
+  kata sandi AD benar, belum ada sesi sampai kode 6 digit benar. Login pertama
+  menampilkan kode QR. Kunci 2FA disimpan terenkripsi
+  (`OUTBOX_ENCRYPTION_KEY`), kode tidak bisa dipakai dua kali. Bisa dimatikan
+  dengan `LOGIN_2FA=off`; HP yang sudah terdaftar tetap tersimpan. HP hilang:
+  `npm run mfa:reset -- <username>`.
+- **Lima kali salah dalam 15 menit mengunci akun itu di portal 15 menit**, per
+  nama akun — header `X-Forwarded-For` palsu tidak bisa mengakalinya — dan
+  sebelum AD ditanya, supaya portal tidak bisa dipakai mengunci akun Windows.
+- **Sesi dicocokkan dengan AD tiap `SESSION_RECHECK_MINUTES`** (bawaan 5):
+  akun yang dinonaktifkan, dihapus, atau keluar dari group portal otomatis
+  keluar dari portal.
+- **Akun demo hanya hidup bila `DEMO_LOGIN=on`** dan AD belum tersambung;
+  production selalu menolaknya. Dulu akun demo menyala sendiri saat alamat AD
+  kosong.
+- **Catatan login** (berhasil, gagal, terkunci, 2FA, keluar, sesi diakhiri) di
+  `data/hc-security-log.jsonl` dan di `/status-ad` — tanpa kata sandi atau kode.
+- **Header HTTPS**: HSTS di production, `Permissions-Policy`,
+  `Cross-Origin-Opener-Policy`, di samping CSP ber-nonce yang sudah ada.
+
+#### Menjalankan di PC/server kantor
+
+Mulai dari **[PANDUAN-PC-KANTOR.md](PANDUAN-PC-KANTOR.md)** — langkah demi
+langkah dari memasang Podman sampai 2FA dan penulisan ke AD, termasuk memuat
+image jadi (`hc-portal-image.tar.gz`) tanpa membangun ulang. Rincian teknisnya
+di **[deploy/windows/README.md](deploy/windows/README.md)** — Podman machine,
+ekspor CA ke PEM, uji AD hanya-baca, IIS HTTPS, startup otomatis, backup,
+update, serta jalur tanpa git atau tanpa akses npm. Konfigurasinya
+`deploy/windows/env.production.example`, disalin menjadi `.env.production.local`
+dan tidak pernah di-commit. Untuk awal, biarkan `AD_LDAP_WRITE_ENABLED=false`.
 
 Setelah pemeriksaan read-only lolos, uji lifecycle di OU pilot dengan email
 approval dialihkan ke penguji; baru setelah bukti uji diterima, aktifkan
