@@ -49,7 +49,6 @@ coverage/
 # Documentation that does not affect the build
 README.md
 AGENTS.md
-CLAUDE.md
 
 # The Podman container files themselves
 Containerfile*
