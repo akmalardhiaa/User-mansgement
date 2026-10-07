@@ -135,11 +135,21 @@ export function AppShell({ children, user }: { children: ReactNode; user?: Sessi
       ? NAV.filter((item) => !item.permission || hasPermission(user.roles ?? [], item.permission))
       : [];
 
+  /*
+   * `signingOut` is reset at the end. This shell lives in the root layout and
+   * survives client navigation, so it used to stay true after the first
+   * sign-out: signed in again, the button was still disabled and nobody could
+   * sign out a second time.
+   */
   async function signOut() {
     setSigningOut(true);
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-    router.refresh();
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.replace("/login");
+      router.refresh();
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   /*
